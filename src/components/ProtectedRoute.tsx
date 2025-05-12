@@ -23,12 +23,8 @@ export const ProtectedRoute = () => {
     return <Navigate to="/auth" state={{ from: location }} replace />;
   }
   
-  // If URL is exactly "/", redirect to dashboard
-  if (location.pathname === "/") {
-    return <Navigate to="/dashboard" replace />;
-  }
-  
-  // Render child routes if authenticated
+  // Render child routes if authenticated - no special handling for root path
+  // as that's now handled by the Index component
   return (
     <MainLayout>
       <Outlet />
