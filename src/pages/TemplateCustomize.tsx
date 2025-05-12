@@ -1,3 +1,4 @@
+
 import { MainLayout } from "@/components/Layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -29,37 +30,37 @@ export default function TemplateCustomize() {
   const getTextVariables = useMemo(() => {
     if (!template?.variables) return [];
     
-    return Object.entries(template.variables).filter(([key]) => {
-      return key.endsWith('.text');
-    }).map(([key, value]) => ({
-      key: key.split('.')[0],
-      property: key.split('.')[1],
-      value
-    }));
+    return Object.entries(template.variables)
+      .filter(([key, value]) => key.includes('.text'))
+      .map(([key, value]) => ({
+        key: key.split('.')[0],
+        property: 'text',
+        value
+      }));
   }, [template?.variables]);
   
   const getMediaVariables = useMemo(() => {
     if (!template?.variables) return [];
     
-    return Object.entries(template.variables).filter(([key]) => {
-      return key.endsWith('.source');
-    }).map(([key, value]) => ({
-      key: key.split('.')[0],
-      property: key.split('.')[1],
-      value
-    }));
+    return Object.entries(template.variables)
+      .filter(([key, value]) => key.includes('.source'))
+      .map(([key, value]) => ({
+        key: key.split('.')[0],
+        property: 'source',
+        value
+      }));
   }, [template?.variables]);
   
   const getColorVariables = useMemo(() => {
     if (!template?.variables) return [];
     
-    return Object.entries(template.variables).filter(([key]) => {
-      return key.endsWith('.fill');
-    }).map(([key, value]) => ({
-      key: key.split('.')[0],
-      property: key.split('.')[1],
-      value
-    }));
+    return Object.entries(template.variables)
+      .filter(([key, value]) => key.includes('.fill'))
+      .map(([key, value]) => ({
+        key: key.split('.')[0],
+        property: 'fill',
+        value
+      }));
   }, [template?.variables]);
   
   // Check if we have any media variables at all
@@ -144,7 +145,7 @@ export default function TemplateCustomize() {
             activeStep >= 3 ? "bg-studio-600 text-white" : "bg-muted text-muted-foreground"
           }`}
         >
-          "3"
+          3
         </div>
       </div>
       <div className="flex justify-between mt-2 text-sm">
@@ -156,7 +157,7 @@ export default function TemplateCustomize() {
   );
 
   const renderMediaSelectionStep = () => (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
+    <div className={`grid grid-cols-1 md:grid-cols-${hasMediaVariables ? '3' : '1'} gap-6 animate-fade-in`}>
       {hasMediaVariables && (
         <div className="md:col-span-1">
           <Card className="p-4 h-full">
@@ -285,7 +286,7 @@ export default function TemplateCustomize() {
                       </label>
                       <input 
                         type="text" 
-                        defaultValue={value}
+                        defaultValue={value || ''}
                         className="w-full px-3 py-1 border rounded-md text-sm"
                       />
                     </div>
@@ -327,12 +328,12 @@ export default function TemplateCustomize() {
                       <div className="flex items-center gap-2">
                         <input 
                           type="color"
-                          defaultValue={value}
+                          defaultValue={value || '#000000'}
                           className="w-8 h-8 rounded-md cursor-pointer"
                         />
                         <input 
                           type="text"
-                          defaultValue={value}
+                          defaultValue={value || '#000000'}
                           className="w-24 px-2 py-1 border rounded-md text-xs"
                         />
                       </div>
