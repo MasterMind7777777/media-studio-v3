@@ -2,9 +2,10 @@
 import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Play, Maximize, Pause, AlertCircle, RotateCcw, RefreshCw } from "lucide-react";
+import { Play, Maximize, Pause, AlertCircle, RotateCcw } from "lucide-react";
 import { useCreatomatePreview } from "@/hooks/templates";
-import { isCreatomateSDKAvailable, loadCreatomateSDKManually } from "@/integrations/creatomate/config";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { DEFAULT_TEMPLATE_ID } from "@/config/creatomate";
 
 interface TemplatePreviewProps {
   previewImageUrl: string;
@@ -19,14 +20,11 @@ export function TemplatePreview({
   previewImageUrl, 
   width, 
   height, 
-  creatomateTemplateId, 
+  creatomateTemplateId = DEFAULT_TEMPLATE_ID, 
   variables 
 }: TemplatePreviewProps) {
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [sdkStatus, setSdkStatus] = useState<string>("checking");
-  const [refreshAttempts, setRefreshAttempts] = useState(0);
-  const [loadingManually, setLoadingManually] = useState(false);
   const [browserInfo, setBrowserInfo] = useState<string | null>(null);
   
   // Check browser compatibility
@@ -60,34 +58,12 @@ export function TemplatePreview({
     checkBrowser();
   }, []);
   
-  // Initial SDK status check
-  useEffect(() => {
-    const available = isCreatomateSDKAvailable();
-    setSdkStatus(available ? "loaded" : "not-loaded");
-    
-    if (!available) {
-      console.log('SDK not detected, checking status...');
-      
-      // Wait a bit for the SDK to load
-      const checkTimeout = setTimeout(() => {
-        const available = isCreatomateSDKAvailable();
-        setSdkStatus(available ? "loaded" : "not-loaded");
-        
-        if (!available) {
-          console.log('SDK still not available after delay');
-        }
-      }, 2000);
-      
-      return () => clearTimeout(checkTimeout);
-    }
-  }, []);
-  
   const {
     isLoaded,
     isPlaying,
     error,
     toggle: togglePlayback,
-    getInitializationStatus,
+    previewMode,
     retryInitialization
   } = useCreatomatePreview({
     creatomateTemplateId,
@@ -95,12 +71,8 @@ export function TemplatePreview({
     containerRef: previewContainerRef,
     autoPlay: false,
     loop: true,
-    muted: true,
-    skipAutoRetry: true // Prevent automatic retries
+    muted: true
   });
-  
-  // For debugging purposes
-  const initStatus = getInitializationStatus?.();
   
   const handleFullscreen = () => {
     if (previewContainerRef.current) {
@@ -114,29 +86,6 @@ export function TemplatePreview({
           .catch((err) => console.error(`Error attempting to exit fullscreen: ${err.message}`));
       }
     }
-  };
-  
-  // Manual retry initialization
-  const handleRetryInitialization = () => {
-    setRefreshAttempts(prev => prev + 1);
-    setSdkStatus("checking");
-    setLoadingManually(true);
-    
-    if (retryInitialization) {
-      retryInitialization();
-      
-      // Update SDK status after a delay
-      setTimeout(() => {
-        const available = isCreatomateSDKAvailable();
-        setSdkStatus(available ? "loaded" : "not-loaded");
-        setLoadingManually(false);
-      }, 2000);
-    }
-  };
-  
-  // Force page refresh as last resort
-  const handleForceRefresh = () => {
-    window.location.reload();
   };
 
   return (
@@ -164,18 +113,13 @@ export function TemplatePreview({
             <div className="text-xl font-medium mb-2">Preview Error</div>
             <p className="text-white/70 mb-4">{error}</p>
             {!creatomateTemplateId && (
-              <p className="text-white/70 mb-4">Missing Creatomate template ID</p>
+              <Alert variant="destructive" className="mb-4 max-w-md">
+                <AlertTitle>Missing Template ID</AlertTitle>
+                <AlertDescription>
+                  Set VITE_CREATOMATE_TEMPLATE_ID in your .env file
+                </AlertDescription>
+              </Alert>
             )}
-            
-            {/* SDK Status Indicator */}
-            <div className={`text-xs px-2 py-1 rounded mb-3 ${
-              sdkStatus === "loaded" ? "bg-green-500/30" : "bg-red-500/30"
-            }`}>
-              Creatomate SDK: {
-                loadingManually ? "Loading..." : 
-                sdkStatus === "loaded" ? "Detected ✓" : "Not Detected ✗"
-              }
-            </div>
             
             {/* Browser information */}
             {browserInfo && (
@@ -184,43 +128,15 @@ export function TemplatePreview({
               </div>
             )}
             
-            {/* Debugging information */}
-            {initStatus && (
-              <div className="text-xs text-white/70 mb-4 max-w-md p-3 bg-black/30 rounded">
-                <h4 className="font-medium mb-1 text-white/90">Debug Information</h4>
-                <div className="grid grid-cols-2 gap-x-4 text-left">
-                  <p>SDK loaded: {initStatus.sdkLoaded ? '✅' : '❌'}</p>
-                  <p>Creatomate SDK: {initStatus.hasCreatomateSDK ? '✅' : '❌'}</p>
-                  <p>Container: {initStatus.hasContainer ? '✅' : '❌'}</p>
-                  <p>Template ID: {initStatus.hasTemplateId ? '✅' : '❌'}</p>
-                  <p>API Key: {initStatus.apiKey}</p>
-                  <p>Attempts: {initStatus.attempts}</p>
-                </div>
-              </div>
-            )}
-            
-            <div className="flex gap-2">
-              <Button 
-                size="sm" 
-                variant="outline"
-                className="bg-white/10 hover:bg-white/20 text-white mb-4"
-                onClick={handleRetryInitialization}
-                disabled={refreshAttempts > 5 || loadingManually}
-              >
-                <RotateCcw className={`h-4 w-4 mr-1 ${loadingManually ? 'animate-spin' : ''}`} />
-                {loadingManually ? "Loading..." : "Retry"}
-              </Button>
-              
-              <Button 
-                size="sm" 
-                variant="outline"
-                className="bg-white/10 hover:bg-white/20 text-white mb-4"
-                onClick={handleForceRefresh}
-              >
-                <RefreshCw className="h-4 w-4 mr-1" />
-                Refresh Page
-              </Button>
-            </div>
+            <Button 
+              size="sm" 
+              variant="outline"
+              className="bg-white/10 hover:bg-white/20 text-white mb-4"
+              onClick={retryInitialization}
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Retry
+            </Button>
             
             <img 
               src={previewImageUrl} 
@@ -252,8 +168,17 @@ export function TemplatePreview({
             Fullscreen
           </Button>
         </div>
-        <div className="text-muted-foreground text-sm">
-          {width} × {height}
+        <div className="flex items-center gap-2">
+          {previewMode && (
+            <span className={`px-2 py-1 text-xs rounded-full ${
+              previewMode === 'interactive' ? 'bg-green-500/20 text-green-500' : 'bg-blue-500/20 text-blue-500'
+            }`}>
+              {previewMode === 'interactive' ? 'Interactive' : 'Player'} Mode
+            </span>
+          )}
+          <div className="text-muted-foreground text-sm">
+            {width} × {height}
+          </div>
         </div>
       </div>
     </Card>

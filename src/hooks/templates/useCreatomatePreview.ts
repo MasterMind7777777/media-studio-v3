@@ -1,12 +1,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { 
-  CREATOMATE_PUBLIC_API_KEY, 
-  formatVariablesForPlayer,
-  waitForCreatomateSDK,
-  isCreatomateSDKAvailable,
-  loadCreatomateSDKManually
-} from '@/integrations/creatomate/config';
+import { formatVariablesForPlayer } from '@/integrations/creatomate/config';
+import { CREATOMATE_PUBLIC_TOKEN, BASIC_COMPOSITION } from '@/config/creatomate';
 
 interface UseCreatomatePreviewOptions {
   creatomateTemplateId?: string;
@@ -15,7 +10,11 @@ interface UseCreatomatePreviewOptions {
   autoPlay?: boolean;
   loop?: boolean;
   muted?: boolean;
-  skipAutoRetry?: boolean;
+}
+
+interface PreviewError {
+  message: string;
+  details?: string;
 }
 
 export function useCreatomatePreview({
@@ -25,193 +24,145 @@ export function useCreatomatePreview({
   autoPlay = false,
   loop = true,
   muted = true,
-  skipAutoRetry = false,
 }: UseCreatomatePreviewOptions) {
   const [isLoaded, setIsLoaded] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const previewRef = useRef<any>(null);
-  const initializationAttempts = useRef(0);
-  const timeoutRef = useRef<number | null>(null);
   const isInitializingRef = useRef(false);
-  const MAX_INITIALIZATION_ATTEMPTS = 3;
 
-  // Initialize Creatomate Preview when SDK is ready
-  const initializePreview = useCallback(async () => {
-    if (!creatomateTemplateId || !containerRef.current) {
-      const missingParts = [];
-      if (!creatomateTemplateId) missingParts.push('template ID');
-      if (!containerRef.current) missingParts.push('container element');
-      
-      setError(`Cannot initialize preview: Missing ${missingParts.join(' and ')}`);
-      return;
-    }
-    
-    // Prevent multiple initialization attempts
+  // Check for mobile/touch-only device
+  const [isTouch, setIsTouch] = useState(false);
+  useEffect(() => {
+    // Check if we're on a touch-only device (for mobile fallback)
+    setIsTouch(window.matchMedia('(hover: none)').matches);
+  }, []);
+
+  // Use player mode for touch devices, interactive for desktop
+  const previewMode = isTouch ? 'player' : 'interactive';
+  
+  // Initialize Creatomate Preview when DOM is ready
+  const initializePreview = useCallback(() => {
+    // Skip if already initializing
     if (isInitializingRef.current) {
-      console.log('Preview initialization already in progress...');
       return;
     }
     
-    isInitializingRef.current = true;
+    // Clear any previous errors
     setError(null);
-    
+    isInitializingRef.current = true;
+
     try {
-      console.log(`Initializing Creatomate preview with template ID: ${creatomateTemplateId}`);
-      console.log('Container dimensions:', 
-                  containerRef.current.clientWidth, 
-                  containerRef.current.clientHeight);
+      // Check requirements
+      if (!containerRef.current) {
+        throw new Error('Container element is not available');
+      }
       
+      if (!CREATOMATE_PUBLIC_TOKEN) {
+        throw new Error('Creatomate API token is missing. Set VITE_CREATOMATE_TOKEN in .env file');
+      }
+      
+      if (!window.Creatomate?.Preview) {
+        throw new Error('Creatomate SDK is not loaded. Check the script tag in index.html');
+      }
+
       // Clean up previous instance if it exists
       if (previewRef.current) {
         try {
-          console.log('Disposing previous preview instance');
           previewRef.current.dispose();
         } catch (e) {
           console.warn('Error disposing previous preview:', e);
         }
       }
-      
-      // Format variables for the preview
-      const formattedVariables = formatVariablesForPlayer(variables);
-      
-      // Check again that the SDK is available
-      if (!window.Creatomate?.Preview) {
-        throw new Error('Creatomate Preview SDK not available');
-      }
+
+      console.log(`Initializing Creatomate preview in ${previewMode} mode`);
       
       // Create the preview in interactive mode
       previewRef.current = new window.Creatomate.Preview(
         containerRef.current,
-        'interactive',
-        CREATOMATE_PUBLIC_API_KEY
+        previewMode,
+        CREATOMATE_PUBLIC_TOKEN
       );
       
-      console.log('Preview instance created');
-      
       // Set up event handlers
-      previewRef.current.onError = (e: any) => {
-        const errorMessage = e?.message || 'Unknown error';
-        console.error('Creatomate preview error:', errorMessage);
+      previewRef.current.onError = (previewError: PreviewError) => {
+        const errorMessage = previewError?.message || 'Unknown error';
+        console.error('Creatomate preview error:', previewError);
         setError(`Preview error: ${errorMessage}`);
         setIsLoaded(false);
         isInitializingRef.current = false;
       };
       
       previewRef.current.onReady = async () => {
-        console.log('Creatomate preview ready, loading template...');
+        console.log('Creatomate preview ready, loading template or composition...');
+        
         try {
-          // Load the template when the preview is ready
-          await previewRef.current.loadTemplate(creatomateTemplateId);
-          console.log('Template loaded successfully');
+          if (creatomateTemplateId) {
+            // Load template if ID is provided
+            console.log(`Loading template with ID: ${creatomateTemplateId}`);
+            await previewRef.current.loadTemplate(creatomateTemplateId);
+          } else {
+            // Fall back to basic composition if no template ID
+            console.log('No template ID provided, loading basic composition');
+            await previewRef.current.setSource(BASIC_COMPOSITION);
+          }
+          
+          // Format variables for the preview
+          if (variables && Object.keys(variables).length > 0) {
+            const formattedVariables = formatVariablesForPlayer(variables);
+            previewRef.current.setModifications(formattedVariables);
+            console.log('Applied modifications:', formattedVariables);
+          }
+          
+          console.log('Template/composition loaded successfully');
           setIsLoaded(true);
           setError(null);
-          isInitializingRef.current = false;
-          
-          // Apply initial modifications if any
-          if (Object.keys(formattedVariables).length > 0) {
-            previewRef.current.setModifications(formattedVariables);
-            console.log('Applied initial modifications:', formattedVariables);
-          }
           
           if (autoPlay) {
             previewRef.current.play();
             setIsPlaying(true);
           }
-        } catch (templateError) {
-          console.error('Error loading template:', templateError);
-          setError(`Failed to load template: ${
-            templateError instanceof Error ? templateError.message : 'Unknown error'
+        } catch (templateError: any) {
+          console.error('Error loading template/composition:', templateError);
+          setError(`Failed to load content: ${
+            templateError?.message || 'Unknown error'
           }`);
+        } finally {
           isInitializingRef.current = false;
         }
       };
       
       previewRef.current.onStateChange = (state: any) => {
-        console.log('Preview state changed:', state);
         setIsPlaying(state.isPlaying || false);
       };
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error initializing Creatomate preview:', error);
-      setError(`Initialization error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setError(`Initialization error: ${error?.message || 'Unknown error'}`);
       setIsLoaded(false);
       isInitializingRef.current = false;
-      
-      // Try again if we haven't reached the maximum attempts
-      if (!skipAutoRetry && initializationAttempts.current < MAX_INITIALIZATION_ATTEMPTS) {
-        initializationAttempts.current++;
-        const retryDelay = 2000 * initializationAttempts.current; // Exponential backoff
-        
-        console.log(`Retrying initialization in ${retryDelay}ms (attempt ${initializationAttempts.current}/${MAX_INITIALIZATION_ATTEMPTS})`);
-        
-        if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-        timeoutRef.current = window.setTimeout(() => {
-          isInitializingRef.current = false;
-          initializePreview();
-        }, retryDelay);
-      }
     }
-  }, [creatomateTemplateId, variables, autoPlay, containerRef, skipAutoRetry]);
-  
-  // Load SDK and initialize preview
+  }, [creatomateTemplateId, variables, autoPlay, containerRef, previewMode]);
+
+  // Initialize preview when dependencies change
   useEffect(() => {
     // Reset state
     setIsLoaded(false);
-    setError(null);
-    initializationAttempts.current = 0;
+    if (error) setError(null);
     
-    // Start loading SDK if template ID is provided
-    if (creatomateTemplateId) {
-      console.log(`Loading SDK for template: ${creatomateTemplateId}`);
-      
-      // Wait for SDK to be available
-      const loadSDK = async () => {
-        try {
-          // First check if SDK is already available
-          if (isCreatomateSDKAvailable()) {
-            console.log('SDK already available, initializing preview');
-            initializePreview();
-            return;
-          }
-          
-          // Try waiting for SDK
-          await waitForCreatomateSDK();
-          console.log('SDK loaded, initializing preview');
-          initializePreview();
-        } catch (error) {
-          console.error('Error waiting for SDK:', error);
-          
-          // Try loading SDK manually as fallback
-          try {
-            await loadCreatomateSDKManually();
-            console.log('SDK loaded manually, initializing preview');
-            initializePreview();
-          } catch (manualError) {
-            console.error('Failed to load SDK manually:', manualError);
-            setError(`SDK loading error: ${
-              manualError instanceof Error ? manualError.message : 'Unknown error'
-            }`);
-          }
-        }
-      };
-      
-      // Add a small delay to ensure DOM is fully rendered
-      setTimeout(loadSDK, 100);
-    }
+    // Add a small delay to ensure DOM is fully rendered
+    const timeoutId = setTimeout(initializePreview, 100);
     
     // Cleanup function
     return () => {
-      // Clear any pending timeouts
-      if (timeoutRef.current) {
-        window.clearTimeout(timeoutRef.current);
-      }
+      clearTimeout(timeoutId);
       
       // Dispose preview if it exists
       if (previewRef.current) {
         try {
           console.log('Disposing Creatomate preview');
           previewRef.current.dispose();
+          previewRef.current = null;
         } catch (e) {
           console.error('Error disposing preview:', e);
         }
@@ -267,35 +218,17 @@ export function useCreatomatePreview({
     }
   }, [isLoaded]);
 
-  // Helper for debugging
-  const getInitializationStatus = useCallback(() => {
-    return {
-      sdkLoaded: isCreatomateSDKAvailable(),
-      hasWindow: typeof window !== 'undefined',
-      hasCreatomateSDK: typeof window !== 'undefined' && !!window.Creatomate,
-      hasContainer: !!containerRef.current,
-      hasTemplateId: !!creatomateTemplateId,
-      hasPreview: !!previewRef.current,
-      apiKey: CREATOMATE_PUBLIC_API_KEY ? 'Valid' : 'Missing',
-      attempts: initializationAttempts.current,
-      initializing: isInitializingRef.current,
-    };
-  }, [creatomateTemplateId, containerRef]);
+  // Get current preview mode
+  const getPreviewMode = useCallback(() => {
+    return previewMode;
+  }, [previewMode]);
 
   // Manual retry function
   const retryInitialization = useCallback(() => {
-    console.log('Manually triggering preview initialization retry');
-    initializationAttempts.current = 0;
+    console.log('Manually retrying preview initialization');
     isInitializingRef.current = false;
     setError(null);
-    
-    loadCreatomateSDKManually()
-      .then(() => {
-        setTimeout(initializePreview, 500);
-      })
-      .catch(() => {
-        initializePreview();
-      });
+    initializePreview();
   }, [initializePreview]);
 
   return {
@@ -306,7 +239,8 @@ export function useCreatomatePreview({
     pause,
     toggle,
     updateVariables,
-    getInitializationStatus,
-    retryInitialization
+    getPreviewMode,
+    retryInitialization,
+    previewMode
   };
 }

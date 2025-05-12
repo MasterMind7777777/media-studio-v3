@@ -1,8 +1,30 @@
+
 # Welcome to your Lovable project
 
 ## Project info
 
 **URL**: https://lovable.dev/projects/959db1ed-a28c-48d7-a39a-7253bfac5b70
+
+## Creatomate setup
+
+This project uses Creatomate for interactive video previews and editing. To set up the integration:
+
+1. **Get your Creatomate API token**:
+   - Sign up or login to [Creatomate](https://creatomate.com)
+   - Go to Project Settings in your Creatomate dashboard
+   - Copy your public token (it's safe to use in the frontend)
+
+2. **Create a template or use an existing one**:
+   - Create a new template in the Creatomate dashboard
+   - After saving, copy the template ID from the URL or project details
+
+3. **Set up environment variables**:
+   - Create a `.env` file in the project root (based on `.env.example`)
+   - Add your Creatomate token: `VITE_CREATOMATE_TOKEN=your_token_here`
+   - Add your template ID: `VITE_CREATOMATE_TEMPLATE_ID=your_template_id_here`
+   - Restart the development server
+
+If configured correctly, the interactive preview will load and allow drag-and-drop editing in the `/create/:id/customize` page.
 
 ## How can I edit this code?
 
