@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import {
   BrowserRouter as Router,
@@ -11,10 +12,10 @@ import Create from "./pages/Create";
 import Templates from "./pages/Templates";
 import TemplateCustomize from "./pages/TemplateCustomize";
 import Projects from "./pages/Projects";
-import { useAuth } from './hooks/useAuth';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Account from './pages/Account';
+import { useAuth } from '@/context/AuthContext';
+import Login from './pages/Auth';
+import Register from './pages/Auth';
+import Account from './pages/Settings';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { CreatomateLoader } from './components/CreatomateLoader';
