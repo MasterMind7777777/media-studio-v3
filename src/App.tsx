@@ -1,7 +1,6 @@
 
 import { useEffect } from 'react';
 import {
-  BrowserRouter as Router,
   Routes,
   Route,
   Navigate,
@@ -21,21 +20,21 @@ import { useToast } from '@/hooks/use-toast';
 import { CreatomateLoader } from './components/CreatomateLoader';
 
 function App() {
-  const { isLoggedIn } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   
   useEffect(() => {
-    if (!isLoggedIn()) {
+    if (!user) {
       console.log('User is not logged in');
     } else {
       console.log('User is logged in');
     }
-  }, [isLoggedIn]);
+  }, [user]);
   
   const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
     const location = useLocation();
     
-    if (!isLoggedIn()) {
+    if (!user) {
       toast({
         title: "Not authenticated",
         description: "You must log in to access this page.",
@@ -51,56 +50,54 @@ function App() {
       {/* Add the loader near the top of the component tree */}
       <CreatomateLoader />
       
-      <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          
-          <Route
-            path="/create"
-            element={
-              <PrivateRoute>
-                <Create />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/create/:id/customize"
-            element={
-              <PrivateRoute>
-                <TemplateCustomize />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/templates"
-            element={
-              <PrivateRoute>
-                <Templates />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/projects"
-            element={
-              <PrivateRoute>
-                <Projects />
-              </PrivateRoute>
-            }
-          />
-          <Route
-            path="/account"
-            element={
-              <PrivateRoute>
-                <Account />
-              </PrivateRoute>
-            }
-          />
-          
-          <Route path="/" element={<Navigate to="/create" />} />
-        </Routes>
-        <Toaster />
-      </Router>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        
+        <Route
+          path="/create"
+          element={
+            <PrivateRoute>
+              <Create />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/create/:id/customize"
+          element={
+            <PrivateRoute>
+              <TemplateCustomize />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/templates"
+          element={
+            <PrivateRoute>
+              <Templates />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/projects"
+          element={
+            <PrivateRoute>
+              <Projects />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <PrivateRoute>
+              <Account />
+            </PrivateRoute>
+          }
+        />
+        
+        <Route path="/" element={<Navigate to="/create" />} />
+      </Routes>
+      <Toaster />
     </>
   );
 }
