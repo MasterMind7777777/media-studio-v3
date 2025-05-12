@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Template } from "@/types";
@@ -35,17 +34,22 @@ export const useTemplates = () => {
   return useQuery({
     queryKey: ["templates"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("templates")
-        .select("*")
-        .eq("is_active", true);
+      try {
+        const { data, error } = await supabase
+          .from("templates")
+          .select("*")
+          .eq("is_active", true);
+          
+        if (error) {
+          throw new Error(`Error fetching templates: ${error.message}`);
+        }
         
-      if (error) {
-        throw new Error(`Error fetching templates: ${error.message}`);
+        // Transform the data to match the expected Template type
+        return (data || []).map(item => transformTemplateData(item));
+      } catch (error) {
+        console.error("Error in useTemplates:", error);
+        throw error;
       }
-      
-      // Transform the data to match the expected Template type
-      return (data || []).map(item => transformTemplateData(item));
     }
   });
 };
@@ -59,24 +63,41 @@ export const useTemplate = (id: string | undefined) => {
     queryFn: async () => {
       if (!id) throw new Error("Template ID is required");
       
-      const { data, error } = await supabase
-        .from("templates")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
+      try {
+        // First try to get it from the cache
+        const queryClient = useQueryClient(); 
+        const templates = queryClient.getQueryData<Template[]>(["templates"]);
+        const cachedTemplate = templates?.find(t => t.id === id);
         
-      if (error) {
-        throw new Error(`Error fetching template: ${error.message}`);
+        if (cachedTemplate) {
+          return cachedTemplate;
+        }
+        
+        // If not in cache, fetch from API
+        const { data, error } = await supabase
+          .from("templates")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
+          
+        if (error) {
+          throw new Error(`Error fetching template: ${error.message}`);
+        }
+        
+        if (!data) {
+          throw new Error(`Template not found with ID: ${id}`);
+        }
+        
+        // Transform the data to match the expected Template type
+        return transformTemplateData(data);
+      } catch (error) {
+        console.error("Error in useTemplate:", error);
+        throw error;
       }
-      
-      if (!data) {
-        throw new Error(`Template not found with ID: ${id}`);
-      }
-      
-      // Transform the data to match the expected Template type
-      return transformTemplateData(data);
     },
-    enabled: !!id
+    enabled: !!id,
+    retry: 1, // Only retry once to avoid excessive retries for non-existent templates
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
   });
 };
 

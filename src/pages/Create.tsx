@@ -41,10 +41,15 @@ export default function Create() {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const templateId = searchParams.get("template");
-    if (templateId) {
-      const template = templates?.find(t => t.id === templateId);
+    if (templateId && templates) {
+      const template = templates.find(t => t.id === templateId);
       if (template) {
         navigate(`/create/${templateId}/customize`);
+      } else {
+        // Template not found in the loaded templates
+        toast.error("Template not found", {
+          description: `The template with ID ${templateId} could not be found.`
+        });
       }
     }
   }, [location, navigate, templates]);
@@ -63,7 +68,13 @@ export default function Create() {
   });
 
   const handleTemplateSelect = (templateId: string) => {
-    navigate(`/create/${templateId}/customize`);
+    if (templates?.find(t => t.id === templateId)) {
+      navigate(`/create/${templateId}/customize`);
+    } else {
+      toast.error("Template not found", {
+        description: `The template with ID ${templateId} could not be found.`
+      });
+    }
   };
 
   // Show error toast if templates fail to load
