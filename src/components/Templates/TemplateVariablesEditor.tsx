@@ -1,15 +1,10 @@
-
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Type, Image, Cog, Check, Loader2 } from "lucide-react";
 import { MediaAsset } from "@/types";
-
-interface TemplateVariableSection {
-  key: string;
-  property: string;
-  value: any;
-}
+import { TemplateVariableSection } from "@/hooks/templates/useTemplateVariables";
+import { Card } from "@/components/ui/card";
 
 interface TemplateVariablesEditorProps {
   textVariables: TemplateVariableSection[];

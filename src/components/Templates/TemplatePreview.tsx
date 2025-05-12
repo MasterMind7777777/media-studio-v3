@@ -1,3 +1,4 @@
+
 import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -29,7 +30,8 @@ export function TemplatePreview({
   const [browserInfo, setBrowserInfo] = useState<string | null>(null);
   const [apiToken, setApiToken] = useState<string>(CREATOMATE_PUBLIC_TOKEN);
   const [templateId, setTemplateId] = useState<string>(creatomateTemplateId);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const previewContainerId = "creatomate-preview-container";
   
   // Get the token from config
   useEffect(() => {
@@ -48,7 +50,7 @@ export function TemplatePreview({
       } catch (err) {
         console.error('Failed to fetch Creatomate credentials:', err);
       } finally {
-        setIsLoading(false);
+        setIsInitialLoading(false);
       }
     }
     
@@ -88,20 +90,18 @@ export function TemplatePreview({
   
   // Only proceed with preview initialization after we've attempted to load credentials
   const {
-    isLoaded: isPreviewLoaded,
+    isLoaded,
     isPlaying,
     error,
-    toggle: togglePlayback,
+    togglePlay,
     previewMode,
     retryInitialization
   } = useCreatomatePreview({
-    creatomateTemplateId: templateId,
-    creatomateToken: apiToken,
+    containerId: previewContainerId,
+    templateId: templateId,
     variables,
-    containerRef: previewContainerRef,
     autoPlay: false,
-    loop: true,
-    muted: true
+    onReady: () => console.log("Preview is ready")
   });
   
   const handleFullscreen = () => {
@@ -121,11 +121,12 @@ export function TemplatePreview({
   return (
     <Card className="h-full">
       <div 
+        id={previewContainerId}
         ref={previewContainerRef} 
         className="aspect-video bg-black/80 rounded-t-md flex items-center justify-center relative"
         style={{ minHeight: '240px' }}
       >
-        {!isPreviewLoaded && !error && (
+        {!isLoaded && !error && (
           <div className="text-white text-center p-8 absolute inset-0 flex flex-col items-center justify-center">
             <div className="text-xl font-medium mb-4">Loading Preview</div>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
@@ -141,7 +142,7 @@ export function TemplatePreview({
           <div className="text-white text-center p-8 absolute inset-0 flex flex-col items-center justify-center">
             <AlertCircle className="h-8 w-8 text-red-400 mb-2" />
             <div className="text-xl font-medium mb-2">Preview Error</div>
-            <p className="text-white/70 mb-4">{error}</p>
+            <p className="text-white/70 mb-4">{error.message}</p>
             {!templateId && (
               <Alert variant="destructive" className="mb-4 max-w-md">
                 <AlertTitle>Missing Template ID</AlertTitle>
@@ -182,8 +183,8 @@ export function TemplatePreview({
           <Button 
             size="sm" 
             variant="outline"
-            onClick={togglePlayback}
-            disabled={!isPreviewLoaded || !!error}
+            onClick={togglePlay}
+            disabled={!isLoaded || !!error}
           >
             {isPlaying ? <Pause className="h-4 w-4 mr-1" /> : <Play className="h-4 w-4 mr-1" />}
             {isPlaying ? 'Pause' : 'Play'}
@@ -192,7 +193,7 @@ export function TemplatePreview({
             size="sm" 
             variant="outline"
             onClick={handleFullscreen}
-            disabled={!isPreviewLoaded || !!error}
+            disabled={!isLoaded || !!error}
           >
             <Maximize className="h-4 w-4 mr-1" />
             Fullscreen

@@ -2,19 +2,26 @@
 import { useMemo } from 'react';
 import { Template } from '@/types';
 
+interface TemplateVariableSection {
+  key: string;
+  variableName: string;
+  value: string;
+  property: string;
+}
+
 interface VariablesByType {
-  textVariables: Array<{ key: string, variableName: string, value: string }>;
-  mediaVariables: Array<{ key: string, variableName: string, value: string }>;
-  colorVariables: Array<{ key: string, variableName: string, value: string }>;
+  textVariables: Array<TemplateVariableSection>;
+  mediaVariables: Array<TemplateVariableSection>;
+  colorVariables: Array<TemplateVariableSection>;
   hasVariables: boolean;
 }
 
 export function useTemplateVariables(template: Template | null): VariablesByType {
   return useMemo(() => {
     const result = {
-      textVariables: [] as Array<{ key: string, variableName: string, value: string }>,
-      mediaVariables: [] as Array<{ key: string, variableName: string, value: string }>,
-      colorVariables: [] as Array<{ key: string, variableName: string, value: string }>,
+      textVariables: [] as Array<TemplateVariableSection>,
+      mediaVariables: [] as Array<TemplateVariableSection>,
+      colorVariables: [] as Array<TemplateVariableSection>,
       hasVariables: false
     };
 
@@ -37,19 +44,22 @@ export function useTemplateVariables(template: Template | null): VariablesByType
         result.textVariables.push({
           key,
           variableName: variableName.replace(/_/g, ' '),
-          value: String(value)
+          value: String(value),
+          property: 'text'
         });
       } else if (variableType === 'source') {
         result.mediaVariables.push({
           key,
           variableName: variableName.replace(/_/g, ' '),
-          value: String(value)
+          value: String(value),
+          property: 'source'
         });
       } else if (variableType === 'fill') {
         result.colorVariables.push({
           key,
           variableName: variableName.replace(/_/g, ' '),
-          value: String(value)
+          value: String(value),
+          property: 'fill'
         });
       }
     });
@@ -62,3 +72,5 @@ export function useTemplateVariables(template: Template | null): VariablesByType
     return result;
   }, [template?.variables]);
 }
+
+export type { TemplateVariableSection };

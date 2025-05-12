@@ -25,6 +25,7 @@ export function useCreatomatePreview({
   const [error, setError] = useState<Error | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
+  const [previewMode, setPreviewMode] = useState<'player' | 'interactive' | null>(null);
   
   // Ref to store the preview instance
   const previewRef = useRef<any>(null);
@@ -32,8 +33,28 @@ export function useCreatomatePreview({
   // Format the variables for the preview
   const formattedVariables = formatVariablesForPlayer(variables);
   
+  // Function to retry initialization
+  const retryInitialization = () => {
+    console.log('Retrying preview initialization');
+    setIsLoading(true);
+    setError(null);
+    
+    // Re-initialize the preview if possible
+    if (previewRef.current) {
+      try {
+        previewRef.current.dispose();
+      } catch (err) {
+        console.error('Error disposing preview during retry:', err);
+      }
+      previewRef.current = null;
+    }
+    
+    // The initialization will be retried in the next useEffect run
+    initializePreview();
+  };
+  
   // Initialize the preview
-  useEffect(() => {
+  const initializePreview = () => {
     // Skip if no container ID or if window/Creatomate is not available
     if (!containerId || !window.Creatomate?.Preview) {
       console.log('Preview initialization skipped: missing containerId or SDK');
@@ -64,6 +85,9 @@ export function useCreatomatePreview({
         'player', 
         import.meta.env.VITE_CREATOMATE_TOKEN || 'public-jb5rna2gay9buhajvtiyp1hb'
       );
+      
+      // Store the preview mode
+      setPreviewMode('player');
 
       // Setup preview event handlers
       preview.onReady = async () => {
@@ -134,6 +158,11 @@ export function useCreatomatePreview({
         description: err instanceof Error ? err.message : 'Unknown error'
       });
     }
+  };
+
+  // Initialize on mount
+  useEffect(() => {
+    initializePreview();
 
     // Clean up on unmount
     return () => {
@@ -214,6 +243,9 @@ export function useCreatomatePreview({
     togglePlay,
     seekTo,
     restart,
-    preview: previewRef.current
+    preview: previewRef.current,
+    previewMode,
+    retryInitialization,
+    isLoaded: isReady && !isLoading
   };
 }
