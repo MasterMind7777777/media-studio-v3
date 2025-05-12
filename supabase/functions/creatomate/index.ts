@@ -482,39 +482,65 @@ Deno.serve(async (req) => {
       
       console.log('Sending modifications to Creatomate:', modifications);
       
-      // Create render configurations for each platform
-      const renders = platforms.map(platform => ({
-        template_id: templateIdentifier, // Use the combined template identifier
-        output_format: 'mp4',
-        width: platform.width,
-        height: platform.height,
-        modifications
-      }));
-      
-      // Send render request to Creatomate
-      const response = await fetch('https://api.creatomate.com/v1/renders', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ renders })
-      });
-      
-      if (!response.ok) {
-        console.error('Creatomate API error:', response.status);
-        const errorText = await response.text();
-        console.error('Error response body:', errorText);
+      // MODIFIED: Instead of sending an array of render jobs, send individual requests for each platform
+      // This ensures the template_id is at the top level of the request as required by Creatomate API
+      try {
+        const renderPromises = platforms.map(async (platform) => {
+          // Create a single render request for this platform
+          const singleRenderPayload = {
+            template_id: templateIdentifier, // Top-level template_id (required by Creatomate)
+            output_format: 'mp4',
+            width: platform.width,
+            height: platform.height,
+            modifications
+          };
+
+          console.log(`Sending request for platform ${platform.name || `${platform.width}x${platform.height}`}`);
+          
+          // Send individual request to Creatomate
+          const response = await fetch('https://api.creatomate.com/v1/renders', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(singleRenderPayload)
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`Creatomate API error for platform ${platform.name || `${platform.width}x${platform.height}`}:`, response.status);
+            console.error('Error response body:', errorText);
+            throw new Error(`Creatomate API error: ${response.statusText} - ${errorText}`);
+          }
+          
+          const data = await response.json();
+          // Creatomate returns renders array even for single requests
+          if (!data.renders || data.renders.length === 0) {
+            console.error('Unexpected response format from Creatomate:', data);
+            throw new Error('Invalid response from Creatomate API: missing renders array');
+          }
+          
+          // Return the render ID
+          return data.renders[0].id;
+        });
+        
+        // Wait for all render requests to complete
+        const renderIds = await Promise.all(renderPromises);
+        console.log('All render requests completed successfully. Render IDs:', renderIds);
+        
+        // Return all render IDs
+        return new Response(JSON.stringify({ renderIds }), { headers: corsHeaders });
+      } catch (error) {
+        console.error('Error during render process:', error);
         return new Response(
-          JSON.stringify({ error: `Creatomate API error: ${response.statusText}`, details: errorText }),
-          { status: response.status, headers: corsHeaders }
+          JSON.stringify({ 
+            error: error.message || 'Failed to process render requests',
+            details: error.details || 'An error occurred while sending requests to Creatomate'
+          }),
+          { status: 500, headers: corsHeaders }
         );
       }
-      
-      const data = await response.json();
-      const renderIds = data.renders.map((render: any) => render.id);
-      
-      return new Response(JSON.stringify({ renderIds }), { headers: corsHeaders });
       
     } else if (action === 'check-render') {
       // Check render status action
