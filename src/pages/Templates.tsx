@@ -33,7 +33,11 @@ export default function Templates() {
         throw new Error(`Error fetching templates: ${error.message}`);
       }
       
-      return data as Template[];
+      // Transform the data to match the expected Template type
+      return (data || []).map(item => ({
+        ...item,
+        platforms: Array.isArray(item.platforms) ? item.platforms : [],
+      })) as Template[];
     }
   });
   

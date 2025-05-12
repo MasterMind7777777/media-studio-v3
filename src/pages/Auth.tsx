@@ -7,10 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 export default function Auth() {
-  const { user, loading, signIn, signUp } = useAuth();
+  const { user, loading, signIn, signUp, isEmailSignupDisabled } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   
@@ -74,6 +75,16 @@ export default function Auth() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {isEmailSignupDisabled && authMode === 'register' && (
+              <Alert className="mb-4" variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Registration Disabled</AlertTitle>
+                <AlertDescription>
+                  Email signup is currently disabled by the administrator. Please contact support for assistance or use an alternative sign-in method.
+                </AlertDescription>
+              </Alert>
+            )}
+            
             <Tabs value={authMode} onValueChange={(v) => setAuthMode(v as 'login' | 'register')}>
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Login</TabsTrigger>
@@ -149,12 +160,18 @@ export default function Auth() {
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={isSubmitting || isEmailSignupDisabled}
+                  >
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Creating account...
                       </>
+                    ) : isEmailSignupDisabled ? (
+                      "Registration Disabled"
                     ) : (
                       "Create account"
                     )}

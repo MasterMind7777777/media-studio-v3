@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface AuthContextProps {
   user: User | null;
@@ -12,6 +13,7 @@ interface AuthContextProps {
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
+  isEmailSignupDisabled: boolean;
 }
 
 const AuthContext = createContext<AuthContextProps | undefined>(undefined);
@@ -20,6 +22,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isEmailSignupDisabled, setIsEmailSignupDisabled] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -63,6 +66,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       if (error) {
+        if (error.message.includes("Email logins are disabled")) {
+          setIsEmailSignupDisabled(true);
+          throw new Error("Email login is currently disabled by the administrator.");
+        }
         throw error;
       }
       
@@ -90,6 +97,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       if (error) {
+        if (error.message.includes("Email signups are disabled")) {
+          setIsEmailSignupDisabled(true);
+          throw new Error("Email signup is currently disabled by the administrator. Please contact support for assistance.");
+        }
         throw error;
       }
       
@@ -125,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signIn, signUp, signOut, isEmailSignupDisabled }}>
       {children}
     </AuthContext.Provider>
   );
