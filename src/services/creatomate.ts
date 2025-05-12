@@ -80,7 +80,7 @@ export async function parseCurlCommand(curlCommand: string): Promise<{
 
 /**
  * Starts a render job with Creatomate via secure Edge Function
- * NOTE: This now takes the Creatomate template ID directly (not the database ID)
+ * This function expects the Creatomate template ID, NOT the database template ID
  */
 export async function startRenderJob(
   creatomateTemplateId: string, 
@@ -88,16 +88,23 @@ export async function startRenderJob(
   platforms: any[]
 ): Promise<string[]> {
   try {
+    if (!creatomateTemplateId) {
+      throw new Error("Creatomate template ID is required");
+    }
+    
     // For debugging
     console.log("Starting render job with Creatomate template ID:", creatomateTemplateId);
     console.log("Variables:", variables);
     console.log("Platforms:", platforms);
 
+    // Clean variables (remove any duplicated keys)
+    const cleanVariables = cleanupVariables(variables);
+
     const { data, error } = await supabase.functions.invoke('creatomate', {
       body: { 
         action: 'start-render',
-        creatomateTemplateId, // Changed from templateId to creatomateTemplateId
-        variables,
+        template_id: creatomateTemplateId, // Send as template_id to match API expectations
+        variables: cleanVariables,
         platforms 
       },
     });
@@ -116,6 +123,38 @@ export async function startRenderJob(
     console.error('Error starting render job:', error);
     throw error;
   }
+}
+
+/**
+ * Helper function to clean up variables before sending to Creatomate API
+ */
+function cleanupVariables(variables: Record<string, any>): Record<string, any> {
+  const cleanVars: Record<string, any> = {};
+  
+  // Process each variable to ensure we don't have duplicated keys
+  Object.entries(variables).forEach(([key, value]) => {
+    // Skip null/undefined values
+    if (value === null || value === undefined) {
+      return;
+    }
+    
+    // Fix duplicated suffixes (like .text.text becoming just .text)
+    const suffixes = ['.text', '.fill', '.source'];
+    
+    let cleanKey = key;
+    suffixes.forEach(suffix => {
+      // Check if key has duplicate suffixes (e.g., "Heading.text.text")
+      const regex = new RegExp(`(${suffix.replace('.', '\\.')})+$`);
+      if (regex.test(key)) {
+        cleanKey = key.replace(regex, suffix);
+      }
+    });
+    
+    // Store with clean key
+    cleanVars[cleanKey] = value;
+  });
+  
+  return cleanVars;
 }
 
 /**

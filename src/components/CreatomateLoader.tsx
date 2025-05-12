@@ -1,5 +1,5 @@
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { isCreatomateSDKAvailable } from '@/integrations/creatomate/config';
 import { toast } from 'sonner';
 
@@ -11,8 +11,11 @@ export function CreatomateLoader() {
   const [sdkChecked, setSDKChecked] = useState(false);
   const [loadAttempts, setLoadAttempts] = useState(0);
   const MAX_ATTEMPTS = 3;
+  const toastShownRef = useRef(false);
   
   useEffect(() => {
+    if (sdkChecked) return; // Don't continue checking once we're done
+    
     // Check if SDK is available without trying to load it manually
     const checkSDK = () => {
       if (isCreatomateSDKAvailable()) {
@@ -21,7 +24,10 @@ export function CreatomateLoader() {
         return true;
       }
       
-      console.warn(`Creatomate SDK not detected (attempt ${loadAttempts + 1}/${MAX_ATTEMPTS})`);
+      // Only log a warning if we haven't exceeded max attempts
+      if (loadAttempts < MAX_ATTEMPTS) {
+        console.warn(`Creatomate SDK not detected (attempt ${loadAttempts + 1}/${MAX_ATTEMPTS})`);
+      }
       return false;
     };
     
@@ -36,12 +42,15 @@ export function CreatomateLoader() {
       setLoadAttempts(prev => {
         const newCount = prev + 1;
         
-        // Show a toast if we've reached the max attempts
-        if (newCount >= MAX_ATTEMPTS) {
+        // Show a toast ONLY ONCE if we've reached the max attempts
+        if (newCount >= MAX_ATTEMPTS && !toastShownRef.current) {
           toast.error('Video editor components may not work properly', {
-            description: 'Please refresh the page or check your internet connection.'
+            description: 'Please refresh the page or check your internet connection.',
+            id: 'sdk-load-error', // Use an ID to prevent duplicate toasts
+            duration: 5000,
           });
-          setSDKChecked(true);
+          toastShownRef.current = true;
+          setSDKChecked(true); // Stop checking after max attempts
         }
         
         return newCount;
@@ -49,7 +58,7 @@ export function CreatomateLoader() {
     }, 2000);
     
     return () => clearTimeout(timer);
-  }, [loadAttempts]);
+  }, [loadAttempts, sdkChecked]);
 
   // This component doesn't render anything visible
   return null;
