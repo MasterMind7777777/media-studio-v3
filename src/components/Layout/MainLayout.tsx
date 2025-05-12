@@ -17,7 +17,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <SideNavigation />
       </aside>
       <div className="flex flex-col flex-1 min-w-0">
-        <Header isAdminMode={false} />
+        <Header isAdminMode={isAdmin} />
         <main className="flex-1">{children}</main>
       </div>
     </div>

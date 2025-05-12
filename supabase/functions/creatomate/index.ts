@@ -37,7 +37,7 @@ const handleCors = (req: Request) => {
   }
 };
 
-// Helper function to get the API key from secrets
+// Helper function to get the API key from secrets table
 async function getCreatomateApiKey(supabaseClient: any) {
   try {
     const { data, error } = await supabaseClient
@@ -72,11 +72,11 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
     
-    // Get the Creatomate API key from secrets
+    // Get the Creatomate API key from secrets table
     const apiKey = await getCreatomateApiKey(supabase);
     if (!apiKey) {
       return new Response(
-        JSON.stringify({ error: 'API key not configured' }),
+        JSON.stringify({ error: 'API key not configured in secrets table' }),
         { status: 500, headers: corsHeaders }
       );
     }

@@ -154,6 +154,27 @@ export type Database = {
           },
         ]
       }
+      secrets: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          value: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          value: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          value?: string
+        }
+        Relationships: []
+      }
       statistics: {
         Row: {
           active_users: number | null
@@ -228,7 +249,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

@@ -8,6 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Copy } from "lucide-react";
 import { importCreatomateTemplate } from "@/services/creatomate";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface TemplateImportDialogProps {
   open: boolean;
@@ -19,6 +21,7 @@ export function TemplateImportDialog({ open, onOpenChange }: TemplateImportDialo
   const [curlCommand, setCurlCommand] = useState("");
   const [templateId, setTemplateId] = useState<string | null>(null);
   const queryClient = useQueryClient();
+  const [importError, setImportError] = useState<string | null>(null);
 
   // Examples of valid CURL commands
   const getExample = `curl -X GET 'https://api.creatomate.com/v1/templates/36481fd5-8dfe-4359-9544-76d8857acf3d' -H 'Authorization: Bearer YOUR_API_KEY'`;
@@ -36,6 +39,8 @@ export function TemplateImportDialog({ open, onOpenChange }: TemplateImportDialo
   // Parse CURL command to extract template ID
   const handleParseCurl = () => {
     try {
+      setImportError(null);
+      
       if (!curlCommand.trim()) {
         setTemplateId(null);
         toast({
@@ -113,6 +118,7 @@ export function TemplateImportDialog({ open, onOpenChange }: TemplateImportDialo
       return await importCreatomateTemplate(id);
     },
     onSuccess: () => {
+      setImportError(null);
       toast({
         title: "Template imported successfully",
         description: "The template has been imported and is now available in your library."
@@ -122,10 +128,12 @@ export function TemplateImportDialog({ open, onOpenChange }: TemplateImportDialo
       setCurlCommand("");
       setTemplateId(null);
     },
-    onError: (error) => {
+    onError: (error: any) => {
+      const errorMessage = error?.message || "Unknown error occurred";
+      setImportError(errorMessage);
       toast({
         title: "Error importing template",
-        description: (error as Error).message,
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -133,6 +141,7 @@ export function TemplateImportDialog({ open, onOpenChange }: TemplateImportDialo
 
   // Handle template import
   const handleImport = () => {
+    setImportError(null);
     if (templateId) {
       importMutation.mutate(templateId);
     } else {
@@ -145,7 +154,14 @@ export function TemplateImportDialog({ open, onOpenChange }: TemplateImportDialo
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(newOpen) => {
+      if (!newOpen) {
+        setImportError(null);
+        setTemplateId(null);
+        setCurlCommand("");
+      }
+      onOpenChange(newOpen);
+    }}>
       <DialogContent className="sm:max-w-[650px]">
         <DialogHeader>
           <DialogTitle>Import Template from Creatomate</DialogTitle>
@@ -155,6 +171,14 @@ export function TemplateImportDialog({ open, onOpenChange }: TemplateImportDialo
         </DialogHeader>
         
         <div className="grid gap-4 py-4">
+          {importError && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error importing template</AlertTitle>
+              <AlertDescription>{importError}</AlertDescription>
+            </Alert>
+          )}
+
           <div className="flex gap-2 flex-wrap">
             <Button 
               variant="outline" 
