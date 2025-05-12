@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4'
 
 // Define necessary types directly in the edge function
@@ -439,13 +440,23 @@ Deno.serve(async (req) => {
         });
       }
       
-      // Note: now expecting creatomateTemplateId instead of templateId
-      const { creatomateTemplateId, variables, platforms } = requestBody;
+      // Support both parameter naming conventions for backward compatibility
+      // creatomateTemplateId (preferred), template_id (backward compatibility)
+      const { creatomateTemplateId, template_id, variables, platforms } = requestBody;
       
-      if (!creatomateTemplateId) {
-        return new Response(JSON.stringify({ error: 'Creatomate template ID is required' }), {
-          status: 400,
-          headers: corsHeaders,
+      // Combine both parameters, with creatomateTemplateId taking precedence if both are provided
+      const templateIdentifier = creatomateTemplateId || template_id;
+      
+      console.log('Template identifier provided:', templateIdentifier);
+      
+      if (!templateIdentifier) {
+        console.error('Missing template ID in request. Request body:', JSON.stringify(requestBody));
+        return new Response(JSON.stringify({ 
+          error: 'Creatomate template ID is required',
+          details: 'Neither creatomateTemplateId nor template_id was provided in the request' 
+        }), {
+          status: 400, 
+          headers: corsHeaders 
         });
       }
       
@@ -456,7 +467,7 @@ Deno.serve(async (req) => {
         });
       }
       
-      console.log(`Starting render with Creatomate template ID: ${creatomateTemplateId}`);
+      console.log(`Starting render with Creatomate template ID: ${templateIdentifier}`);
       
       // Prepare the modifications object for Creatomate
       const modifications = {};
@@ -473,7 +484,7 @@ Deno.serve(async (req) => {
       
       // Create render configurations for each platform
       const renders = platforms.map(platform => ({
-        template_id: creatomateTemplateId, // Use the Creatomate template ID here
+        template_id: templateIdentifier, // Use the combined template identifier
         output_format: 'mp4',
         width: platform.width,
         height: platform.height,
