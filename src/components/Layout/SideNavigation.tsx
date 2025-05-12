@@ -1,8 +1,9 @@
 
 import { cn } from "@/lib/utils";
 import { SideNavItem } from "@/types";
-import { Home, Settings, FolderOpen, Layers, Activity, PlusCircle } from "lucide-react";
+import { Home, Settings, FolderOpen, Layers, Activity, PlusCircle, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 
 interface SideNavigationProps {
   items?: SideNavItem[];
@@ -39,6 +40,7 @@ const defaultItems: SideNavItem[] = [
 
 export function SideNavigation({ items = defaultItems, className }: SideNavigationProps) {
   const navigate = useNavigate();
+  const { isAdmin } = useAuth();
 
   const handleCreateNew = () => {
     navigate('/create');
@@ -85,6 +87,27 @@ export function SideNavigation({ items = defaultItems, className }: SideNavigati
                 </button>
               );
             })}
+
+            {/* Admin section, only shown to admin users */}
+            {isAdmin && (
+              <>
+                <div className="my-4 border-t border-muted pt-4">
+                  <h2 className="mb-2 px-4 text-xs font-semibold tracking-tight text-muted-foreground">
+                    Administration
+                  </h2>
+                </div>
+                <button
+                  onClick={() => navigate('/admin')}
+                  className={cn(
+                    "w-full flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors",
+                    location.pathname.startsWith('/admin') && "bg-accent text-accent-foreground"
+                  )}
+                >
+                  <Shield className="h-4 w-4" />
+                  <span>Admin Panel</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
