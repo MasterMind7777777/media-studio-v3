@@ -9,6 +9,8 @@ import { toast } from 'sonner';
  */
 export function CreatomateLoader() {
   const [sdkChecked, setSDKChecked] = useState(false);
+  const [loadAttempts, setLoadAttempts] = useState(0);
+  const MAX_ATTEMPTS = 3;
   
   useEffect(() => {
     // Check if SDK is available without trying to load it manually
@@ -16,28 +18,38 @@ export function CreatomateLoader() {
       if (isCreatomateSDKAvailable()) {
         console.log('Creatomate SDK detected');
         setSDKChecked(true);
-        return;
+        return true;
       }
       
-      console.warn('Creatomate SDK not detected after initial page load');
-      toast.error('Video editor components may not work properly', {
-        description: 'Please refresh the page or check your internet connection.'
-      });
-      setSDKChecked(true);
+      console.warn(`Creatomate SDK not detected (attempt ${loadAttempts + 1}/${MAX_ATTEMPTS})`);
+      return false;
     };
     
     // First check immediately
-    if (isCreatomateSDKAvailable()) {
-      console.log('Creatomate SDK already loaded');
-      setSDKChecked(true);
-      return;
-    }
+    if (checkSDK()) return;
     
-    // If not found, wait a short time to check again as the script might still be loading
-    const timer = setTimeout(checkSDK, 2000);
+    // If not found, check again after a delay
+    const timer = setTimeout(() => {
+      if (checkSDK()) return;
+      
+      // If still not loaded, increase attempt counter
+      setLoadAttempts(prev => {
+        const newCount = prev + 1;
+        
+        // Show a toast if we've reached the max attempts
+        if (newCount >= MAX_ATTEMPTS) {
+          toast.error('Video editor components may not work properly', {
+            description: 'Please refresh the page or check your internet connection.'
+          });
+          setSDKChecked(true);
+        }
+        
+        return newCount;
+      });
+    }, 2000);
     
     return () => clearTimeout(timer);
-  }, []);
+  }, [loadAttempts]);
 
   // This component doesn't render anything visible
   return null;

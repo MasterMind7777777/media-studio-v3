@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4'
 
 // Define necessary types directly in the edge function
@@ -440,13 +439,24 @@ Deno.serve(async (req) => {
         });
       }
       
-      const { templateId, variables, platforms } = requestBody;
-      if (!templateId || !platforms || !Array.isArray(platforms)) {
-        return new Response(JSON.stringify({ error: 'Missing required parameters' }), {
+      // Note: now expecting creatomateTemplateId instead of templateId
+      const { creatomateTemplateId, variables, platforms } = requestBody;
+      
+      if (!creatomateTemplateId) {
+        return new Response(JSON.stringify({ error: 'Creatomate template ID is required' }), {
           status: 400,
           headers: corsHeaders,
         });
       }
+      
+      if (!platforms || !Array.isArray(platforms)) {
+        return new Response(JSON.stringify({ error: 'Platforms must be an array' }), {
+          status: 400,
+          headers: corsHeaders,
+        });
+      }
+      
+      console.log(`Starting render with Creatomate template ID: ${creatomateTemplateId}`);
       
       // Prepare the modifications object for Creatomate
       const modifications = {};
@@ -463,7 +473,7 @@ Deno.serve(async (req) => {
       
       // Create render configurations for each platform
       const renders = platforms.map(platform => ({
-        template_id: templateId,
+        template_id: creatomateTemplateId, // Use the Creatomate template ID here
         output_format: 'mp4',
         width: platform.width,
         height: platform.height,
@@ -485,7 +495,7 @@ Deno.serve(async (req) => {
         const errorText = await response.text();
         console.error('Error response body:', errorText);
         return new Response(
-          JSON.stringify({ error: `Creatomate API error: ${response.statusText}` }),
+          JSON.stringify({ error: `Creatomate API error: ${response.statusText}`, details: errorText }),
           { status: response.status, headers: corsHeaders }
         );
       }

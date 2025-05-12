@@ -80,27 +80,35 @@ export async function parseCurlCommand(curlCommand: string): Promise<{
 
 /**
  * Starts a render job with Creatomate via secure Edge Function
+ * NOTE: This now takes the Creatomate template ID directly (not the database ID)
  */
 export async function startRenderJob(
-  templateId: string, 
+  creatomateTemplateId: string, 
   variables: Record<string, any>,
   platforms: any[]
 ): Promise<string[]> {
   try {
     // For debugging
-    console.log("Starting render job with variables:", variables);
+    console.log("Starting render job with Creatomate template ID:", creatomateTemplateId);
+    console.log("Variables:", variables);
+    console.log("Platforms:", platforms);
 
     const { data, error } = await supabase.functions.invoke('creatomate', {
       body: { 
         action: 'start-render',
-        templateId,
+        creatomateTemplateId, // Changed from templateId to creatomateTemplateId
         variables,
         platforms 
       },
     });
     
     if (error) {
+      console.error("Edge function error:", error);
       throw new Error(`Error starting render: ${error.message}`);
+    }
+    
+    if (!data || !data.renderIds) {
+      throw new Error("Invalid response from Creatomate edge function");
     }
     
     return data.renderIds;

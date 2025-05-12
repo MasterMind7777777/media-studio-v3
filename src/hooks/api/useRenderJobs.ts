@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RenderJob, Platform } from "@/types";
@@ -91,8 +90,53 @@ export const useCreateRenderJob = () => {
       variables: Record<string, any>, 
       platforms: Platform[] 
     }) => {
-      // Start the render job with Creatomate
-      const renderIds = await startRenderJob(templateId, variables, platforms);
+      // First, fetch the template to get the Creatomate template ID
+      const { data: templateData, error: templateError } = await supabase
+        .from("templates")
+        .select("id, creatomate_template_id")
+        .eq("id", templateId)
+        .maybeSingle();
+        
+      if (templateError) {
+        throw new Error(`Error fetching template: ${templateError.message}`);
+      }
+      
+      if (!templateData) {
+        throw new Error(`Template not found with ID: ${templateId}`);
+      }
+      
+      const creatomateTemplateId = templateData.creatomate_template_id;
+      
+      if (!creatomateTemplateId) {
+        throw new Error("This template doesn't have a valid Creatomate template ID");
+      }
+
+      console.log(`Starting render for template ${templateId} with Creatomate ID: ${creatomateTemplateId}`);
+      
+      // Clean up variables before sending to the API
+      const cleanVariables = { ...variables };
+      
+      // Remove any duplicated keys that might have been caused by the previous bug
+      // For example, if there's both "Heading.text" and "Heading.text.text", keep only the most basic one
+      Object.keys(cleanVariables).forEach(key => {
+        if (key.match(/\.(text|fill|source)\.\1(\.\1)*$/)) {
+          const basicKey = key.replace(/(\.(text|fill|source))+$/, `.$2`);
+          console.log(`Cleaning up duplicate key: ${key} -> ${basicKey}`);
+          
+          // Only replace if the basic key doesn't exist
+          if (!cleanVariables[basicKey]) {
+            cleanVariables[basicKey] = cleanVariables[key];
+          }
+          
+          // Remove the duplicated key
+          delete cleanVariables[key];
+        }
+      });
+      
+      console.log("Cleaned variables:", cleanVariables);
+      
+      // Start the render job with Creatomate using the correct template ID
+      const renderIds = await startRenderJob(creatomateTemplateId, cleanVariables, platforms);
       
       // Need to get the current user ID
       const { data: { user } } = await supabase.auth.getUser();
@@ -104,7 +148,7 @@ export const useCreateRenderJob = () => {
         .insert([{
           user_id: user.id,
           template_id: templateId,
-          variables: variables as Json,
+          variables: cleanVariables as Json,
           platforms: platforms as unknown as Json,
           status: 'pending',
           creatomate_render_ids: renderIds,
