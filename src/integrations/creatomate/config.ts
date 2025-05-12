@@ -1,9 +1,9 @@
+
 /**
  * Configuration for the Creatomate integration
  * Using environment variables from src/config/creatomate.ts
  */
 import { CREATOMATE_PUBLIC_TOKEN } from '@/config/creatomate';
-import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Get Creatomate API token
@@ -99,8 +99,15 @@ export function loadCreatomateSDKManually(): Promise<void> {
     // Create new script element if none exists
     const script = document.createElement('script');
     script.id = 'creatomate-sdk';
-    script.src = 'https://cdn.creatomate.com/js/preview.js';
-    script.async = true;
+    script.src = 'https://cdn.jsdelivr.net/npm/@creatomate/preview@1.5.1/dist/preview.min.js';
+    script.crossOrigin = 'anonymous';
+    
+    // Add fallback for CDN failures
+    script.onerror = () => {
+      console.warn('[Creatomate] jsDelivr failed, switching to unpkg');
+      script.onerror = null;
+      script.src = 'https://unpkg.com/@creatomate/preview@1.5.1/dist/preview.min.js';
+    };
     
     // Set up event handlers
     script.onload = () => {
@@ -109,8 +116,8 @@ export function loadCreatomateSDKManually(): Promise<void> {
     };
     
     script.onerror = () => {
-      console.error('Failed to load Creatomate SDK');
-      reject(new Error('Failed to load Creatomate SDK script'));
+      console.error('Failed to load Creatomate SDK from both CDNs');
+      reject(new Error('Failed to load Creatomate SDK script from both jsDelivr and unpkg'));
     };
     
     // Add to document

@@ -5,7 +5,7 @@
 
 **URL**: https://lovable.dev/projects/959db1ed-a28c-48d7-a39a-7253bfac5b70
 
-## Creatomate setup
+## Creatomate Setup
 
 This project uses Creatomate for interactive video previews and editing. To set up the integration:
 
@@ -25,6 +25,12 @@ This project uses Creatomate for interactive video previews and editing. To set 
    - Restart the development server
 
 If configured correctly, the interactive preview will load and allow drag-and-drop editing in the `/create/:id/customize` page.
+
+### Important Notes
+
+- The Creatomate public token is specifically designed to be used in client-side code, so it's safe to expose in the frontend.
+- For production deployments, make sure to add the environment variables to your hosting platform (Vercel, Render, etc.).
+- The preview uses jsDelivr CDN with an unpkg fallback for reliability.
 
 ## How can I edit this code?
 

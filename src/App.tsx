@@ -1,84 +1,107 @@
-
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from "@/context/AuthContext";
-import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { AdminProtectedRoute } from "@/components/AdminProtectedRoute";
-import Dashboard from "./pages/Dashboard";
-import Templates from "./pages/Templates";
-import Projects from "./pages/Projects";
-import Activity from "./pages/Activity";
-import Settings from "./pages/Settings";
+import { useEffect } from 'react';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+  useLocation,
+} from "react-router-dom";
+import { Toaster } from "@/components/ui/sonner";
 import Create from "./pages/Create";
+import Templates from "./pages/Templates";
 import TemplateCustomize from "./pages/TemplateCustomize";
-import Media from "./pages/Media";
-import Auth from "./pages/Auth";
-import NotFound from "./pages/NotFound";
-import Index from "./pages/Index";
-import { CreatomateLoader } from "@/components/CreatomateLoader";
+import Projects from "./pages/Projects";
+import { useAuth } from './hooks/useAuth';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Account from './pages/Account';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { CreatomateLoader } from './components/CreatomateLoader';
 
-// Admin pages
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import AdminTemplates from "./pages/admin/AdminTemplates";
-import AdminContentPacks from "./pages/admin/AdminContentPacks";
-import AdminUsers from "./pages/admin/AdminUsers";
-
-// Create a new query client with proper default options
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 1,
-      refetchOnWindowFocus: false, // Changed to false to prevent unnecessary refetches
-      staleTime: 1000 * 30, // 30 seconds (reduced from 60)
-    },
-  },
-});
-
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      {/* Load Creatomate SDK as early as possible */}
+function App() {
+  const { isLoggedIn } = useAuth();
+  const { toast } = useToast();
+  
+  useEffect(() => {
+    if (!isLoggedIn()) {
+      console.log('User is not logged in');
+    } else {
+      console.log('User is logged in');
+    }
+  }, [isLoggedIn]);
+  
+  const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
+    const location = useLocation();
+    
+    if (!isLoggedIn()) {
+      toast({
+        title: "Not authenticated",
+        description: "You must log in to access this page.",
+      });
+      return <Navigate to="/login" replace state={{ from: location }} />;
+    }
+    
+    return <>{children}</>;
+  };
+  
+  return (
+    <>
+      {/* Add the loader near the top of the component tree */}
       <CreatomateLoader />
-      <BrowserRouter>
-        <AuthProvider>
-          <Routes>
-            {/* Root route - handles redirect logic */}
-            <Route path="/" element={<Index />} />
-            
-            {/* Public route */}
-            <Route path="/auth" element={<Auth />} />
-            
-            {/* Protected routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/templates" element={<Templates />} />
-              <Route path="/projects" element={<Projects />} />
-              <Route path="/media" element={<Media />} />
-              <Route path="/activity" element={<Activity />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/create" element={<Create />} />
-              <Route path="/create/:id/customize" element={<TemplateCustomize />} />
-            </Route>
-            
-            {/* Admin routes */}
-            <Route path="/admin" element={<AdminProtectedRoute />}>
-              <Route index element={<AdminDashboard />} />
-              <Route path="templates" element={<AdminTemplates />} />
-              <Route path="content-packs" element={<AdminContentPacks />} />
-              <Route path="users" element={<AdminUsers />} />
-            </Route>
-            
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthProvider>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+      
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          
+          <Route
+            path="/create"
+            element={
+              <PrivateRoute>
+                <Create />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/create/:id/customize"
+            element={
+              <PrivateRoute>
+                <TemplateCustomize />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/templates"
+            element={
+              <PrivateRoute>
+                <Templates />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/projects"
+            element={
+              <PrivateRoute>
+                <Projects />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/account"
+            element={
+              <PrivateRoute>
+                <Account />
+              </PrivateRoute>
+            }
+          />
+          
+          <Route path="/" element={<Navigate to="/create" />} />
+        </Routes>
+        <Toaster />
+      </Router>
+    </>
+  );
+}
 
 export default App;
