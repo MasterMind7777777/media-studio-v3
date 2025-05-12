@@ -64,8 +64,26 @@ Deno.serve(async (req) => {
   if (corsResponse) return corsResponse;
   
   try {
-    const url = new URL(req.url);
-    const action = url.pathname.split('/').pop();
+    // Extract the action from the request body instead of the URL path
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON in request body' }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+    
+    const action = requestBody.action;
+    if (!action) {
+      return new Response(
+        JSON.stringify({ error: 'Missing action parameter in request body' }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+    
+    console.log('Action requested:', action);
     
     // Create a Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -90,13 +108,15 @@ Deno.serve(async (req) => {
         });
       }
       
-      const { templateId } = await req.json();
+      const { templateId } = requestBody;
       if (!templateId) {
         return new Response(JSON.stringify({ error: 'Template ID is required' }), {
           status: 400,
           headers: corsHeaders,
         });
       }
+      
+      console.log('Importing template:', templateId);
       
       // Fetch template from Creatomate API
       const response = await fetch(`https://api.creatomate.com/v1/templates/${templateId}`, {
@@ -107,6 +127,9 @@ Deno.serve(async (req) => {
       });
       
       if (!response.ok) {
+        console.error('Creatomate API error:', response.status, response.statusText);
+        const errorText = await response.text();
+        console.error('Error response body:', errorText);
         return new Response(
           JSON.stringify({ error: `Creatomate API error: ${response.statusText}` }),
           { status: response.status, headers: corsHeaders }
@@ -171,6 +194,7 @@ Deno.serve(async (req) => {
         .single();
         
       if (error) {
+        console.error('Database error:', error);
         return new Response(
           JSON.stringify({ error: `Database error: ${error.message}` }),
           { status: 500, headers: corsHeaders }
@@ -188,7 +212,7 @@ Deno.serve(async (req) => {
         });
       }
       
-      const { templateId, variables, platforms } = await req.json();
+      const { templateId, variables, platforms } = requestBody;
       if (!templateId || !platforms || !Array.isArray(platforms)) {
         return new Response(JSON.stringify({ error: 'Missing required parameters' }), {
           status: 400,
@@ -236,7 +260,7 @@ Deno.serve(async (req) => {
         });
       }
       
-      const { renderIds } = await req.json();
+      const { renderIds } = requestBody;
       if (!renderIds || !Array.isArray(renderIds)) {
         return new Response(JSON.stringify({ error: 'Render IDs are required' }), {
           status: 400,
