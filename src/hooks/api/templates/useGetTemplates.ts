@@ -3,20 +3,30 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Template } from "@/types";
 import { transformTemplateData } from "./transformers";
+import { useAuth } from "@/context/AuthContext";
 
 /**
  * Hook to fetch all templates with improved caching
  */
 export const useTemplates = () => {
+  const { isAdmin } = useAuth();
+  
   return useQuery({
     queryKey: ["templates"],
     queryFn: async () => {
       try {
         console.log("Fetching all templates from API");
-        const { data, error } = await supabase
+        const query = supabase
           .from("templates")
-          .select("*")
-          .eq("is_active", true);
+          .select("*");
+          
+        // For regular users, only fetch active templates
+        // For admins, fetch all templates including inactive ones
+        if (!isAdmin) {
+          query.eq("is_active", true);
+        }
+        
+        const { data, error } = await query;
           
         if (error) {
           throw new Error(`Error fetching templates: ${error.message}`);
