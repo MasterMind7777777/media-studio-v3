@@ -100,10 +100,11 @@ export async function startRenderJob(
     // Clean variables (remove any duplicated keys)
     const cleanVariables = cleanupVariables(variables);
 
+    // Use the correct field name for template_id expected by the edge function
     const { data, error } = await supabase.functions.invoke('creatomate', {
       body: { 
         action: 'start-render',
-        template_id: creatomateTemplateId, // Send as template_id to match API expectations
+        template_id: creatomateTemplateId, // Use template_id key for consistency with edge function
         variables: cleanVariables,
         platforms 
       },

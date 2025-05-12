@@ -14,6 +14,13 @@ export function CreatomateLoader() {
   const toastShownRef = useRef(false);
   
   useEffect(() => {
+    // Use session storage to track if the toast has been shown in this session
+    const hasShownToastThisSession = sessionStorage.getItem('creatomate-sdk-toast-shown') === 'true';
+    
+    if (hasShownToastThisSession) {
+      toastShownRef.current = true;
+    }
+    
     if (sdkChecked) return; // Don't continue checking once we're done
     
     // Check if SDK is available without trying to load it manually
@@ -42,14 +49,17 @@ export function CreatomateLoader() {
       setLoadAttempts(prev => {
         const newCount = prev + 1;
         
-        // Show a toast ONLY ONCE if we've reached the max attempts
+        // Show a toast ONLY ONCE if we've reached the max attempts and it hasn't been shown yet this session
         if (newCount >= MAX_ATTEMPTS && !toastShownRef.current) {
           toast.error('Video editor components may not work properly', {
             description: 'Please refresh the page or check your internet connection.',
             id: 'sdk-load-error', // Use an ID to prevent duplicate toasts
             duration: 5000,
           });
+          
+          // Mark the toast as shown for this component instance and this session
           toastShownRef.current = true;
+          sessionStorage.setItem('creatomate-sdk-toast-shown', 'true');
           setSDKChecked(true); // Stop checking after max attempts
         }
         

@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RenderJob, Platform } from "@/types";
@@ -113,33 +114,38 @@ export const useCreateRenderJob = () => {
 
       console.log(`Starting render for template ${templateId} with Creatomate ID: ${creatomateTemplateId}`);
       
-      // Start the render job with Creatomate using the correct template ID
-      const renderIds = await startRenderJob(creatomateTemplateId, variables, platforms);
-      
-      // Need to get the current user ID
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("User not authenticated");
-
-      // Create a record in the render_jobs table
-      const { data, error } = await supabase
-        .from("render_jobs")
-        .insert([{
-          user_id: user.id,
-          template_id: templateId,
-          variables: variables as Json,
-          platforms: platforms as unknown as Json,
-          status: 'pending',
-          creatomate_render_ids: renderIds,
-          output_urls: {} as Json
-        }])
-        .select()
-        .single();
+      try {
+        // Start the render job with Creatomate using the creatomate_template_id (not the database ID)
+        const renderIds = await startRenderJob(creatomateTemplateId, variables, platforms);
         
-      if (error) {
-        throw new Error(`Error creating render job: ${error.message}`);
+        // Need to get the current user ID
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error("User not authenticated");
+
+        // Create a record in the render_jobs table
+        const { data, error } = await supabase
+          .from("render_jobs")
+          .insert([{
+            user_id: user.id,
+            template_id: templateId,
+            variables: variables as Json,
+            platforms: platforms as unknown as Json,
+            status: 'pending',
+            creatomate_render_ids: renderIds,
+            output_urls: {} as Json
+          }])
+          .select()
+          .single();
+          
+        if (error) {
+          throw new Error(`Error creating render job: ${error.message}`);
+        }
+        
+        return transformRenderJobData(data);
+      } catch (error) {
+        console.error("Failed to start render job:", error);
+        throw error;
       }
-      
-      return transformRenderJobData(data);
     },
     onSuccess: () => {
       // Invalidate render jobs query to refetch data
