@@ -3,16 +3,21 @@ import { MainLayout } from "@/components/Layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Check, ChevronRight, Cog, Image, Type } from "lucide-react";
-import { useState, useMemo } from "react";
+import { ArrowLeft, Check, ChevronRight, Cog, Image, Type, Loader2 } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useTemplate, useCreateRenderJob } from "@/hooks/api";
+import { useTemplate, useCreateRenderJob, useUpdateTemplate } from "@/hooks/api";
 import { toast } from "@/components/ui/sonner";
+import { MediaUploader } from "@/components/Media/MediaUploader";
+import { MediaGallery } from "@/components/Media/MediaGallery";
+import { MediaAsset, Template } from "@/types";
 
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [activeStep, setActiveStep] = useState<number>(1);
+  const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
+  const [updatedTemplate, setUpdatedTemplate] = useState<Template | null>(null);
   
   // Fetch template data using our custom hook
   const { 
@@ -22,46 +27,58 @@ export default function TemplateCustomize() {
   } = useTemplate(id);
 
   const { 
+    mutate: updateTemplate,
+    isPending: isUpdating
+  } = useUpdateTemplate();
+
+  const { 
     mutate: createRenderJob, 
     isPending: isRendering 
   } = useCreateRenderJob();
   
+  // Update our local state when template data is loaded
+  useEffect(() => {
+    if (template && !updatedTemplate) {
+      setUpdatedTemplate(template);
+    }
+  }, [template, updatedTemplate]);
+  
   // Helper functions to extract variables by type from the flattened structure
   const getTextVariables = useMemo(() => {
-    if (!template?.variables) return [];
+    if (!updatedTemplate?.variables) return [];
     
-    return Object.entries(template.variables)
+    return Object.entries(updatedTemplate.variables)
       .filter(([key, value]) => key.includes('.text'))
       .map(([key, value]) => ({
         key: key.split('.')[0],
         property: 'text',
         value
       }));
-  }, [template?.variables]);
+  }, [updatedTemplate?.variables]);
   
   const getMediaVariables = useMemo(() => {
-    if (!template?.variables) return [];
+    if (!updatedTemplate?.variables) return [];
     
-    return Object.entries(template.variables)
+    return Object.entries(updatedTemplate.variables)
       .filter(([key, value]) => key.includes('.source'))
       .map(([key, value]) => ({
         key: key.split('.')[0],
         property: 'source',
         value
       }));
-  }, [template?.variables]);
+  }, [updatedTemplate?.variables]);
   
   const getColorVariables = useMemo(() => {
-    if (!template?.variables) return [];
+    if (!updatedTemplate?.variables) return [];
     
-    return Object.entries(template.variables)
+    return Object.entries(updatedTemplate.variables)
       .filter(([key, value]) => key.includes('.fill'))
       .map(([key, value]) => ({
         key: key.split('.')[0],
         property: 'fill',
         value
       }));
-  }, [template?.variables]);
+  }, [updatedTemplate?.variables]);
   
   // Check if we have any media variables at all
   const hasMediaVariables = useMemo(() => {
@@ -82,7 +99,7 @@ export default function TemplateCustomize() {
     );
   }
   
-  if (error || !template) {
+  if (error || !template || !updatedTemplate) {
     // Show error toast before redirecting
     toast.error("Template not found", {
       description: "The template you requested could not be found.",
@@ -102,22 +119,100 @@ export default function TemplateCustomize() {
       setActiveStep(activeStep - 1);
     }
   };
+  
+  const handleTextChange = (variableKey: string, value: string) => {
+    if (!updatedTemplate) return;
+    
+    setUpdatedTemplate({
+      ...updatedTemplate,
+      variables: {
+        ...updatedTemplate.variables,
+        [`${variableKey}.text`]: value
+      }
+    });
+  };
+  
+  const handleColorChange = (variableKey: string, value: string) => {
+    if (!updatedTemplate) return;
+    
+    setUpdatedTemplate({
+      ...updatedTemplate,
+      variables: {
+        ...updatedTemplate.variables,
+        [`${variableKey}.fill`]: value
+      }
+    });
+  };
+  
+  const handleMediaSelect = (variableKey: string, mediaAsset: MediaAsset) => {
+    // Update the selected media
+    setSelectedMedia({
+      ...selectedMedia,
+      [variableKey]: mediaAsset
+    });
+    
+    // Update the template variable with the media URL
+    if (!updatedTemplate) return;
+    
+    setUpdatedTemplate({
+      ...updatedTemplate,
+      variables: {
+        ...updatedTemplate.variables,
+        [`${variableKey}.source`]: mediaAsset.file_url
+      }
+    });
+    
+    toast.success("Media selected", {
+      description: `${mediaAsset.name} added to ${variableKey.replace(/_/g, ' ')}`
+    });
+  };
 
   const handleNext = () => {
-    if (activeStep < 3) {
-      setActiveStep(activeStep + 1);
-    } else {
-      // Final step, start render job
-      createRenderJob({
-        templateId: template.id,
-        variables: template.variables,
-        platforms: template.platforms
+    // Save any changes to the template before proceeding to the next step
+    if (updatedTemplate && JSON.stringify(template.variables) !== JSON.stringify(updatedTemplate.variables)) {
+      updateTemplate({
+        id: updatedTemplate.id,
+        variables: updatedTemplate.variables
       }, {
         onSuccess: () => {
-          // Navigate to dashboard or projects page after successful render job creation
-          navigate("/");
+          toast.success("Template updated", {
+            description: "Your changes have been saved."
+          });
+          
+          if (activeStep < 3) {
+            setActiveStep(activeStep + 1);
+          }
+        },
+        onError: (error) => {
+          toast.error("Failed to save changes", {
+            description: error.message
+          });
         }
       });
+    } else {
+      if (activeStep < 3) {
+        setActiveStep(activeStep + 1);
+      } else {
+        // Final step, start render job
+        createRenderJob({
+          templateId: template.id,
+          variables: updatedTemplate.variables,
+          platforms: updatedTemplate.platforms
+        }, {
+          onSuccess: (renderJob) => {
+            // Navigate to dashboard or projects page after successful render job creation
+            toast.success("Render started", {
+              description: "Your render job has been created and is processing."
+            });
+            navigate(`/projects?job=${renderJob.id}`);
+          },
+          onError: (error) => {
+            toast.error("Failed to start render", {
+              description: error.message
+            });
+          }
+        });
+      }
     }
   };
 
@@ -163,19 +258,50 @@ export default function TemplateCustomize() {
           <Card className="p-4 h-full">
             <h3 className="font-medium mb-4">Required Media</h3>
             <div className="space-y-4">
-              {getMediaVariables.map(({key, property, value}) => (
-                <div key={key} className="border rounded-md p-3">
-                  <div className="text-sm font-medium mb-2">{key.replace(/_/g, ' ')}</div>
-                  <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
-                    <Image className="h-8 w-8 text-muted-foreground" />
+              {getMediaVariables.map(({key, property, value}) => {
+                const isSelected = selectedMedia[key]?.file_url === value;
+                const previewImage = value || (selectedMedia[key]?.thumbnail_url || selectedMedia[key]?.file_url);
+                
+                return (
+                  <div key={key} className="border rounded-md p-3">
+                    <div className="text-sm font-medium mb-2">{key.replace(/_/g, ' ')}</div>
+                    <div className="aspect-video bg-muted rounded-md flex items-center justify-center overflow-hidden">
+                      {previewImage ? (
+                        <img 
+                          src={previewImage} 
+                          alt={key} 
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Image className="h-8 w-8 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="mt-2">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="w-full"
+                        onClick={() => {
+                          // When this media element is clicked, set the active tab to "my-uploads"
+                          // and focus on this particular media element for selection
+                          const mediaTab = document.getElementById("media-tab-my-uploads");
+                          if (mediaTab) {
+                            (mediaTab as HTMLButtonElement).click();
+                          }
+                          
+                          // Scroll to the media gallery area
+                          const mediaGallery = document.getElementById("media-gallery");
+                          if (mediaGallery) {
+                            mediaGallery.scrollIntoView({ behavior: 'smooth' });
+                          }
+                        }}
+                      >
+                        {value ? "Change Media" : "Select Media"}
+                      </Button>
+                    </div>
                   </div>
-                  <div className="mt-2">
-                    <Button size="sm" variant="outline" className="w-full">
-                      Select Media
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </Card>
         </div>
@@ -185,21 +311,31 @@ export default function TemplateCustomize() {
         <Card className="h-full">
           <Tabs defaultValue="my-uploads">
             <TabsList className="w-full">
-              <TabsTrigger value="my-uploads" className="flex-1">My Uploads</TabsTrigger>
+              <TabsTrigger id="media-tab-my-uploads" value="my-uploads" className="flex-1">My Uploads</TabsTrigger>
               <TabsTrigger value="content-packs" className="flex-1">Content Packs</TabsTrigger>
             </TabsList>
             <TabsContent value="my-uploads" className="p-4">
-              <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-md">
-                <Image className="h-16 w-16 text-muted-foreground mb-4" />
-                <h3 className="font-medium text-lg">Drop files to upload</h3>
-                <p className="text-muted-foreground mb-4">or click to browse files</p>
-                <Button>Upload Files</Button>
-                <p className="text-xs text-muted-foreground mt-4">
-                  Supported: JPG, PNG, WebP, MP4, MOV up to 100MB
-                </p>
-              </div>
-              <div className="mt-4 text-center text-muted-foreground">
-                No uploads yet
+              <MediaUploader 
+                onMediaSelected={(media) => {
+                  // If there's a selected media variable, automatically apply this upload to it
+                  if (getMediaVariables.length > 0) {
+                    const firstMediaVar = getMediaVariables[0].key;
+                    handleMediaSelect(firstMediaVar, media);
+                  }
+                }}
+              />
+              
+              <div className="mt-6" id="media-gallery">
+                <h3 className="font-medium mb-4">Your Uploads</h3>
+                <MediaGallery 
+                  onMediaSelect={(media) => {
+                    // If there's a selected media variable, apply this selection to it
+                    if (getMediaVariables.length > 0) {
+                      const firstMediaVar = getMediaVariables[0].key;
+                      handleMediaSelect(firstMediaVar, media);
+                    }
+                  }}
+                />
               </div>
             </TabsContent>
             <TabsContent value="content-packs" className="p-4">
@@ -250,7 +386,7 @@ export default function TemplateCustomize() {
                 Creatomate Preview SDK would be integrated here
               </p>
               <img 
-                src={template.preview_image_url} 
+                src={updatedTemplate.preview_image_url} 
                 alt="Preview" 
                 className="max-w-full max-h-60 mx-auto rounded-md shadow-lg"
               />
@@ -262,7 +398,7 @@ export default function TemplateCustomize() {
               <Button size="sm" variant="outline">Fullscreen</Button>
             </div>
             <div className="text-muted-foreground text-sm">
-              {template.platforms[0]?.width} × {template.platforms[0]?.height}
+              {updatedTemplate.platforms[0]?.width} × {updatedTemplate.platforms[0]?.height}
             </div>
           </div>
         </Card>
@@ -270,7 +406,7 @@ export default function TemplateCustomize() {
       <div className="md:col-span-4">
         <Card className="h-full">
           <div className="p-4 border-b">
-            <h3 className="font-medium">Edit Template: {template.name}</h3>
+            <h3 className="font-medium">Edit Template: {updatedTemplate.name}</h3>
           </div>
           <div className="p-4 space-y-6">
             {getTextVariables.length > 0 && (
@@ -286,7 +422,8 @@ export default function TemplateCustomize() {
                       </label>
                       <input 
                         type="text" 
-                        defaultValue={value || ''}
+                        value={value || ''}
+                        onChange={(e) => handleTextChange(key, e.target.value)}
                         className="w-full px-3 py-1 border rounded-md text-sm"
                       />
                     </div>
@@ -301,17 +438,36 @@ export default function TemplateCustomize() {
                   <Image className="h-4 w-4 mr-1" /> Media Elements
                 </h4>
                 <div className="space-y-3">
-                  {getMediaVariables.map(({key}) => (
-                    <div key={key} className="flex items-center gap-2">
-                      <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
-                        <Image className="h-4 w-4 text-muted-foreground" />
+                  {getMediaVariables.map(({key, value}) => {
+                    const mediaAsset = selectedMedia[key];
+                    return (
+                      <div key={key} className="flex items-center gap-2">
+                        <div className="h-10 w-10 bg-muted rounded flex items-center justify-center overflow-hidden">
+                          {value ? (
+                            <img src={value} className="w-full h-full object-cover" alt={key} />
+                          ) : (
+                            <Image className="h-4 w-4 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="flex-grow">
+                          <div className="text-sm">{key.replace(/_/g, ' ')}</div>
+                          {mediaAsset && (
+                            <div className="text-xs text-muted-foreground">{mediaAsset.name}</div>
+                          )}
+                        </div>
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => {
+                            setActiveStep(1); // Go back to media selection step
+                            // Focus on this media element
+                          }}
+                        >
+                          Change
+                        </Button>
                       </div>
-                      <div className="flex-grow">
-                        <div className="text-sm">{key.replace(/_/g, ' ')}</div>
-                      </div>
-                      <Button size="sm" variant="outline">Change</Button>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -328,12 +484,14 @@ export default function TemplateCustomize() {
                       <div className="flex items-center gap-2">
                         <input 
                           type="color"
-                          defaultValue={value || '#000000'}
+                          value={value || '#000000'}
+                          onChange={(e) => handleColorChange(key, e.target.value)}
                           className="w-8 h-8 rounded-md cursor-pointer"
                         />
                         <input 
                           type="text"
-                          defaultValue={value || '#000000'}
+                          value={value || '#000000'}
+                          onChange={(e) => handleColorChange(key, e.target.value)}
                           className="w-24 px-2 py-1 border rounded-md text-xs"
                         />
                       </div>
@@ -435,15 +593,13 @@ export default function TemplateCustomize() {
           <Button 
             className="gap-2 bg-studio-600 hover:bg-studio-700"
             onClick={handleNext}
-            disabled={isRendering}
+            disabled={isRendering || isUpdating}
           >
-            {isRendering 
-              ? "Starting Render..." 
-              : activeStep === 3 
-                ? 'Start Render' 
-                : 'Next Step'
-            }
-            {!isRendering && <ChevronRight className="h-4 w-4" />}
+            {isRendering ? "Starting Render..." : 
+             isUpdating ? "Saving Changes..." :
+             activeStep === 3 ? 'Start Render' : 'Next Step'}
+            {!isRendering && !isUpdating && <ChevronRight className="h-4 w-4" />}
+            {(isRendering || isUpdating) && <Loader2 className="h-4 w-4 animate-spin" />}
           </Button>
         </div>
       </div>
