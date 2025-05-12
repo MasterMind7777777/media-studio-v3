@@ -14,6 +14,7 @@ import Activity from "./pages/Activity";
 import Settings from "./pages/Settings";
 import Create from "./pages/Create";
 import TemplateCustomize from "./pages/TemplateCustomize";
+import Media from "./pages/Media";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Index from "./pages/Index";
@@ -54,6 +55,7 @@ const App = () => (
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/templates" element={<Templates />} />
               <Route path="/projects" element={<Projects />} />
+              <Route path="/media" element={<Media />} />
               <Route path="/activity" element={<Activity />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/create" element={<Create />} />

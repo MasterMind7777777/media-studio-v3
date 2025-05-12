@@ -1,7 +1,7 @@
 
 import { cn } from "@/lib/utils";
 import { SideNavItem } from "@/types";
-import { Home, Settings, FolderOpen, Layers, Activity, PlusCircle, Shield } from "lucide-react";
+import { Home, Settings, FolderOpen, Layers, Activity, PlusCircle, Shield, Image } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 
@@ -25,6 +25,11 @@ const defaultItems: SideNavItem[] = [
     title: "Templates",
     href: "/templates",
     icon: Layers,
+  },
+  {
+    title: "Media",
+    href: "/media",
+    icon: Image,
   },
   {
     title: "Activity",

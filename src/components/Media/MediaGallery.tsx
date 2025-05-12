@@ -11,10 +11,26 @@ interface MediaGalleryProps {
   contentPackId?: string;
   onMediaSelect?: (media: MediaAsset) => void;
   selectedMediaId?: string;
+  mediaAssets?: MediaAsset[];
+  isLoading?: boolean;
 }
 
-export function MediaGallery({ contentPackId, onMediaSelect, selectedMediaId }: MediaGalleryProps) {
-  const { data: mediaAssets, isLoading, error } = useMediaAssets(contentPackId);
+export function MediaGallery({ 
+  contentPackId, 
+  onMediaSelect, 
+  selectedMediaId,
+  mediaAssets: propMediaAssets,
+  isLoading: propIsLoading
+}: MediaGalleryProps) {
+  // Only fetch from API if mediaAssets weren't provided as props
+  const { data: fetchedMediaAssets, isLoading: isFetching, error } = useMediaAssets(
+    contentPackId, 
+    { enabled: !propMediaAssets }
+  );
+  
+  // Use either provided media assets or fetched ones
+  const mediaAssets = propMediaAssets || fetchedMediaAssets;
+  const isLoading = propIsLoading !== undefined ? propIsLoading : isFetching;
   
   const handleSelectMedia = (media: MediaAsset) => {
     if (onMediaSelect) {

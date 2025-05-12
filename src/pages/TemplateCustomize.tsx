@@ -9,6 +9,7 @@ import { toast } from "@/components/ui/sonner";
 import { MediaUploader } from "@/components/Media/MediaUploader";
 import { MediaGallery } from "@/components/Media/MediaGallery";
 import { MediaAsset, Template } from "@/types";
+import { MediaNavigation } from "@/components/Media/MediaNavigation";
 
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +17,7 @@ export default function TemplateCustomize() {
   const [activeStep, setActiveStep] = useState<number>(1);
   const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
   const [updatedTemplate, setUpdatedTemplate] = useState<Template | null>(null);
+  const [mediaTab, setMediaTab] = useState<string>("all-uploads");
   
   // Validate template ID
   useEffect(() => {
@@ -342,24 +344,20 @@ export default function TemplateCustomize() {
       
       <div className={`md:col-span-${hasMediaVariables ? '2' : '3'}`}>
         <Card className="h-full">
-          <Tabs defaultValue="my-uploads">
-            <TabsList className="w-full">
-              <TabsTrigger id="media-tab-my-uploads" value="my-uploads" className="flex-1">My Uploads</TabsTrigger>
-              <TabsTrigger value="content-packs" className="flex-1">Content Packs</TabsTrigger>
-            </TabsList>
-            <TabsContent value="my-uploads" className="p-4">
-              <MediaUploader 
-                onMediaSelected={(media) => {
-                  // If there's a selected media variable, automatically apply this upload to it
-                  if (getMediaVariables.length > 0) {
-                    const firstMediaVar = getMediaVariables[0].key;
-                    handleMediaSelect(firstMediaVar, media);
-                  }
-                }}
-              />
-              
-              <div className="mt-6" id="media-gallery">
-                <h3 className="font-medium mb-4">Your Uploads</h3>
+          <div className="p-4 border-b flex items-center justify-between">
+            <MediaNavigation 
+              activeTab={mediaTab} 
+              onTabChange={setMediaTab}
+              className="border-none p-0"
+            />
+            {mediaTab === "all-uploads" && (
+              <Button size="sm">Upload New</Button>
+            )}
+          </div>
+          <div className="p-4">
+            {mediaTab === "all-uploads" && (
+              <div className="mt-4">
+                <h3 className="font-medium mb-4">Your Media</h3>
                 <MediaGallery 
                   onMediaSelect={(media) => {
                     // If there's a selected media variable, apply this selection to it
@@ -370,39 +368,68 @@ export default function TemplateCustomize() {
                   }}
                 />
               </div>
-            </TabsContent>
-            <TabsContent value="content-packs" className="p-4">
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                <Card className="cursor-pointer hover-scale">
-                  <div className="aspect-video bg-gradient-to-br from-studio-100 to-studio-300 flex items-center justify-center rounded-t-md">
-                    <div className="text-studio-700 font-medium">Nature</div>
-                  </div>
-                  <div className="p-3">
-                    <h4 className="font-medium text-sm">Nature Collection</h4>
-                    <p className="text-xs text-muted-foreground">12 items</p>
-                  </div>
-                </Card>
-                <Card className="cursor-pointer hover-scale">
-                  <div className="aspect-video bg-gradient-to-br from-amber-100 to-amber-300 flex items-center justify-center rounded-t-md">
-                    <div className="text-amber-800 font-medium">Urban</div>
-                  </div>
-                  <div className="p-3">
-                    <h4 className="font-medium text-sm">Urban Scenes</h4>
-                    <p className="text-xs text-muted-foreground">8 items</p>
-                  </div>
-                </Card>
-                <Card className="cursor-pointer hover-scale">
-                  <div className="aspect-video bg-gradient-to-br from-blue-100 to-blue-300 flex items-center justify-center rounded-t-md">
-                    <div className="text-blue-800 font-medium">Business</div>
-                  </div>
-                  <div className="p-3">
-                    <h4 className="font-medium text-sm">Business & Office</h4>
-                    <p className="text-xs text-muted-foreground">15 items</p>
-                  </div>
-                </Card>
+            )}
+            
+            {mediaTab === "recent-uploads" && (
+              <div className="mt-4">
+                <h3 className="font-medium mb-4">Recent Uploads</h3>
+                <MediaUploader 
+                  onMediaSelected={(media) => {
+                    // If there's a selected media variable, automatically apply this upload to it
+                    if (getMediaVariables.length > 0) {
+                      const firstMediaVar = getMediaVariables[0].key;
+                      handleMediaSelect(firstMediaVar, media);
+                    }
+                  }}
+                />
               </div>
-            </TabsContent>
-          </Tabs>
+            )}
+            
+            {mediaTab === "content-packs" && (
+              <div className="mt-4">
+                <Tabs defaultValue="nature">
+                  <TabsList>
+                    <TabsTrigger value="nature">Nature</TabsTrigger>
+                    <TabsTrigger value="business">Business</TabsTrigger>
+                    <TabsTrigger value="urban">Urban</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="nature" className="mt-4">
+                    <MediaGallery 
+                      contentPackId="nature"
+                      onMediaSelect={(media) => {
+                        if (getMediaVariables.length > 0) {
+                          const firstMediaVar = getMediaVariables[0].key;
+                          handleMediaSelect(firstMediaVar, media);
+                        }
+                      }}
+                    />
+                  </TabsContent>
+                  <TabsContent value="business" className="mt-4">
+                    <MediaGallery 
+                      contentPackId="business"
+                      onMediaSelect={(media) => {
+                        if (getMediaVariables.length > 0) {
+                          const firstMediaVar = getMediaVariables[0].key;
+                          handleMediaSelect(firstMediaVar, media);
+                        }
+                      }}
+                    />
+                  </TabsContent>
+                  <TabsContent value="urban" className="mt-4">
+                    <MediaGallery 
+                      contentPackId="urban"
+                      onMediaSelect={(media) => {
+                        if (getMediaVariables.length > 0) {
+                          const firstMediaVar = getMediaVariables[0].key;
+                          handleMediaSelect(firstMediaVar, media);
+                        }
+                      }}
+                    />
+                  </TabsContent>
+                </Tabs>
+              </div>
+            )}
+          </div>
         </Card>
       </div>
     </div>
