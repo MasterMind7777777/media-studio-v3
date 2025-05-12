@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Play, Maximize, Pause, AlertCircle, RotateCcw, RefreshCw } from "lucide-react";
 import { useCreatomatePreview } from "@/hooks/templates";
-import { isCreatomateSDKAvailable } from "@/integrations/creatomate/config";
+import { isCreatomateSDKAvailable, forcePageRefresh } from "@/integrations/creatomate/config";
 
 interface TemplatePreviewProps {
   previewImageUrl: string;
@@ -25,19 +25,21 @@ export function TemplatePreview({
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [sdkStatus, setSdkStatus] = useState<string>("checking");
+  const [refreshAttempts, setRefreshAttempts] = useState(0);
   
-  // Check if SDK is available
+  // Check if SDK is available but only once on component mount
   useEffect(() => {
     const checkSdk = () => {
       const available = isCreatomateSDKAvailable();
       setSdkStatus(available ? "loaded" : "not-loaded");
     };
     
-    // Check immediately and then on an interval
+    // Initial check only, no interval to prevent refresh loops
     checkSdk();
-    const interval = setInterval(checkSdk, 2000);
     
-    return () => clearInterval(interval);
+    return () => {
+      // No cleanup needed since we're not using intervals anymore
+    };
   }, []);
   
   const {
@@ -53,7 +55,8 @@ export function TemplatePreview({
     containerRef: previewContainerRef,
     autoPlay: false,
     loop: true,
-    muted: true
+    muted: true,
+    skipAutoRetry: true // New prop to prevent automatic retries
   });
   
   // For debugging purposes
@@ -73,16 +76,19 @@ export function TemplatePreview({
     }
   };
   
-  // Retry initialization by using the hook's retry function
+  // Retry initialization by using the hook's retry function - with rate limiting
   const handleRetryInitialization = () => {
+    // Rate limit the retries
+    setRefreshAttempts(prev => prev + 1);
     if (retryInitialization) {
       retryInitialization();
     }
   };
   
-  // Force page refresh to reload SDK
+  // Force page refresh to reload SDK - but prevent multiple quick refreshes
   const handleForceRefresh = () => {
-    window.location.reload();
+    // Only allow refresh every few seconds to prevent infinite loops
+    forcePageRefresh();
   };
 
   return (
@@ -131,7 +137,6 @@ export function TemplatePreview({
                   <p>Template ID: {initStatus.hasTemplateId ? '✅' : '❌'}</p>
                   <p>API Key: {initStatus.apiKey}</p>
                   <p>Attempts: {initStatus.attempts}</p>
-                  <p>Status: {initStatus.initializing ? 'Initializing...' : 'Idle'}</p>
                 </div>
               </div>
             )}
@@ -142,6 +147,7 @@ export function TemplatePreview({
                 variant="outline"
                 className="bg-white/10 hover:bg-white/20 text-white mb-4"
                 onClick={handleRetryInitialization}
+                disabled={refreshAttempts > 5}
               >
                 <RotateCcw className="h-4 w-4 mr-1" />
                 Retry
