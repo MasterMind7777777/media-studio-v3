@@ -244,7 +244,14 @@ Deno.serve(async (req) => {
     }
     
     // Get the site URL for webhook
-    const siteUrl = Deno.env.get('SITE_URL') || supabaseUrl.replace('.supabase.co', '.functions.supabase.co');
+    const siteUrl = Deno.env.get('SITE_URL');
+    if (!siteUrl) {
+      return new Response(
+        JSON.stringify({ error: 'SITE_URL environment variable not set' }),
+        { status: 500, headers: corsHeaders }
+      );
+    }
+    
     const webhookUrl = `${siteUrl}/functions/v1/creatomate-webhook`;
     
     if (action === 'import-template') {
@@ -500,10 +507,11 @@ Deno.serve(async (req) => {
             width: platform.width,
             height: platform.height,
             modifications,
-            webhook_url: webhookUrl,
+            webhook_url: webhookUrl,  // Add the webhook URL
             metadata: JSON.stringify({
               platform_id: platform.id,
-              user_id: requestBody.user_id // Pass user ID if available
+              user_id: requestBody.user_id, // Pass user ID if available
+              template_id: requestBody.template_id // Pass database template ID
             })
           };
           
@@ -524,6 +532,7 @@ Deno.serve(async (req) => {
             throw new Error(`Creatomate API error: ${response.statusText} - ${errorText}`);
           }
           
+          // Process the response - always expect an array from Creatomate
           const data = await response.json();
           console.log('Creatomate response:', JSON.stringify(data));
           
@@ -542,14 +551,11 @@ Deno.serve(async (req) => {
         
         console.log('All render requests completed. Total renders:', allRenders.length);
         
-        // Store render IDs for legacy compatibility
-        const renderIds = allRenders.map(render => render.id);
-        
         // Return both the full render objects and just the IDs for backwards compatibility
         return new Response(
           JSON.stringify({ 
             renders: allRenders,
-            renderIds 
+            renderIds: allRenders.map(render => render.id)
           }), 
           { headers: corsHeaders }
         );

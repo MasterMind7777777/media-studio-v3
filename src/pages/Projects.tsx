@@ -32,11 +32,24 @@ export default function Projects() {
         return 'bg-green-500/10 text-green-500 hover:bg-green-500/20';
       case 'processing':
       case 'rendering':
+      case 'planned':
         return 'bg-blue-500/10 text-blue-500 hover:bg-blue-500/20';
       case 'failed':
         return 'bg-red-500/10 text-red-500 hover:bg-red-500/20';
       default:
         return 'bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20';
+    }
+  };
+  
+  // Format status for display
+  const formatStatus = (status: string) => {
+    switch (status) {
+      case 'succeeded':
+        return 'Completed';
+      case 'planned':
+        return 'Planned';
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1);
     }
   };
   
@@ -128,7 +141,7 @@ export default function Projects() {
                     </CardDescription>
                   </div>
                   <Badge className={getStatusColor(job.status)}>
-                    {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                    {formatStatus(job.status)}
                   </Badge>
                 </div>
               </CardHeader>

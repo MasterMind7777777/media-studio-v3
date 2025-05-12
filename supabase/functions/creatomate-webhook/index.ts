@@ -71,7 +71,7 @@ serve(async (req: Request) => {
             [render.id]: render.url
           },
           template_id: metadata?.template_id || render.template_id,
-          user_id: metadata?.user_id || 'system',
+          user_id: metadata?.user_id || null,
         });
 
       if (insertError) {

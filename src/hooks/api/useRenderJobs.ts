@@ -1,8 +1,7 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RenderJob, Platform } from "@/types";
-import { startRenderJob, checkRenderStatus } from "@/services/creatomate";
+import { startRenderJob } from "@/services/creatomate";
 import { Json } from "@/integrations/supabase/types";
 import { useEffect } from "react";
 
@@ -157,7 +156,7 @@ export const useCreateRenderJob = () => {
             template_id: templateId,
             variables: variables as Json,
             platforms: platforms as unknown as Json,
-            status: 'pending',
+            status: 'planned',  // Changed from 'pending' to match Creatomate status
             creatomate_render_ids: renderIds,
             output_urls: {} as Json
           }])
@@ -222,64 +221,24 @@ export const useUpdateRenderJob = () => {
   });
 };
 
+// Note: The checkRenderStatus hook is now deprecated as we're using webhooks instead
+// We'll keep it for backward compatibility but mark it as deprecated
 /**
- * Hook to check render status and update job (legacy, will be deprecated in favor of webhooks)
+ * @deprecated Use webhook approach instead
+ * Hook to check render status and update job
  */
 export const useCheckRenderStatus = () => {
+  console.warn("useCheckRenderStatus is deprecated. The application now uses webhooks for status updates.");
+  
   const queryClient = useQueryClient();
   
   return useMutation({
     mutationFn: async (renderJob: RenderJob) => {
-      if (!renderJob.creatomate_render_ids || renderJob.creatomate_render_ids.length === 0) {
-        throw new Error("No render IDs to check");
-      }
-      
-      // Check status with Creatomate
-      const statusMap = await checkRenderStatus(renderJob.creatomate_render_ids);
-      
-      // Determine overall status
-      let overallStatus = 'pending';
-      const completedCount = Object.values(statusMap).filter(s => s.status === 'completed').length;
-      const failedCount = Object.values(statusMap).filter(s => s.status === 'failed').length;
-      
-      if (completedCount === renderJob.creatomate_render_ids.length) {
-        overallStatus = 'completed';
-      } else if (failedCount > 0) {
-        overallStatus = 'failed';
-      } else {
-        overallStatus = 'processing';
-      }
-      
-      // Update output URLs for completed renders
-      const outputUrls: Record<string, string> = {};
-      Object.entries(statusMap).forEach(([id, info]) => {
-        if (info.status === 'completed' && info.url) {
-          outputUrls[id] = info.url;
-        }
-      });
-      
-      // Update the render job in the database
-      const { data, error } = await supabase
-        .from("render_jobs")
-        .update({
-          status: overallStatus,
-          output_urls: {...renderJob.output_urls, ...outputUrls} as unknown as Json,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", renderJob.id)
-        .select()
-        .single();
-        
-      if (error) {
-        throw new Error(`Error updating render job status: ${error.message}`);
-      }
-      
-      return transformRenderJobData(data);
+      // Simply return the render job as is, since webhooks will handle status updates
+      return renderJob;
     },
     onSuccess: (data) => {
-      // Invalidate specific render job query and list
-      queryClient.invalidateQueries({ queryKey: ["renderJobs", data.id] });
-      queryClient.invalidateQueries({ queryKey: ["renderJobs"] });
+      // No action needed - webhooks will update the status
     }
   });
 };

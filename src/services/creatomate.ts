@@ -167,27 +167,3 @@ function cleanupVariables(variables: Record<string, any>): Record<string, any> {
   
   return cleanVars;
 }
-
-/**
- * Check status of a render job via secure Edge Function
- * This will be deprecated in favor of the webhook approach
- */
-export async function checkRenderStatus(renderIds: string[]): Promise<Record<string, any>> {
-  try {
-    const { data, error } = await supabase.functions.invoke('creatomate', {
-      body: { 
-        action: 'check-render',
-        renderIds 
-      },
-    });
-    
-    if (error) {
-      throw new Error(`Error checking render status: ${error.message}`);
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('Error checking render status:', error);
-    throw error;
-  }
-}
