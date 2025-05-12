@@ -11,7 +11,7 @@ export function CreatomateLoader() {
   const [sdkChecked, setSDKChecked] = useState(false);
   
   useEffect(() => {
-    // Only check if SDK is available without trying to load it manually
+    // Check if SDK is available without trying to load it manually
     const checkSDK = () => {
       if (isCreatomateSDKAvailable()) {
         console.log('Creatomate SDK detected');

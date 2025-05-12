@@ -28,6 +28,9 @@ export function useTemplateVariables(template: Template | null): VariablesByType
     if (!template?.variables) {
       return result;
     }
+
+    // Create a map to track elements and prevent duplicates
+    const processedElements = new Map();
     
     // Process each variable
     Object.entries(template.variables).forEach(([key, value]) => {
@@ -36,35 +39,44 @@ export function useTemplateVariables(template: Template | null): VariablesByType
       
       // Extract the variable name from the key (e.g., "title.text" -> "title")
       const parts = key.split('.');
-      const variableName = parts[0];
-      const variableType = parts.length > 1 ? parts[1] : '';
+      const variableName = parts[0]; // Base element name
+      const propertyType = parts.length > 1 ? parts[1] : '';
       
-      // Handle nested source properties (e.g., "avatar-1.source.source")
-      // This prevents duplicate entries for the same media element
-      if (key.includes('.source.source')) {
-        // Skip these as they're duplicates
+      // Skip if it's a duplicate property type for the same element
+      const elementPropertyKey = `${variableName}-${propertyType}`;
+      if (processedElements.has(elementPropertyKey)) {
+        console.log(`Skipping duplicate: ${key}`);
         return;
       }
       
-      // Categorize by type
-      if (variableType === 'text') {
+      // Skip nested source properties
+      if (key.endsWith('.source.source') || key.includes('.source.') && !key.endsWith('.source')) {
+        console.log(`Skipping nested source property: ${key}`);
+        return;
+      }
+      
+      // Categorize variables by type
+      if (propertyType === 'text') {
+        processedElements.set(elementPropertyKey, true);
         result.textVariables.push({
           key,
-          variableName: variableName,
+          variableName,
           value: String(value),
           property: 'text'
         });
-      } else if (variableType === 'source') {
+      } else if (propertyType === 'source') {
+        processedElements.set(elementPropertyKey, true);
         result.mediaVariables.push({
           key,
-          variableName: variableName,
+          variableName,
           value: String(value),
           property: 'source'
         });
-      } else if (variableType === 'fill') {
+      } else if (propertyType === 'fill') {
+        processedElements.set(elementPropertyKey, true);
         result.colorVariables.push({
           key,
-          variableName: variableName,
+          variableName,
           value: String(value),
           property: 'fill'
         });

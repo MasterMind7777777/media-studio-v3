@@ -70,7 +70,7 @@ export function TemplateVariablesEditor({
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="p-4 pt-0 space-y-3">
-              {textVariables.map(({key, value}) => (
+              {textVariables.map(({key, value, variableName}) => (
                 <div key={key} className="space-y-1">
                   <label className="text-sm text-muted-foreground">
                     {formatVariableName(key)}
@@ -102,7 +102,7 @@ export function TemplateVariablesEditor({
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="p-4 pt-0 space-y-3">
-              {mediaVariables.map(({key, value}) => {
+              {mediaVariables.map(({key, value, variableName}) => {
                 const mediaAsset = selectedMedia[key];
                 const displayName = formatVariableName(key);
                 
@@ -152,7 +152,7 @@ export function TemplateVariablesEditor({
               </div>
             </CollapsibleTrigger>
             <CollapsibleContent className="p-4 pt-0 space-y-3">
-              {colorVariables.map(({key, value}) => (
+              {colorVariables.map(({key, value, variableName}) => (
                 <div key={key} className="flex items-center justify-between">
                   <label className="text-sm">{formatVariableName(key)}</label>
                   <div className="flex items-center gap-2">
@@ -174,7 +174,7 @@ export function TemplateVariablesEditor({
             </CollapsibleContent>
           </Collapsible>
         )}
-        
+
         {/* Output Options Section */}
         <Collapsible open={outputOpen} onOpenChange={setOutputOpen} className="border rounded-md">
           <CollapsibleTrigger className="flex w-full items-center justify-between p-4">

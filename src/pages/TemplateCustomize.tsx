@@ -91,28 +91,38 @@ export default function TemplateCustomize() {
     navigate("/create");
   };
   
-  // Variable update handlers
+  // Variable update handlers - FIXED to properly handle keys
   const handleTextChange = (variableKey: string, value: string) => {
     if (!updatedTemplate) return;
     
+    console.log(`Updating text variable: ${variableKey} = ${value}`);
+    
+    // Use the provided key directly without modification - the key already includes the .text suffix
+    const updatedVariables = {
+      ...updatedTemplate.variables,
+      [variableKey]: value
+    };
+    
     setUpdatedTemplate({
       ...updatedTemplate,
-      variables: {
-        ...updatedTemplate.variables,
-        [`${variableKey}.text`]: value
-      }
+      variables: updatedVariables
     });
   };
   
   const handleColorChange = (variableKey: string, value: string) => {
     if (!updatedTemplate) return;
     
+    console.log(`Updating color variable: ${variableKey} = ${value}`);
+    
+    // Use the provided key directly without modification - the key already includes the .fill suffix
+    const updatedVariables = {
+      ...updatedTemplate.variables,
+      [variableKey]: value
+    };
+    
     setUpdatedTemplate({
       ...updatedTemplate,
-      variables: {
-        ...updatedTemplate.variables,
-        [`${variableKey}.fill`]: value
-      }
+      variables: updatedVariables
     });
   };
   
@@ -125,6 +135,8 @@ export default function TemplateCustomize() {
   const handleMediaDialogSelect = (mediaAsset: MediaAsset) => {
     if (!currentMediaKey || !updatedTemplate) return;
     
+    console.log(`Selected media for ${currentMediaKey}: ${mediaAsset.name}`);
+    
     // Update the selected media
     setSelectedMedia({
       ...selectedMedia,
@@ -136,7 +148,7 @@ export default function TemplateCustomize() {
       ...updatedTemplate,
       variables: {
         ...updatedTemplate.variables,
-        [`${currentMediaKey}.source`]: mediaAsset.file_url
+        [currentMediaKey]: mediaAsset.file_url
       }
     });
     
