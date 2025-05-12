@@ -11,6 +11,7 @@ import Create from "./pages/Create";
 import Templates from "./pages/Templates";
 import TemplateCustomize from "./pages/TemplateCustomize";
 import Projects from "./pages/Projects";
+import Media from "./pages/Media"; // Import the Media page
 import { useAuth } from '@/context/AuthContext';
 import Login from './pages/Auth';
 import Register from './pages/Auth';
@@ -55,6 +56,7 @@ function App() {
           <Route path="/create/:id/customize" element={<TemplateCustomize />} />
           <Route path="/templates" element={<Templates />} />
           <Route path="/projects" element={<Projects />} />
+          <Route path="/media" element={<Media />} /> {/* Add the Media route */}
           <Route path="/account" element={<Account />} />
           <Route path="/settings" element={<Account />} />
         </Route>
