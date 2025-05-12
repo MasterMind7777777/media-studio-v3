@@ -1,10 +1,8 @@
 
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { MainLayout } from "@/components/Layout/MainLayout";
 import { Template, Platform } from "@/types";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Card,
   CardContent,
@@ -15,42 +13,14 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, Filter, Loader2 } from "lucide-react";
+import { useTemplates } from "@/hooks/api";
 
 export default function Templates() {
   const navigate = useNavigate();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
-  // Fetch templates from Supabase
-  const { data: templates, isLoading, error } = useQuery({
-    queryKey: ["templates"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("templates")
-        .select("*")
-        .eq("is_active", true);
-        
-      if (error) {
-        throw new Error(`Error fetching templates: ${error.message}`);
-      }
-      
-      // Transform the data to match the expected Template type
-      return (data || []).map(item => ({
-        ...item,
-        // Properly transform the platforms from Json to Platform[] type
-        platforms: Array.isArray(item.platforms) 
-          ? item.platforms.map((platform: any) => ({
-              id: platform.id || '',
-              name: platform.name || '',
-              width: platform.width || 0,
-              height: platform.height || 0,
-              aspect_ratio: platform.aspect_ratio || '1:1'
-            }))
-          : [],
-        // Ensure variables is a proper Record type
-        variables: item.variables || {},
-      })) as Template[];
-    }
-  });
+  // Fetch templates using our custom hook
+  const { data: templates, isLoading, error } = useTemplates();
   
   // Get unique categories from templates
   const categories = templates 
