@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { formatVariablesForPlayer } from '@/integrations/creatomate/config';
+import { formatVariablesForPlayer, isCreatomateSDKAvailable } from '@/integrations/creatomate/config';
 import { toast } from 'sonner';
 
 interface UseCreatomatePreviewProps {
@@ -56,8 +56,15 @@ export function useCreatomatePreview({
   // Initialize the preview
   const initializePreview = () => {
     // Skip if no container ID or if window/Creatomate is not available
-    if (!containerId || !window.Creatomate?.Preview) {
-      console.log('Preview initialization skipped: missing containerId or SDK');
+    if (!containerId) {
+      console.log('Preview initialization skipped: missing containerId');
+      return;
+    }
+
+    // Check if the SDK is available
+    if (!isCreatomateSDKAvailable()) {
+      console.log('Preview initialization skipped: SDK not available');
+      setError(new Error('Creatomate SDK not loaded. Please refresh the page and try again.'));
       return;
     }
 

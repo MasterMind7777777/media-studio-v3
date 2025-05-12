@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from 'react';
-import { isCreatomateSDKAvailable, loadCreatomateSDKManually } from '@/integrations/creatomate/config';
+import { isCreatomateSDKAvailable } from '@/integrations/creatomate/config';
 import { toast } from 'sonner';
 
 /**
@@ -8,47 +8,30 @@ import { toast } from 'sonner';
  * This can be added near the top of the app to handle SDK loading
  */
 export function CreatomateLoader() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 2;
-
+  const [sdkChecked, setSDKChecked] = useState(false);
+  
   useEffect(() => {
-    // Check if SDK is already loaded
-    if (isCreatomateSDKAvailable()) {
-      console.log('Creatomate SDK already loaded on mount');
-      setIsLoaded(true);
-      return;
-    }
-    
-    // Only try to load if we haven't tried too many times
-    if (retryCount >= maxRetries) {
-      console.error(`Failed to load Creatomate SDK after ${maxRetries} retries`);
-      toast.error('Failed to load video editor', {
-        description: 'Please refresh the page or try again later.'
+    // Only check if SDK is available without trying to load it manually
+    // The SDK should already be loaded via the script tag in index.html
+    const checkSDK = () => {
+      if (isCreatomateSDKAvailable()) {
+        console.log('Creatomate SDK detected');
+        setSDKChecked(true);
+        return;
+      }
+      
+      console.warn('Creatomate SDK not detected after initial page load');
+      toast.error('Video editor components may not work properly', {
+        description: 'Please refresh the page or check your internet connection.'
       });
-      return;
-    }
+      setSDKChecked(true);
+    };
     
-    // Try to load the SDK
-    setIsLoading(true);
-    console.log(`Attempting to load Creatomate SDK (attempt ${retryCount + 1})`);
+    // Wait a short time for the script to load
+    const timer = setTimeout(checkSDK, 1000);
     
-    loadCreatomateSDKManually()
-      .then(() => {
-        console.log('Creatomate SDK loaded successfully');
-        setIsLoaded(true);
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        console.error('Failed to load Creatomate SDK:', err);
-        setIsLoading(false);
-        // Retry after a delay
-        setTimeout(() => {
-          setRetryCount(count => count + 1);
-        }, 2000);
-      });
-  }, [retryCount]);
+    return () => clearTimeout(timer);
+  }, []);
 
   // This component doesn't render anything visible
   return null;
