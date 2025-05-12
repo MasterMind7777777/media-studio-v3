@@ -1,4 +1,3 @@
-
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useTemplate, useCreateRenderJob, useUpdateTemplate } from "@/hooks/api";
@@ -224,6 +223,8 @@ export default function TemplateCustomize() {
             previewImageUrl={updatedTemplate.preview_image_url}
             width={updatedTemplate.platforms[0]?.width}
             height={updatedTemplate.platforms[0]?.height}
+            templateId={updatedTemplate.id}
+            variables={updatedTemplate.variables}
           />
         </div>
         
