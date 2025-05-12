@@ -22,20 +22,38 @@ export function formatVariablesForPlayer(variables: Record<string, any> = {}): R
   }
   
   console.log('Formatting variables for player:', variables);
+  
+  // Simple validation to ensure we have proper format
+  Object.entries(formattedVariables).forEach(([key, value]) => {
+    if (value === null || value === undefined) {
+      console.warn(`Variable ${key} has null or undefined value, removing it`);
+      delete formattedVariables[key];
+    }
+  });
+  
   return formattedVariables;
 }
 
 /**
- * Get Creatomate SDK URL
- */
-export const CREATOMATE_SDK_URL = 'https://cdn.jsdelivr.net/npm/creatomate@1.2.1/dist/index.min.js';
-
-/**
  * Maximum retry attempts for player initialization
  */
-export const MAX_INITIALIZATION_RETRIES = 3;
+export const MAX_INITIALIZATION_RETRIES = 5;
 
 /**
- * Delay in ms before initializing player after SDK load
+ * Delay in ms before initializing player after SDK load check
  */
-export const SDK_INITIALIZATION_DELAY = 300;
+export const SDK_INITIALIZATION_DELAY = 500;
+
+/**
+ * Delay between initialization retry attempts in ms
+ */
+export const RETRY_DELAY = 1000;
+
+/**
+ * Check if Creatomate SDK is available in the window object
+ */
+export function isCreatomateSDKAvailable(): boolean {
+  return typeof window !== 'undefined' && 
+         typeof window.Creatomate !== 'undefined' && 
+         window.Creatomate !== null;
+}

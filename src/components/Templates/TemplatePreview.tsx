@@ -29,7 +29,8 @@ export function TemplatePreview({
     isPlaying,
     error,
     toggle: togglePlayback,
-    getInitializationStatus
+    getInitializationStatus,
+    retryInitialization
   } = useCreatomatePreview({
     creatomateTemplateId,
     variables,
@@ -56,21 +57,10 @@ export function TemplatePreview({
     }
   };
   
-  // Retry initialization by forcing a remount
+  // Retry initialization by using the hook's retry function
   const handleRetryInitialization = () => {
-    if (previewContainerRef.current) {
-      // Force a refresh of the container to retry initialization
-      const container = previewContainerRef.current;
-      const parent = container.parentElement;
-      if (parent) {
-        parent.removeChild(container);
-        setTimeout(() => {
-          parent.appendChild(container);
-        }, 100);
-      }
-      
-      // Reload the page as last resort
-      // window.location.reload();
+    if (retryInitialization) {
+      retryInitialization();
     }
   };
 

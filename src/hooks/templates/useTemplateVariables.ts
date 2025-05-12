@@ -48,12 +48,17 @@ export function useTemplateVariables(template: Template | null) {
       }));
   }, [hasVariables, template?.variables]);
 
-  // Format variables for Creatomate Player - preserving original structure
+  // Format variables for Creatomate Player - ensuring correct format
   const formattedVariables = useMemo(() => {
     if (!hasVariables) return {};
     
-    // Use our formatter helper to ensure variables are in the right format
-    return formatVariablesForPlayer(template!.variables);
+    try {
+      // Use our formatter helper to ensure variables are in the right format
+      return formatVariablesForPlayer(template!.variables);
+    } catch (error) {
+      console.error('Error formatting variables:', error);
+      return {};
+    }
   }, [hasVariables, template?.variables]);
 
   // Debug function to check variable structure
@@ -63,9 +68,10 @@ export function useTemplateVariables(template: Template | null) {
       variableCount: hasVariables ? Object.keys(template!.variables).length : 0,
       textCount: textVariables.length,
       mediaCount: mediaVariables.length,
-      colorCount: colorVariables.length
+      colorCount: colorVariables.length,
+      formattedKeys: hasVariables ? Object.keys(formattedVariables) : []
     };
-  }, [hasVariables, template?.variables, textVariables.length, mediaVariables.length, colorVariables.length]);
+  }, [hasVariables, template?.variables, textVariables.length, mediaVariables.length, colorVariables.length, formattedVariables]);
 
   return {
     textVariables,
