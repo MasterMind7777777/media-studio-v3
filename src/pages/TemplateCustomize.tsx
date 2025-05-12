@@ -1,4 +1,3 @@
-import { MainLayout } from "@/components/Layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useParams, useNavigate } from "react-router-dom";
@@ -126,14 +125,12 @@ export default function TemplateCustomize() {
   // If template is loading, show loading state
   if (isLoading) {
     return (
-      <MainLayout>
-        <div className="flex justify-center items-center h-[70vh]">
-          <div className="text-center">
-            <div className="mb-4">Loading template...</div>
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-studio-600 mx-auto"></div>
-          </div>
+      <div className="flex justify-center items-center h-[70vh]">
+        <div className="text-center">
+          <div className="mb-4">Loading template...</div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-studio-600 mx-auto"></div>
         </div>
-      </MainLayout>
+      </div>
     );
   }
   
@@ -606,39 +603,37 @@ export default function TemplateCustomize() {
   );
 
   return (
-    <MainLayout>
-      <div className="flex flex-col gap-6 p-8">
-        <div className="flex items-center justify-between">
-          <Button variant="ghost" className="gap-2" onClick={handleBack}>
-            <ArrowLeft className="h-4 w-4" />
-            Back
-          </Button>
-          <h1 className="text-xl font-bold">{template.name}</h1>
-          <div className="w-24"></div> {/* Empty div for spacing */}
-        </div>
-        
-        {renderSteps()}
-        
-        <div className="min-h-[60vh]">
-          {activeStep === 1 && renderMediaSelectionStep()}
-          {activeStep === 2 && renderCustomizationStep()}
-          {activeStep === 3 && renderRenderOptionsStep()}
-        </div>
-        
-        <div className="flex justify-end mt-8">
-          <Button 
-            className="gap-2 bg-studio-600 hover:bg-studio-700"
-            onClick={handleNext}
-            disabled={isRendering || isUpdating}
-          >
-            {isRendering ? "Starting Render..." : 
-             isUpdating ? "Saving Changes..." :
-             activeStep === 3 ? 'Start Render' : 'Next Step'}
-            {!isRendering && !isUpdating && <ChevronRight className="h-4 w-4" />}
-            {(isRendering || isUpdating) && <Loader2 className="h-4 w-4 animate-spin" />}
-          </Button>
-        </div>
+    <div className="flex flex-col gap-6 p-8">
+      <div className="flex items-center justify-between">
+        <Button variant="ghost" className="gap-2" onClick={handleBack}>
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
+        <h1 className="text-xl font-bold">{template.name}</h1>
+        <div className="w-24"></div> {/* Empty div for spacing */}
       </div>
-    </MainLayout>
+      
+      {renderSteps()}
+      
+      <div className="min-h-[60vh]">
+        {activeStep === 1 && renderMediaSelectionStep()}
+        {activeStep === 2 && renderCustomizationStep()}
+        {activeStep === 3 && renderRenderOptionsStep()}
+      </div>
+      
+      <div className="flex justify-end mt-8">
+        <Button 
+          className="gap-2 bg-studio-600 hover:bg-studio-700"
+          onClick={handleNext}
+          disabled={isRendering || isUpdating}
+        >
+          {isRendering ? "Starting Render..." : 
+           isUpdating ? "Saving Changes..." :
+           activeStep === 3 ? 'Start Render' : 'Next Step'}
+          {!isRendering && !isUpdating && <ChevronRight className="h-4 w-4" />}
+          {(isRendering || isUpdating) && <Loader2 className="h-4 w-4 animate-spin" />}
+        </Button>
+      </div>
+    </div>
   );
 }
