@@ -3,46 +3,62 @@ import { useMemo } from "react";
 import { Template } from "@/types";
 
 export function useTemplateVariables(template: Template | null) {
-  // Helper functions to extract variables by type from the flattened structure
+  // Helper function to validate if we have a valid template with variables
+  const hasVariables = useMemo(() => {
+    return template?.variables && Object.keys(template.variables).length > 0;
+  }, [template]);
+
+  // Extract text variables from template
   const textVariables = useMemo(() => {
-    if (!template?.variables) return [];
+    if (!hasVariables) return [];
     
-    return Object.entries(template.variables)
-      .filter(([key, value]) => key.includes('.text'))
+    return Object.entries(template!.variables)
+      .filter(([key]) => key.includes('.text'))
       .map(([key, value]) => ({
         key: key.split('.')[0],
         property: 'text',
         value
       }));
-  }, [template?.variables]);
+  }, [hasVariables, template?.variables]);
   
+  // Extract media variables from template
   const mediaVariables = useMemo(() => {
-    if (!template?.variables) return [];
+    if (!hasVariables) return [];
     
-    return Object.entries(template.variables)
-      .filter(([key, value]) => key.includes('.source'))
+    return Object.entries(template!.variables)
+      .filter(([key]) => key.includes('.source'))
       .map(([key, value]) => ({
         key: key.split('.')[0],
         property: 'source',
         value
       }));
-  }, [template?.variables]);
+  }, [hasVariables, template?.variables]);
   
+  // Extract color variables from template
   const colorVariables = useMemo(() => {
-    if (!template?.variables) return [];
+    if (!hasVariables) return [];
     
-    return Object.entries(template.variables)
-      .filter(([key, value]) => key.includes('.fill'))
+    return Object.entries(template!.variables)
+      .filter(([key]) => key.includes('.fill'))
       .map(([key, value]) => ({
         key: key.split('.')[0],
         property: 'fill',
         value
       }));
-  }, [template?.variables]);
+  }, [hasVariables, template?.variables]);
+
+  // Format variables for Creatomate Player
+  const formattedVariables = useMemo(() => {
+    if (!hasVariables) return {};
+    
+    // Return the original variables structure as Creatomate expects
+    return template!.variables;
+  }, [hasVariables, template?.variables]);
 
   return {
     textVariables,
     mediaVariables,
-    colorVariables
+    colorVariables,
+    formattedVariables
   };
 }

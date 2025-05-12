@@ -33,6 +33,7 @@ export function useCreatomatePreview({
   // Load the Creatomate SDK
   useEffect(() => {
     if (!sdkLoadedRef.current && !window.Creatomate && !document.getElementById('creatomate-sdk')) {
+      console.log('Loading Creatomate SDK...');
       const script = document.createElement('script');
       script.id = 'creatomate-sdk';
       script.src = 'https://cdn.jsdelivr.net/npm/creatomate@1.2.1/dist/index.min.js';
@@ -41,16 +42,18 @@ export function useCreatomatePreview({
       script.onload = () => {
         console.log('Creatomate SDK loaded successfully');
         sdkLoadedRef.current = true;
-        initializePlayer();
+        if (templateId && containerRef.current) {
+          initializePlayer();
+        }
       };
       
-      script.onerror = () => {
-        console.error('Failed to load Creatomate SDK');
+      script.onerror = (e) => {
+        console.error('Failed to load Creatomate SDK:', e);
         setError('Failed to load preview SDK. Please try again later.');
       };
       
       document.body.appendChild(script);
-    } else if (window.Creatomate) {
+    } else if (window.Creatomate && templateId && containerRef.current) {
       sdkLoadedRef.current = true;
       initializePlayer();
     }
@@ -59,6 +62,7 @@ export function useCreatomatePreview({
       // Cleanup
       if (playerRef.current) {
         try {
+          console.log('Disposing Creatomate player');
           playerRef.current.dispose();
           playerRef.current = null;
         } catch (e) {
@@ -66,17 +70,27 @@ export function useCreatomatePreview({
         }
       }
     };
-  }, []);
+  }, [templateId]);
   
-  // Initialize or update player when templateId or variables change
+  // Initialize or update player when variables change
   useEffect(() => {
-    if (sdkLoadedRef.current && templateId) {
-      initializePlayer();
+    if (sdkLoadedRef.current && templateId && containerRef.current && playerRef.current) {
+      try {
+        console.log('Updating player variables:', variables);
+        playerRef.current.setModifications(variables || {});
+      } catch (e) {
+        console.error('Error updating variables:', e);
+      }
     }
-  }, [templateId, JSON.stringify(variables)]);
+  }, [JSON.stringify(variables)]);
   
-  const initializePlayer = async () => {
+  const initializePlayer = () => {
     if (!window.Creatomate || !templateId || !containerRef.current) {
+      console.log('Cannot initialize player:', { 
+        sdkLoaded: !!window.Creatomate,
+        templateId,
+        containerRef: !!containerRef.current
+      });
       return;
     }
     
@@ -92,8 +106,8 @@ export function useCreatomatePreview({
         }
       }
       
-      // Create new player instance
-      playerRef.current = new window.Creatomate.Player(containerRef.current, {
+      // Create player configuration based on tutorial approach
+      const playerOptions = {
         source: {
           template_id: templateId,
           modifications: variables || {},
@@ -101,7 +115,12 @@ export function useCreatomatePreview({
         autoPlay,
         loop,
         muted,
-      });
+      };
+      
+      console.log('Player options:', playerOptions);
+      
+      // Create new player instance
+      playerRef.current = new window.Creatomate.Player(containerRef.current, playerOptions);
       
       playerRef.current.on('loaded', () => {
         console.log('Creatomate player loaded successfully');
@@ -123,13 +142,13 @@ export function useCreatomatePreview({
       
       playerRef.current.on('error', (e: any) => {
         console.error('Creatomate player error:', e);
-        setError('Failed to load preview. Please check your template configuration.');
+        setError(`Preview error: ${e.message || 'Unknown error'}`);
         setIsLoaded(false);
       });
       
     } catch (e) {
       console.error('Error initializing Creatomate player:', e);
-      setError('Failed to initialize preview.');
+      setError(`Initialization error: ${e instanceof Error ? e.message : 'Unknown error'}`);
       setIsLoaded(false);
     }
   };
