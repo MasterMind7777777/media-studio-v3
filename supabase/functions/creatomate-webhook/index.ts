@@ -9,6 +9,20 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 };
 
+// Define status mapping from Creatomate to our database status values
+const mapCreatomateStatus = (status: string): string => {
+  const statusMap: Record<string, string> = {
+    'planned': 'pending',
+    'waiting': 'pending',
+    'transcribing': 'processing',
+    'rendering': 'processing',
+    'succeeded': 'completed',
+    'failed': 'failed'
+  };
+  
+  return statusMap[status] || 'pending'; // Default to 'pending' for unknown statuses
+};
+
 // Handle CORS preflight requests
 serve(async (req: Request) => {
   // Handle CORS OPTIONS preflight request
@@ -31,6 +45,10 @@ serve(async (req: Request) => {
         { status: 400, headers: corsHeaders }
       );
     }
+
+    // Map Creatomate status to our database status
+    const mappedStatus = mapCreatomateStatus(render.status);
+    console.log(`Mapping Creatomate status '${render.status}' to database status '${mappedStatus}'`);
 
     // Create a Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -65,7 +83,7 @@ serve(async (req: Request) => {
         .from('render_jobs')
         .insert({
           id: render.id,
-          status: render.status,
+          status: mappedStatus, // Use mapped status
           creatomate_render_ids: [render.id],
           output_urls: {
             [render.id]: render.url
@@ -93,7 +111,7 @@ serve(async (req: Request) => {
       const { error: updateError } = await supabase
         .from('render_jobs')
         .update({
-          status: render.status,
+          status: mappedStatus, // Use mapped status
           output_urls: outputUrls,
           updated_at: new Date().toISOString()
         })

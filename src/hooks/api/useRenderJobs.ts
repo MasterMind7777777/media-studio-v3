@@ -1,9 +1,24 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RenderJob, Platform } from "@/types";
 import { startRenderJob } from "@/services/creatomate";
 import { Json } from "@/integrations/supabase/types";
 import { useEffect } from "react";
+
+// Define status mapping from Creatomate to our database status values
+const mapCreatomateStatus = (status: string): 'pending' | 'processing' | 'completed' | 'failed' => {
+  const statusMap: Record<string, 'pending' | 'processing' | 'completed' | 'failed'> = {
+    'planned': 'pending',
+    'waiting': 'pending',
+    'transcribing': 'processing',
+    'rendering': 'processing',
+    'succeeded': 'completed',
+    'failed': 'failed'
+  };
+  
+  return statusMap[status] || 'pending'; // Default to 'pending' for unknown statuses
+};
 
 // Helper function to transform render job data from Supabase
 const transformRenderJobData = (item: any): RenderJob => ({
@@ -156,7 +171,7 @@ export const useCreateRenderJob = () => {
             template_id: templateId,
             variables: variables as Json,
             platforms: platforms as unknown as Json,
-            status: 'planned',  // Changed from 'pending' to match Creatomate status
+            status: 'pending',  // Changed from 'planned' to 'pending' to match our database constraints
             creatomate_render_ids: renderIds,
             output_urls: {} as Json
           }])

@@ -202,6 +202,20 @@ function extractVariablesFromElements(elements: any[]): Record<string, any> {
   return variables;
 }
 
+// Define status mapping from Creatomate to our database status values
+const mapCreatomateStatus = (status: string): string => {
+  const statusMap: Record<string, string> = {
+    'planned': 'pending',
+    'waiting': 'pending',
+    'transcribing': 'processing',
+    'rendering': 'processing',
+    'succeeded': 'completed',
+    'failed': 'failed'
+  };
+  
+  return statusMap[status] || 'pending'; // Default to 'pending' for unknown statuses
+};
+
 Deno.serve(async (req) => {
   // Handle CORS
   const corsResponse = handleCors(req);
@@ -554,7 +568,10 @@ Deno.serve(async (req) => {
         // Return both the full render objects and just the IDs for backwards compatibility
         return new Response(
           JSON.stringify({ 
-            renders: allRenders,
+            renders: allRenders.map(render => ({
+              ...render,
+              status: mapCreatomateStatus(render.status) // Map status for database compatibility
+            })),
             renderIds: allRenders.map(render => render.id)
           }), 
           { headers: corsHeaders }
