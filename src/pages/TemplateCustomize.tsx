@@ -1,3 +1,4 @@
+
 import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { useTemplate, useCreateRenderJob, useUpdateTemplate } from "@/hooks/api";
@@ -55,12 +56,13 @@ export default function TemplateCustomize() {
   useEffect(() => {
     if (template && !updatedTemplate) {
       console.log(`Template data loaded successfully: ${template.name}`);
+      console.log(`Creatomate template ID: ${template.creatomate_template_id}`);
       setUpdatedTemplate(template);
     }
   }, [template, updatedTemplate]);
   
   // Extract variables by type
-  const { textVariables, mediaVariables, colorVariables } = useTemplateVariables(updatedTemplate);
+  const { textVariables, mediaVariables, colorVariables, hasVariables } = useTemplateVariables(updatedTemplate);
   
   // Handle template loading errors
   useEffect(() => {
@@ -224,8 +226,21 @@ export default function TemplateCustomize() {
             width={updatedTemplate.platforms[0]?.width}
             height={updatedTemplate.platforms[0]?.height}
             templateId={updatedTemplate.id}
+            creatomateTemplateId={updatedTemplate.creatomate_template_id}
             variables={updatedTemplate.variables}
           />
+          
+          {/* Debug information - this will help troubleshoot preview issues */}
+          <div className="mt-2 p-4 bg-muted/20 rounded border text-sm">
+            <div className="font-medium mb-1">Preview Information:</div>
+            <div>Database Template ID: {updatedTemplate.id}</div>
+            <div className={updatedTemplate.creatomate_template_id ? 'text-green-600' : 'text-red-500 font-medium'}>
+              Creatomate Template ID: {updatedTemplate.creatomate_template_id || 'Missing!'}
+            </div>
+            <div className={hasVariables ? 'text-green-600' : 'text-yellow-500'}>
+              Variables: {hasVariables ? 'Available' : 'None defined'}
+            </div>
+          </div>
         </div>
         
         {/* Editing Panel */}

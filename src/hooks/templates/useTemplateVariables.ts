@@ -47,7 +47,7 @@ export function useTemplateVariables(template: Template | null) {
       }));
   }, [hasVariables, template?.variables]);
 
-  // Format variables for Creatomate Player
+  // Format variables for Creatomate Player - preserving original structure
   const formattedVariables = useMemo(() => {
     if (!hasVariables) return {};
     
@@ -59,6 +59,7 @@ export function useTemplateVariables(template: Template | null) {
     textVariables,
     mediaVariables,
     colorVariables,
-    formattedVariables
+    formattedVariables,
+    hasVariables
   };
 }

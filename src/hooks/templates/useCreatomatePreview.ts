@@ -1,5 +1,6 @@
 
 import { useEffect, useRef, useState } from 'react';
+import { CREATOMATE_PUBLIC_API_KEY, formatVariablesForPlayer } from '@/integrations/creatomate/config';
 
 declare global {
   interface Window {
@@ -8,7 +9,7 @@ declare global {
 }
 
 interface UseCreatomatePreviewOptions {
-  templateId?: string;
+  creatomateTemplateId?: string; // This should be the Creatomate template ID, not our database ID
   variables?: Record<string, any>;
   containerRef: React.RefObject<HTMLDivElement>;
   autoPlay?: boolean;
@@ -17,7 +18,7 @@ interface UseCreatomatePreviewOptions {
 }
 
 export function useCreatomatePreview({
-  templateId,
+  creatomateTemplateId,
   variables,
   containerRef,
   autoPlay = false,
@@ -42,7 +43,7 @@ export function useCreatomatePreview({
       script.onload = () => {
         console.log('Creatomate SDK loaded successfully');
         sdkLoadedRef.current = true;
-        if (templateId && containerRef.current) {
+        if (creatomateTemplateId && containerRef.current) {
           initializePlayer();
         }
       };
@@ -53,7 +54,7 @@ export function useCreatomatePreview({
       };
       
       document.body.appendChild(script);
-    } else if (window.Creatomate && templateId && containerRef.current) {
+    } else if (window.Creatomate && creatomateTemplateId && containerRef.current) {
       sdkLoadedRef.current = true;
       initializePlayer();
     }
@@ -70,32 +71,34 @@ export function useCreatomatePreview({
         }
       }
     };
-  }, [templateId]);
+  }, [creatomateTemplateId]);
   
   // Initialize or update player when variables change
   useEffect(() => {
-    if (sdkLoadedRef.current && templateId && containerRef.current && playerRef.current) {
+    if (sdkLoadedRef.current && creatomateTemplateId && containerRef.current && playerRef.current) {
       try {
         console.log('Updating player variables:', variables);
-        playerRef.current.setModifications(variables || {});
+        const formattedVariables = formatVariablesForPlayer(variables);
+        playerRef.current.setModifications(formattedVariables);
       } catch (e) {
         console.error('Error updating variables:', e);
       }
     }
-  }, [JSON.stringify(variables)]);
+  }, [variables, JSON.stringify(variables)]);
   
   const initializePlayer = () => {
-    if (!window.Creatomate || !templateId || !containerRef.current) {
+    if (!window.Creatomate || !creatomateTemplateId || !containerRef.current) {
       console.log('Cannot initialize player:', { 
         sdkLoaded: !!window.Creatomate,
-        templateId,
+        templateId: creatomateTemplateId,
         containerRef: !!containerRef.current
       });
+      setError('Missing required configuration to initialize preview');
       return;
     }
     
     try {
-      console.log('Initializing Creatomate player with template ID:', templateId);
+      console.log('Initializing Creatomate player with template ID:', creatomateTemplateId);
       
       // Dispose existing player if any
       if (playerRef.current) {
@@ -108,9 +111,10 @@ export function useCreatomatePreview({
       
       // Create player configuration based on tutorial approach
       const playerOptions = {
+        apiKey: CREATOMATE_PUBLIC_API_KEY,
         source: {
-          template_id: templateId,
-          modifications: variables || {},
+          template_id: creatomateTemplateId,
+          modifications: formatVariablesForPlayer(variables),
         },
         autoPlay,
         loop,
@@ -179,7 +183,8 @@ export function useCreatomatePreview({
   const updateVariables = (newVariables: Record<string, any>) => {
     if (playerRef.current && isLoaded) {
       try {
-        playerRef.current.setModifications(newVariables);
+        const formattedVariables = formatVariablesForPlayer(newVariables);
+        playerRef.current.setModifications(formattedVariables);
       } catch (e) {
         console.error('Error updating variables:', e);
       }

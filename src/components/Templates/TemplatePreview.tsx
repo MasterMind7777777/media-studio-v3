@@ -2,7 +2,7 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Play, Maximize, Pause } from "lucide-react";
+import { Play, Maximize, Pause, AlertCircle } from "lucide-react";
 import { useCreatomatePreview } from "@/hooks/templates";
 
 interface TemplatePreviewProps {
@@ -10,10 +10,17 @@ interface TemplatePreviewProps {
   width?: number;
   height?: number;
   templateId?: string;
+  creatomateTemplateId?: string;
   variables?: Record<string, any>;
 }
 
-export function TemplatePreview({ previewImageUrl, width, height, templateId, variables }: TemplatePreviewProps) {
+export function TemplatePreview({ 
+  previewImageUrl, 
+  width, 
+  height, 
+  creatomateTemplateId, 
+  variables 
+}: TemplatePreviewProps) {
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
@@ -23,7 +30,7 @@ export function TemplatePreview({ previewImageUrl, width, height, templateId, va
     error,
     toggle: togglePlayback
   } = useCreatomatePreview({
-    templateId,
+    creatomateTemplateId,
     variables,
     containerRef: previewContainerRef,
     autoPlay: false,
@@ -66,8 +73,12 @@ export function TemplatePreview({ previewImageUrl, width, height, templateId, va
         
         {error && (
           <div className="text-white text-center p-8 absolute inset-0 flex flex-col items-center justify-center">
-            <div className="text-xl font-medium mb-4">Preview Error</div>
+            <AlertCircle className="h-8 w-8 text-red-400 mb-2" />
+            <div className="text-xl font-medium mb-2">Preview Error</div>
             <p className="text-white/70 mb-4">{error}</p>
+            {!creatomateTemplateId && (
+              <p className="text-white/70 mb-4">Missing Creatomate template ID</p>
+            )}
             <img 
               src={previewImageUrl} 
               alt="Preview" 
