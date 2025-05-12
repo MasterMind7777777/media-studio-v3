@@ -3,7 +3,20 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MediaAsset } from "@/types";
 import { Json } from "@/integrations/supabase/types";
-import { v4 as uuidv4 } from 'uuid';
+
+/**
+ * Helper function to generate a unique ID (replacing uuid dependency)
+ */
+function generateUniqueId() {
+  // Create a timestamp-based prefix
+  const timestamp = new Date().getTime().toString(36);
+  
+  // Add random component
+  const randomPart = Math.random().toString(36).substring(2, 10);
+  
+  // Combine for a reasonably unique ID
+  return `${timestamp}-${randomPart}`;
+}
 
 /**
  * Hook to fetch all media assets
@@ -173,7 +186,7 @@ export const useUploadMedia = () => {
       
       // Create a unique file name to prevent overwriting
       const fileExtension = file.name.split('.').pop();
-      const uniqueFileName = `${uuidv4()}.${fileExtension}`;
+      const uniqueFileName = `${generateUniqueId()}.${fileExtension}`;
       const filePath = `${user.id}/${uniqueFileName}`;
       
       try {
