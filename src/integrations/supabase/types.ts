@@ -9,7 +9,220 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      content_packs: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          thumbnail_url: string | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          thumbnail_url?: string | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          thumbnail_url?: string | null
+        }
+        Relationships: []
+      }
+      media_assets: {
+        Row: {
+          content_pack_id: string | null
+          created_at: string | null
+          file_type: string | null
+          file_url: string
+          id: string
+          metadata: Json | null
+          name: string
+          thumbnail_url: string | null
+          user_id: string | null
+        }
+        Insert: {
+          content_pack_id?: string | null
+          created_at?: string | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          metadata?: Json | null
+          name: string
+          thumbnail_url?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          content_pack_id?: string | null
+          created_at?: string | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          metadata?: Json | null
+          name?: string
+          thumbnail_url?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "media_assets_content_pack_id_fkey"
+            columns: ["content_pack_id"]
+            isOneToOne: false
+            referencedRelation: "content_packs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string | null
+          role: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id: string
+          name?: string | null
+          role?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string | null
+          role?: string | null
+        }
+        Relationships: []
+      }
+      render_jobs: {
+        Row: {
+          created_at: string | null
+          creatomate_render_ids: string[] | null
+          id: string
+          output_urls: Json | null
+          platforms: Json | null
+          status: string | null
+          template_id: string
+          updated_at: string | null
+          user_id: string
+          variables: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          creatomate_render_ids?: string[] | null
+          id?: string
+          output_urls?: Json | null
+          platforms?: Json | null
+          status?: string | null
+          template_id: string
+          updated_at?: string | null
+          user_id: string
+          variables?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          creatomate_render_ids?: string[] | null
+          id?: string
+          output_urls?: Json | null
+          platforms?: Json | null
+          status?: string | null
+          template_id?: string
+          updated_at?: string | null
+          user_id?: string
+          variables?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "render_jobs_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      statistics: {
+        Row: {
+          active_users: number | null
+          date: string
+          id: string
+          platform_breakdown: Json | null
+          processing_time: number | null
+          renders_count: number | null
+          storage_used: number | null
+        }
+        Insert: {
+          active_users?: number | null
+          date: string
+          id?: string
+          platform_breakdown?: Json | null
+          processing_time?: number | null
+          renders_count?: number | null
+          storage_used?: number | null
+        }
+        Update: {
+          active_users?: number | null
+          date?: string
+          id?: string
+          platform_breakdown?: Json | null
+          processing_time?: number | null
+          renders_count?: number | null
+          storage_used?: number | null
+        }
+        Relationships: []
+      }
+      templates: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          creatomate_template_id: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          platforms: Json | null
+          preview_image_url: string | null
+          variables: Json | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          creatomate_template_id: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          platforms?: Json | null
+          preview_image_url?: string | null
+          variables?: Json | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          creatomate_template_id?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          platforms?: Json | null
+          preview_image_url?: string | null
+          variables?: Json | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
