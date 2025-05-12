@@ -15,13 +15,10 @@ import { useAuth } from '@/context/AuthContext';
 import Login from './pages/Auth';
 import Register from './pages/Auth';
 import Account from './pages/Settings';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
 import { CreatomateLoader } from './components/CreatomateLoader';
 
 function App() {
   const { user } = useAuth();
-  const { toast } = useToast();
   
   useEffect(() => {
     if (!user) {
@@ -35,10 +32,6 @@ function App() {
     const location = useLocation();
     
     if (!user) {
-      toast({
-        title: "Not authenticated",
-        description: "You must log in to access this page.",
-      });
       return <Navigate to="/login" replace state={{ from: location }} />;
     }
     

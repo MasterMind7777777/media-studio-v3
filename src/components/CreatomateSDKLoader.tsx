@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { isCreatomateSDKAvailable, loadCreatomateSDKManually } from '@/integrations/creatomate/config';
-import { toast } from '@/components/ui/sonner';
+import { toast } from 'sonner';
 
 /**
  * Component to ensure the Creatomate SDK is properly loaded
