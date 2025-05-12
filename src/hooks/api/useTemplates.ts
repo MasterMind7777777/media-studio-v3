@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Template } from "@/types";
@@ -58,6 +59,8 @@ export const useTemplates = () => {
  * Hook to fetch a single template by ID
  */
 export const useTemplate = (id: string | undefined) => {
+  const queryClient = useQueryClient();
+  
   return useQuery({
     queryKey: ["templates", id],
     queryFn: async () => {
@@ -65,7 +68,6 @@ export const useTemplate = (id: string | undefined) => {
       
       try {
         // First try to get it from the cache
-        const queryClient = useQueryClient(); 
         const templates = queryClient.getQueryData<Template[]>(["templates"]);
         const cachedTemplate = templates?.find(t => t.id === id);
         
