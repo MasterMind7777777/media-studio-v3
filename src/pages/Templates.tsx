@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { MainLayout } from "@/components/Layout/MainLayout";
-import { Template } from "@/types";
+import { Template, Platform } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import {
   Card,
@@ -36,7 +36,18 @@ export default function Templates() {
       // Transform the data to match the expected Template type
       return (data || []).map(item => ({
         ...item,
-        platforms: Array.isArray(item.platforms) ? item.platforms : [],
+        // Properly transform the platforms from Json to Platform[] type
+        platforms: Array.isArray(item.platforms) 
+          ? item.platforms.map((platform: any) => ({
+              id: platform.id || '',
+              name: platform.name || '',
+              width: platform.width || 0,
+              height: platform.height || 0,
+              aspect_ratio: platform.aspect_ratio || '1:1'
+            }))
+          : [],
+        // Ensure variables is a proper Record type
+        variables: item.variables || {},
       })) as Template[];
     }
   });
