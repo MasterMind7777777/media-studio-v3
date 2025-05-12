@@ -4,6 +4,73 @@
  * Using environment variables from src/config/creatomate.ts
  */
 import { CREATOMATE_PUBLIC_TOKEN } from '@/config/creatomate';
+import { supabase } from '@/integrations/supabase/client';
+
+/**
+ * Fetch Creatomate API token from Supabase secrets
+ * This provides a more secure way to access the API token
+ * Returns the token from .env as fallback
+ */
+export async function getCreatomateToken(): Promise<string> {
+  try {
+    // First try to get from Supabase secrets table
+    const { data, error } = await supabase
+      .from('secrets')
+      .select('value')
+      .eq('name', 'CREATOMATE_API_KEY')
+      .maybeSingle();
+      
+    if (error) {
+      console.warn('Error fetching Creatomate API token from Supabase:', error.message);
+    }
+    
+    if (data?.value) {
+      console.log('Using Creatomate token from Supabase secrets');
+      return data.value;
+    }
+    
+    // Fallback to environment variable
+    if (CREATOMATE_PUBLIC_TOKEN) {
+      console.log('Using Creatomate token from environment variable');
+      return CREATOMATE_PUBLIC_TOKEN;
+    }
+    
+    throw new Error('Creatomate API token is missing. Set in Supabase secrets or .env file');
+  } catch (error) {
+    console.error('Failed to get Creatomate token:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch Creatomate template ID from Supabase secrets
+ * This provides a more secure way to access the template ID
+ * Returns the template ID from .env as fallback
+ */
+export async function getCreatomateTemplateId(): Promise<string> {
+  try {
+    // First try to get from Supabase secrets table
+    const { data, error } = await supabase
+      .from('secrets')
+      .select('value')
+      .eq('name', 'CREATOMATE_TEMPLATE_ID')
+      .maybeSingle();
+      
+    if (error) {
+      console.warn('Error fetching Creatomate template ID from Supabase:', error.message);
+    }
+    
+    if (data?.value) {
+      console.log('Using template ID from Supabase secrets');
+      return data.value;
+    }
+    
+    throw new Error('Creatomate template ID is missing. Set in Supabase secrets.');
+  } catch (error) {
+    console.error('Failed to get Creatomate template ID:', error);
+    throw error;
+  }
+}
 
 /**
  * Helper function to ensure template variables are formatted correctly for Creatomate

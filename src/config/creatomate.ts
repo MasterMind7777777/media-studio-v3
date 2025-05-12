@@ -4,9 +4,11 @@
  * Environment variables for Creatomate integration
  */
 
+// Public token that can be safely exposed in frontend
 export const CREATOMATE_PUBLIC_TOKEN = 
   import.meta.env.VITE_CREATOMATE_TOKEN ?? '';
   
+// Default template ID as fallback
 export const DEFAULT_TEMPLATE_ID =
   import.meta.env.VITE_CREATOMATE_TEMPLATE_ID ?? '';
 

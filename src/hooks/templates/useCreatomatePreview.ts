@@ -1,10 +1,11 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { formatVariablesForPlayer } from '@/integrations/creatomate/config';
+import { formatVariablesForPlayer, isCreatomateSDKAvailable, loadCreatomateSDKManually } from '@/integrations/creatomate/config';
 import { CREATOMATE_PUBLIC_TOKEN, BASIC_COMPOSITION } from '@/config/creatomate';
 
 interface UseCreatomatePreviewOptions {
   creatomateTemplateId?: string;
+  creatomateToken?: string;
   variables?: Record<string, any>;
   containerRef: React.RefObject<HTMLDivElement>;
   autoPlay?: boolean;
@@ -19,6 +20,7 @@ interface PreviewError {
 
 export function useCreatomatePreview({
   creatomateTemplateId,
+  creatomateToken = CREATOMATE_PUBLIC_TOKEN,
   variables,
   containerRef,
   autoPlay = false,
@@ -58,8 +60,8 @@ export function useCreatomatePreview({
         throw new Error('Container element is not available');
       }
       
-      if (!CREATOMATE_PUBLIC_TOKEN) {
-        throw new Error('Creatomate API token is missing. Set VITE_CREATOMATE_TOKEN in .env file');
+      if (!creatomateToken) {
+        throw new Error('Creatomate API token is missing. Set CREATOMATE_API_KEY in Supabase secrets table');
       }
       
       if (!window.Creatomate?.Preview) {
@@ -75,13 +77,13 @@ export function useCreatomatePreview({
         }
       }
 
-      console.log(`Initializing Creatomate preview in ${previewMode} mode`);
+      console.log(`Initializing Creatomate preview in ${previewMode} mode with token: ${creatomateToken.substring(0, 5)}...`);
       
       // Create the preview in interactive mode
       previewRef.current = new window.Creatomate.Preview(
         containerRef.current,
         previewMode,
-        CREATOMATE_PUBLIC_TOKEN
+        creatomateToken
       );
       
       // Set up event handlers
@@ -142,7 +144,7 @@ export function useCreatomatePreview({
       setIsLoaded(false);
       isInitializingRef.current = false;
     }
-  }, [creatomateTemplateId, variables, autoPlay, containerRef, previewMode]);
+  }, [creatomateTemplateId, variables, autoPlay, containerRef, previewMode, creatomateToken]);
 
   // Initialize preview when dependencies change
   useEffect(() => {
@@ -168,7 +170,7 @@ export function useCreatomatePreview({
         }
       }
     };
-  }, [creatomateTemplateId, initializePreview]);
+  }, [creatomateTemplateId, initializePreview, creatomateToken]);
 
   // Update variables when they change
   useEffect(() => {

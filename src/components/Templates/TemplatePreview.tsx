@@ -6,6 +6,8 @@ import { Play, Maximize, Pause, AlertCircle, RotateCcw } from "lucide-react";
 import { useCreatomatePreview } from "@/hooks/templates";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { DEFAULT_TEMPLATE_ID } from "@/config/creatomate";
+import { getCreatomateToken, getCreatomateTemplateId } from "@/integrations/creatomate/config";
+import { CREATOMATE_PUBLIC_TOKEN } from "@/config/creatomate";
 
 interface TemplatePreviewProps {
   previewImageUrl: string;
@@ -26,6 +28,36 @@ export function TemplatePreview({
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [browserInfo, setBrowserInfo] = useState<string | null>(null);
+  const [apiToken, setApiToken] = useState<string>(CREATOMATE_PUBLIC_TOKEN);
+  const [templateId, setTemplateId] = useState<string>(creatomateTemplateId);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Fetch credentials from Supabase
+  useEffect(() => {
+    async function fetchCredentials() {
+      try {
+        // Try to get token from Supabase
+        const token = await getCreatomateToken();
+        setApiToken(token);
+        
+        // If no template ID was provided through props, try to get it from Supabase
+        if (!creatomateTemplateId) {
+          try {
+            const id = await getCreatomateTemplateId();
+            setTemplateId(id);
+          } catch (err) {
+            console.warn('Could not get template ID from Supabase:', err);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch Creatomate credentials:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    
+    fetchCredentials();
+  }, [creatomateTemplateId]);
   
   // Check browser compatibility
   useEffect(() => {
@@ -58,15 +90,17 @@ export function TemplatePreview({
     checkBrowser();
   }, []);
   
+  // Only proceed with preview initialization after we've attempted to load credentials
   const {
-    isLoaded,
+    isLoaded: isPreviewLoaded,
     isPlaying,
     error,
     toggle: togglePlayback,
     previewMode,
     retryInitialization
   } = useCreatomatePreview({
-    creatomateTemplateId,
+    creatomateTemplateId: templateId,
+    creatomateToken: apiToken,
     variables,
     containerRef: previewContainerRef,
     autoPlay: false,
@@ -95,7 +129,7 @@ export function TemplatePreview({
         className="aspect-video bg-black/80 rounded-t-md flex items-center justify-center relative"
         style={{ minHeight: '240px' }}
       >
-        {!isLoaded && !error && (
+        {!isPreviewLoaded && !error && (
           <div className="text-white text-center p-8 absolute inset-0 flex flex-col items-center justify-center">
             <div className="text-xl font-medium mb-4">Loading Preview</div>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
@@ -112,11 +146,11 @@ export function TemplatePreview({
             <AlertCircle className="h-8 w-8 text-red-400 mb-2" />
             <div className="text-xl font-medium mb-2">Preview Error</div>
             <p className="text-white/70 mb-4">{error}</p>
-            {!creatomateTemplateId && (
+            {!templateId && (
               <Alert variant="destructive" className="mb-4 max-w-md">
                 <AlertTitle>Missing Template ID</AlertTitle>
                 <AlertDescription>
-                  Set VITE_CREATOMATE_TEMPLATE_ID in your .env file
+                  Set CREATOMATE_TEMPLATE_ID in Supabase secrets
                 </AlertDescription>
               </Alert>
             )}
@@ -153,7 +187,7 @@ export function TemplatePreview({
             size="sm" 
             variant="outline"
             onClick={togglePlayback}
-            disabled={!isLoaded || !!error}
+            disabled={!isPreviewLoaded || !!error}
           >
             {isPlaying ? <Pause className="h-4 w-4 mr-1" /> : <Play className="h-4 w-4 mr-1" />}
             {isPlaying ? 'Pause' : 'Play'}
@@ -162,7 +196,7 @@ export function TemplatePreview({
             size="sm" 
             variant="outline"
             onClick={handleFullscreen}
-            disabled={!isLoaded || !!error}
+            disabled={!isPreviewLoaded || !!error}
           >
             <Maximize className="h-4 w-4 mr-1" />
             Fullscreen
