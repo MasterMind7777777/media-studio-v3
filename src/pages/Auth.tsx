@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -9,16 +9,23 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function Auth() {
   const { user, loading, signIn, signUp, isEmailSignupDisabled } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const queryClient = useQueryClient();
   
   // Form states
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  
+  // Clear any stale caches when the component mounts
+  useEffect(() => {
+    queryClient.clear();
+  }, [queryClient]);
   
   // If already logged in, redirect to dashboard
   if (!loading && user) {
@@ -31,6 +38,7 @@ export default function Auth() {
     try {
       await signIn(email, password);
       // Redirect handled by auth context
+      queryClient.clear(); // Clear any stale caches on login
     } catch (error) {
       console.error('Login error:', error);
     } finally {

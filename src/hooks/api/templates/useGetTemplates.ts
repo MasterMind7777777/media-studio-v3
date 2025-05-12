@@ -9,10 +9,10 @@ import { useAuth } from "@/context/AuthContext";
  * Hook to fetch all templates with improved caching
  */
 export const useTemplates = () => {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   
   return useQuery({
-    queryKey: ["templates"],
+    queryKey: ["templates", user?.id],
     queryFn: async () => {
       try {
         console.log("Fetching all templates from API");
@@ -41,8 +41,9 @@ export const useTemplates = () => {
         throw error;
       }
     },
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
-    refetchOnWindowFocus: false, // Don't refetch on window focus to improve performance
+    staleTime: 60 * 1000, // Cache for 1 minute only (reduced from 5 minutes)
+    refetchOnWindowFocus: true, // Refetch when window gets focus
+    refetchOnMount: true, // Refetch when component mounts
   });
 };
 
@@ -51,9 +52,10 @@ export const useTemplates = () => {
  */
 export const useTemplate = (id: string | undefined) => {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
   
   return useQuery({
-    queryKey: ["templates", id],
+    queryKey: ["templates", id, user?.id],
     queryFn: async () => {
       if (!id) {
         console.error("Template ID is missing");
@@ -64,7 +66,7 @@ export const useTemplate = (id: string | undefined) => {
       
       try {
         // First try to get it from the cache
-        const templates = queryClient.getQueryData<Template[]>(["templates"]);
+        const templates = queryClient.getQueryData<Template[]>(["templates", user?.id]);
         console.log(`Checking cache for templates. Found: ${templates ? templates.length : 0} templates`);
         
         if (templates && templates.length > 0) {
@@ -99,25 +101,15 @@ export const useTemplate = (id: string | undefined) => {
         const transformedTemplate = transformTemplateData(data);
         console.log(`Successfully fetched template "${transformedTemplate.name}" from API`);
         
-        // Update the cache with this template
-        if (templates) {
-          queryClient.setQueryData(["templates"], 
-            templates.some(t => t.id === transformedTemplate.id) 
-              ? templates.map(t => t.id === transformedTemplate.id ? transformedTemplate : t)
-              : [...templates, transformedTemplate]
-          );
-        } else {
-          queryClient.setQueryData(["templates"], [transformedTemplate]);
-        }
-        
         return transformedTemplate;
       } catch (error) {
         console.error("Error in useTemplate:", error);
         throw error;
       }
     },
-    enabled: !!id,
+    enabled: !!id && !!user,
     retry: 1, // Only retry once to avoid excessive retries for non-existent templates
-    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+    staleTime: 60 * 1000, // Cache for 1 minute only (reduced from 5 minutes)
+    refetchOnWindowFocus: true,
   });
 };

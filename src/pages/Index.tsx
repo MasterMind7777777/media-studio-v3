@@ -10,12 +10,23 @@ const Index = () => {
   useEffect(() => {
     if (!loading) {
       if (user) {
-        navigate("/");
+        // User is authenticated, navigate to dashboard
+        navigate("/", { replace: true });
       } else {
-        navigate("/auth");
+        // User is not authenticated, navigate to login
+        navigate("/auth", { replace: true });
       }
     }
   }, [navigate, user, loading]);
+
+  // Show a loading state while checking auth
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <p>Loading...</p>
+      </div>
+    );
+  }
 
   return null;
 };

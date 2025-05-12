@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AdminProtectedRoute } from "@/components/AdminProtectedRoute";
@@ -16,6 +16,7 @@ import Create from "./pages/Create";
 import TemplateCustomize from "./pages/TemplateCustomize";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
+import Index from "./pages/Index";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -23,7 +24,16 @@ import AdminTemplates from "./pages/admin/AdminTemplates";
 import AdminContentPacks from "./pages/admin/AdminContentPacks";
 import AdminUsers from "./pages/admin/AdminUsers";
 
-const queryClient = new QueryClient();
+// Create a new query client with proper default options
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: true,
+      staleTime: 1000 * 60, // 1 minute
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -33,12 +43,15 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
+            {/* Root route - handles redirect logic */}
+            <Route path="/" element={<Index />} />
+            
             {/* Public route */}
             <Route path="/auth" element={<Auth />} />
             
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<Dashboard />} />
+              <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/templates" element={<Templates />} />
               <Route path="/projects" element={<Projects />} />
               <Route path="/activity" element={<Activity />} />
@@ -48,11 +61,11 @@ const App = () => (
             </Route>
             
             {/* Admin routes */}
-            <Route element={<AdminProtectedRoute />}>
-              <Route path="/admin" element={<AdminDashboard />} />
-              <Route path="/admin/templates" element={<AdminTemplates />} />
-              <Route path="/admin/content-packs" element={<AdminContentPacks />} />
-              <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin" element={<AdminProtectedRoute />}>
+              <Route index element={<AdminDashboard />} />
+              <Route path="templates" element={<AdminTemplates />} />
+              <Route path="content-packs" element={<AdminContentPacks />} />
+              <Route path="users" element={<AdminUsers />} />
             </Route>
             
             <Route path="*" element={<NotFound />} />

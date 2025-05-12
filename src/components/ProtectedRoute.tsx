@@ -1,10 +1,12 @@
 
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { MainLayout } from './Layout/MainLayout';
 
 export const ProtectedRoute = () => {
   const { user, loading } = useAuth();
+  const location = useLocation();
   
   // Show loading state while checking authentication
   if (loading) {
@@ -17,9 +19,19 @@ export const ProtectedRoute = () => {
   
   // Redirect to login if not authenticated
   if (!user) {
-    return <Navigate to="/auth" />;
+    // Save the location they were trying to access for redirecting after login
+    return <Navigate to="/auth" state={{ from: location }} replace />;
+  }
+  
+  // If URL is exactly "/", redirect to dashboard
+  if (location.pathname === "/") {
+    return <Navigate to="/dashboard" replace />;
   }
   
   // Render child routes if authenticated
-  return <Outlet />;
+  return (
+    <MainLayout>
+      <Outlet />
+    </MainLayout>
+  );
 };

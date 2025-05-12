@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/context/AuthContext";
+import { toast } from "@/hooks/use-toast";
 
 interface HeaderProps {
   isAdminMode?: boolean;
@@ -20,7 +21,7 @@ interface HeaderProps {
 
 export function Header({ isAdminMode = false }: HeaderProps) {
   const navigate = useNavigate();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, signOut } = useAuth();
   
   const initials = user?.user_metadata?.name 
     ? user.user_metadata.name
@@ -29,6 +30,23 @@ export function Header({ isAdminMode = false }: HeaderProps) {
         .join("")
         .toUpperCase()
     : "U";
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      // Navigation will be handled by auth state change listener in AuthContext
+      toast({
+        title: "Signed out successfully",
+        description: "You have been logged out of your account."
+      });
+    } catch (error: any) {
+      toast({
+        title: "Sign-out failed",
+        description: error.message || "An error occurred during sign-out.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-10">
@@ -100,7 +118,7 @@ export function Header({ isAdminMode = false }: HeaderProps) {
                   Settings
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSignOut}>
                   Log out
                 </DropdownMenuItem>
               </DropdownMenuContent>
