@@ -1,6 +1,12 @@
 
 import { useEffect, useRef, useState } from 'react';
-import { CREATOMATE_PUBLIC_API_KEY, formatVariablesForPlayer } from '@/integrations/creatomate/config';
+import { 
+  CREATOMATE_PUBLIC_API_KEY, 
+  formatVariablesForPlayer, 
+  CREATOMATE_SDK_URL,
+  MAX_INITIALIZATION_RETRIES,
+  SDK_INITIALIZATION_DELAY
+} from '@/integrations/creatomate/config';
 
 declare global {
   interface Window {
@@ -30,42 +36,73 @@ export function useCreatomatePreview({
   const [error, setError] = useState<string | null>(null);
   const playerRef = useRef<any>(null);
   const sdkLoadedRef = useRef(false);
+  const initializationAttempts = useRef(0);
+  const timeoutRef = useRef<number | null>(null);
 
   // Load the Creatomate SDK
   useEffect(() => {
-    if (!sdkLoadedRef.current && !window.Creatomate && !document.getElementById('creatomate-sdk')) {
-      console.log('Loading Creatomate SDK...');
-      const script = document.createElement('script');
-      script.id = 'creatomate-sdk';
-      script.src = 'https://cdn.jsdelivr.net/npm/creatomate@1.2.1/dist/index.min.js';
-      script.async = true;
-      
-      script.onload = () => {
-        console.log('Creatomate SDK loaded successfully');
+    // Clear previous errors when dependencies change
+    setError(null);
+    
+    const loadSdk = () => {
+      if (!sdkLoadedRef.current && !window.Creatomate && !document.getElementById('creatomate-sdk')) {
+        console.log('Loading Creatomate SDK...');
+        const script = document.createElement('script');
+        script.id = 'creatomate-sdk';
+        script.src = CREATOMATE_SDK_URL;
+        script.async = true;
+        
+        script.onload = () => {
+          console.log('Creatomate SDK loaded successfully');
+          sdkLoadedRef.current = true;
+          
+          // Add a small delay before initializing to ensure SDK is fully ready
+          if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+          timeoutRef.current = window.setTimeout(() => {
+            if (creatomateTemplateId && containerRef.current) {
+              initializePlayer();
+            } else {
+              console.log('Cannot initialize player yet:', { 
+                templateId: !!creatomateTemplateId, 
+                container: !!containerRef.current 
+              });
+            }
+          }, SDK_INITIALIZATION_DELAY);
+        };
+        
+        script.onerror = (e) => {
+          console.error('Failed to load Creatomate SDK:', e);
+          setError('Failed to load preview SDK. Please try again later.');
+        };
+        
+        document.body.appendChild(script);
+      } else if (window.Creatomate && creatomateTemplateId && containerRef.current) {
         sdkLoadedRef.current = true;
-        if (creatomateTemplateId && containerRef.current) {
+        
+        // Also use a small delay for consistency
+        if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = window.setTimeout(() => {
           initializePlayer();
-        }
-      };
-      
-      script.onerror = (e) => {
-        console.error('Failed to load Creatomate SDK:', e);
-        setError('Failed to load preview SDK. Please try again later.');
-      };
-      
-      document.body.appendChild(script);
-    } else if (window.Creatomate && creatomateTemplateId && containerRef.current) {
-      sdkLoadedRef.current = true;
-      initializePlayer();
-    }
+        }, SDK_INITIALIZATION_DELAY);
+      }
+    };
+
+    loadSdk();
     
     return () => {
+      // Clear any pending timeouts
+      if (timeoutRef.current) {
+        window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      
       // Cleanup
       if (playerRef.current) {
         try {
           console.log('Disposing Creatomate player');
           playerRef.current.dispose();
           playerRef.current = null;
+          initializationAttempts.current = 0;
         } catch (e) {
           console.error('Error disposing player:', e);
         }
@@ -75,7 +112,7 @@ export function useCreatomatePreview({
   
   // Initialize or update player when variables change
   useEffect(() => {
-    if (sdkLoadedRef.current && creatomateTemplateId && containerRef.current && playerRef.current) {
+    if (sdkLoadedRef.current && creatomateTemplateId && containerRef.current && playerRef.current && isLoaded) {
       try {
         console.log('Updating player variables:', variables);
         const formattedVariables = formatVariablesForPlayer(variables);
@@ -84,16 +121,37 @@ export function useCreatomatePreview({
         console.error('Error updating variables:', e);
       }
     }
-  }, [variables, JSON.stringify(variables)]);
+  }, [variables, JSON.stringify(variables), isLoaded]);
   
   const initializePlayer = () => {
-    if (!window.Creatomate || !creatomateTemplateId || !containerRef.current) {
-      console.log('Cannot initialize player:', { 
-        sdkLoaded: !!window.Creatomate,
-        templateId: creatomateTemplateId,
-        containerRef: !!containerRef.current
-      });
-      setError('Missing required configuration to initialize preview');
+    // Check if we've tried too many times already
+    if (initializationAttempts.current >= MAX_INITIALIZATION_RETRIES) {
+      console.error(`Failed to initialize player after ${MAX_INITIALIZATION_RETRIES} attempts`);
+      setError(`Failed to initialize player after ${MAX_INITIALIZATION_RETRIES} attempts. Please reload the page.`);
+      return;
+    }
+    
+    initializationAttempts.current++;
+    console.log(`Initialization attempt #${initializationAttempts.current}`);
+    
+    if (!window.Creatomate) {
+      const errorMsg = 'Creatomate SDK not loaded. Please reload the page.';
+      console.error(errorMsg);
+      setError(errorMsg);
+      return;
+    }
+    
+    if (!creatomateTemplateId) {
+      const errorMsg = 'Missing Creatomate template ID. Please check template configuration.';
+      console.error(errorMsg);
+      setError(errorMsg);
+      return;
+    }
+    
+    if (!containerRef.current) {
+      const errorMsg = 'Player container not found. Please check your UI layout.';
+      console.error(errorMsg);
+      setError(errorMsg);
       return;
     }
     
@@ -109,12 +167,15 @@ export function useCreatomatePreview({
         }
       }
       
-      // Create player configuration based on tutorial approach
+      // Format variables properly for the player
+      const formattedVariables = formatVariablesForPlayer(variables);
+      
+      // Create player configuration based on Creatomate documentation
       const playerOptions = {
         apiKey: CREATOMATE_PUBLIC_API_KEY,
         source: {
           template_id: creatomateTemplateId,
-          modifications: formatVariablesForPlayer(variables),
+          modifications: formattedVariables,
         },
         autoPlay,
         loop,
@@ -145,15 +206,33 @@ export function useCreatomatePreview({
       });
       
       playerRef.current.on('error', (e: any) => {
-        console.error('Creatomate player error:', e);
-        setError(`Preview error: ${e.message || 'Unknown error'}`);
+        const errorMessage = e?.message || 'Unknown error';
+        console.error('Creatomate player error:', e, errorMessage);
+        setError(`Preview error: ${errorMessage}`);
         setIsLoaded(false);
+        
+        // Try to reinitialize on certain errors
+        if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+          if (initializationAttempts.current < MAX_INITIALIZATION_RETRIES) {
+            console.log('Attempting to reinitialize player due to network error...');
+            // Add a delay before retrying
+            setTimeout(initializePlayer, 1000);
+          }
+        }
       });
       
     } catch (e) {
+      const errorMessage = e instanceof Error ? e.message : 'Unknown error';
       console.error('Error initializing Creatomate player:', e);
-      setError(`Initialization error: ${e instanceof Error ? e.message : 'Unknown error'}`);
+      setError(`Initialization error: ${errorMessage}`);
       setIsLoaded(false);
+      
+      // Try once more after a delay if it's not the last attempt
+      if (initializationAttempts.current < MAX_INITIALIZATION_RETRIES) {
+        console.log('Retrying player initialization...');
+        if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
+        timeoutRef.current = window.setTimeout(initializePlayer, 1000);
+      }
     }
   };
   
@@ -191,6 +270,20 @@ export function useCreatomatePreview({
     }
   };
 
+  // Helper to check initialization status (for debugging)
+  const getInitializationStatus = () => {
+    return {
+      sdkLoaded: sdkLoadedRef.current,
+      hasWindow: typeof window !== 'undefined',
+      hasCreatomateSDK: typeof window !== 'undefined' && !!window.Creatomate,
+      hasContainer: !!containerRef.current,
+      hasTemplateId: !!creatomateTemplateId,
+      hasPlayer: !!playerRef.current,
+      apiKey: CREATOMATE_PUBLIC_API_KEY ? 'Valid' : 'Missing',
+      attempts: initializationAttempts.current,
+    };
+  };
+
   return {
     isLoaded,
     isPlaying,
@@ -199,5 +292,6 @@ export function useCreatomatePreview({
     pause,
     toggle,
     updateVariables,
+    getInitializationStatus,
   };
 }

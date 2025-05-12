@@ -2,7 +2,7 @@
 import { useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Play, Maximize, Pause, AlertCircle } from "lucide-react";
+import { Play, Maximize, Pause, AlertCircle, RotateCcw } from "lucide-react";
 import { useCreatomatePreview } from "@/hooks/templates";
 
 interface TemplatePreviewProps {
@@ -28,7 +28,8 @@ export function TemplatePreview({
     isLoaded,
     isPlaying,
     error,
-    toggle: togglePlayback
+    toggle: togglePlayback,
+    getInitializationStatus
   } = useCreatomatePreview({
     creatomateTemplateId,
     variables,
@@ -37,6 +38,9 @@ export function TemplatePreview({
     loop: true,
     muted: true
   });
+  
+  // For debugging purposes
+  const initStatus = getInitializationStatus?.();
   
   const handleFullscreen = () => {
     if (previewContainerRef.current) {
@@ -49,6 +53,24 @@ export function TemplatePreview({
           .then(() => setIsFullscreen(false))
           .catch((err) => console.error(`Error attempting to exit fullscreen: ${err.message}`));
       }
+    }
+  };
+  
+  // Retry initialization by forcing a remount
+  const handleRetryInitialization = () => {
+    if (previewContainerRef.current) {
+      // Force a refresh of the container to retry initialization
+      const container = previewContainerRef.current;
+      const parent = container.parentElement;
+      if (parent) {
+        parent.removeChild(container);
+        setTimeout(() => {
+          parent.appendChild(container);
+        }, 100);
+      }
+      
+      // Reload the page as last resort
+      // window.location.reload();
     }
   };
 
@@ -79,6 +101,29 @@ export function TemplatePreview({
             {!creatomateTemplateId && (
               <p className="text-white/70 mb-4">Missing Creatomate template ID</p>
             )}
+            
+            {/* Debugging information */}
+            {initStatus && (
+              <div className="text-xs text-white/50 mb-4 max-w-md">
+                <p>SDK loaded: {initStatus.sdkLoaded ? '✅' : '❌'}</p>
+                <p>Creatomate SDK: {initStatus.hasCreatomateSDK ? '✅' : '❌'}</p>
+                <p>Container: {initStatus.hasContainer ? '✅' : '❌'}</p>
+                <p>Template ID: {initStatus.hasTemplateId ? '✅' : '❌'}</p>
+                <p>API Key: {initStatus.apiKey}</p>
+                <p>Attempts: {initStatus.attempts}</p>
+              </div>
+            )}
+            
+            <Button 
+              size="sm" 
+              variant="outline"
+              className="bg-white/10 hover:bg-white/20 text-white mb-4"
+              onClick={handleRetryInitialization}
+            >
+              <RotateCcw className="h-4 w-4 mr-1" />
+              Retry
+            </Button>
+            
             <img 
               src={previewImageUrl} 
               alt="Preview" 
