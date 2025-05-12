@@ -16,18 +16,19 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    
+    <!-- Load Creatomate Preview SDK -->
+    <script 
+      src="https://cdn.creatomate.com/preview/preview.js" 
+      id="creatomate-sdk"
+      onload="window.creatomateSDKLoaded = true; window.dispatchEvent(new Event('creatomate-sdk-loaded'));">
+    </script>
   </head>
 
   <body>
     <div id="root"></div>
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
-    <!-- Load Creatomate SDK with enhanced loading strategy -->
-    <script 
-      src="https://cdn.jsdelivr.net/npm/creatomate@1.2.1/dist/index.min.js" 
-      id="creatomate-sdk"
-      onload="window.creatomateSDKLoaded = true; window.dispatchEvent(new Event('creatomate-sdk-loaded'));">
-    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

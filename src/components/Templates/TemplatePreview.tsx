@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Play, Maximize, Pause, AlertCircle, RotateCcw, RefreshCw } from "lucide-react";
 import { useCreatomatePreview } from "@/hooks/templates";
-import { isCreatomateSDKAvailable, forcePageRefresh, loadCreatomateSDKManually } from "@/integrations/creatomate/config";
+import { isCreatomateSDKAvailable, loadCreatomateSDKManually } from "@/integrations/creatomate/config";
 
 interface TemplatePreviewProps {
   previewImageUrl: string;
@@ -60,35 +60,26 @@ export function TemplatePreview({
     checkBrowser();
   }, []);
   
-  // Check if SDK is available but only once on component mount
+  // Initial SDK status check
   useEffect(() => {
-    const checkSdk = () => {
-      const available = isCreatomateSDKAvailable();
-      setSdkStatus(available ? "loaded" : "not-loaded");
+    const available = isCreatomateSDKAvailable();
+    setSdkStatus(available ? "loaded" : "not-loaded");
+    
+    if (!available) {
+      console.log('SDK not detected, checking status...');
       
-      // If SDK is not loaded, try loading manually
-      if (!available) {
-        console.log('SDK not detected on mount, trying to load manually...');
-        setLoadingManually(true);
-        loadCreatomateSDKManually()
-          .then(() => {
-            console.log('Manual SDK loading successful on mount');
-            setSdkStatus("loaded");
-            setLoadingManually(false);
-          })
-          .catch(() => {
-            console.log('Manual SDK loading failed on mount');
-            setLoadingManually(false);
-          });
-      }
-    };
-    
-    // Initial check only, no interval to prevent refresh loops
-    checkSdk();
-    
-    return () => {
-      // No cleanup needed since we're not using intervals anymore
-    };
+      // Wait a bit for the SDK to load
+      const checkTimeout = setTimeout(() => {
+        const available = isCreatomateSDKAvailable();
+        setSdkStatus(available ? "loaded" : "not-loaded");
+        
+        if (!available) {
+          console.log('SDK still not available after delay');
+        }
+      }, 2000);
+      
+      return () => clearTimeout(checkTimeout);
+    }
   }, []);
   
   const {
@@ -105,7 +96,7 @@ export function TemplatePreview({
     autoPlay: false,
     loop: true,
     muted: true,
-    skipAutoRetry: true // New prop to prevent automatic retries
+    skipAutoRetry: true // Prevent automatic retries
   });
   
   // For debugging purposes
@@ -125,9 +116,8 @@ export function TemplatePreview({
     }
   };
   
-  // Retry initialization by using the hook's retry function - with rate limiting
+  // Manual retry initialization
   const handleRetryInitialization = () => {
-    // Rate limit the retries
     setRefreshAttempts(prev => prev + 1);
     setSdkStatus("checking");
     setLoadingManually(true);
@@ -144,10 +134,9 @@ export function TemplatePreview({
     }
   };
   
-  // Force page refresh to reload SDK - but prevent multiple quick refreshes
+  // Force page refresh as last resort
   const handleForceRefresh = () => {
-    // Only allow refresh every few seconds to prevent infinite loops
-    forcePageRefresh();
+    window.location.reload();
   };
 
   return (
@@ -206,7 +195,6 @@ export function TemplatePreview({
                   <p>Template ID: {initStatus.hasTemplateId ? '✅' : '❌'}</p>
                   <p>API Key: {initStatus.apiKey}</p>
                   <p>Attempts: {initStatus.attempts}</p>
-                  <p>Global state: {initStatus.globalInitializing ? '⏳' : '✅'}</p>
                 </div>
               </div>
             )}
