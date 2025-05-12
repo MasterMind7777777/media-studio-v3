@@ -46,6 +46,64 @@ export function isCreatomateSDKAvailable(): boolean {
   return typeof window.Creatomate?.Preview === 'function';
 }
 
+/**
+ * Manually load the Creatomate SDK if it's not already loaded.
+ * This is useful if the script tag in index.html fails to load for any reason.
+ * @returns Promise that resolves when SDK is loaded or rejects on timeout
+ */
+export function loadCreatomateSDKManually(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    // If SDK already available, resolve immediately
+    if (isCreatomateSDKAvailable()) {
+      console.log('Creatomate SDK already loaded');
+      resolve();
+      return;
+    }
+    
+    console.log('Attempting to manually load Creatomate SDK...');
+    
+    // Check if script already exists
+    const existingScript = document.getElementById('creatomate-sdk');
+    if (existingScript) {
+      console.log('Found existing script tag, waiting for it to load');
+      // If script exists but SDK not loaded yet, wait for it
+      const timeout = setTimeout(() => {
+        reject(new Error('Timed out waiting for existing Creatomate SDK to load'));
+      }, 10000);
+      
+      const checkInterval = setInterval(() => {
+        if (isCreatomateSDKAvailable()) {
+          clearInterval(checkInterval);
+          clearTimeout(timeout);
+          console.log('Existing Creatomate SDK loaded successfully');
+          resolve();
+        }
+      }, 200);
+      return;
+    }
+    
+    // Create new script element if none exists
+    const script = document.createElement('script');
+    script.id = 'creatomate-sdk';
+    script.src = 'https://cdn.creatomate.com/js/preview.js';
+    script.async = true;
+    
+    // Set up event handlers
+    script.onload = () => {
+      console.log('Creatomate SDK loaded successfully via dynamic script');
+      resolve();
+    };
+    
+    script.onerror = () => {
+      console.error('Failed to load Creatomate SDK');
+      reject(new Error('Failed to load Creatomate SDK script'));
+    };
+    
+    // Add to document
+    document.head.appendChild(script);
+  });
+}
+
 // Add TypeScript interface for Window with Creatomate property
 declare global {
   interface Window {
