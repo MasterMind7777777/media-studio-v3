@@ -17,7 +17,14 @@ import Register from './pages/Auth';
 import Account from './pages/Settings';
 import { CreatomateLoader } from './components/CreatomateLoader';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { AdminProtectedRoute } from './components/AdminProtectedRoute';
 import Dashboard from './pages/Dashboard';
+
+// Import admin page components
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminTemplates from './pages/admin/AdminTemplates';
+import AdminContentPacks from './pages/admin/AdminContentPacks';
+import AdminUsers from './pages/admin/AdminUsers';
 
 function App() {
   const { user } = useAuth();
@@ -50,6 +57,15 @@ function App() {
           <Route path="/projects" element={<Projects />} />
           <Route path="/account" element={<Account />} />
           <Route path="/settings" element={<Account />} />
+        </Route>
+        
+        {/* Admin routes with admin layout */}
+        <Route element={<AdminProtectedRoute />}>
+          <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/admin/templates" element={<AdminTemplates />} />
+          <Route path="/admin/content-packs" element={<AdminContentPacks />} />
+          <Route path="/admin/users" element={<AdminUsers />} />
+          <Route path="/admin/settings" element={<Account />} />
         </Route>
         
         {/* Redirects */}
