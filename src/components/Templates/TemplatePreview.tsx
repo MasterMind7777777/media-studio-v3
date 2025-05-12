@@ -1,9 +1,10 @@
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Play, Maximize, Pause, AlertCircle, RotateCcw } from "lucide-react";
+import { Play, Maximize, Pause, AlertCircle, RotateCcw, RefreshCw } from "lucide-react";
 import { useCreatomatePreview } from "@/hooks/templates";
+import { isCreatomateSDKAvailable } from "@/integrations/creatomate/config";
 
 interface TemplatePreviewProps {
   previewImageUrl: string;
@@ -23,6 +24,21 @@ export function TemplatePreview({
 }: TemplatePreviewProps) {
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [sdkStatus, setSdkStatus] = useState<string>("checking");
+  
+  // Check if SDK is available
+  useEffect(() => {
+    const checkSdk = () => {
+      const available = isCreatomateSDKAvailable();
+      setSdkStatus(available ? "loaded" : "not-loaded");
+    };
+    
+    // Check immediately and then on an interval
+    checkSdk();
+    const interval = setInterval(checkSdk, 2000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   const {
     isLoaded,
@@ -63,6 +79,11 @@ export function TemplatePreview({
       retryInitialization();
     }
   };
+  
+  // Force page refresh to reload SDK
+  const handleForceRefresh = () => {
+    window.location.reload();
+  };
 
   return (
     <Card className="h-full">
@@ -92,27 +113,50 @@ export function TemplatePreview({
               <p className="text-white/70 mb-4">Missing Creatomate template ID</p>
             )}
             
+            {/* SDK Status Indicator */}
+            <div className={`text-xs px-2 py-1 rounded mb-3 ${
+              sdkStatus === "loaded" ? "bg-green-500/30" : "bg-red-500/30"
+            }`}>
+              Creatomate SDK: {sdkStatus === "loaded" ? "Detected ✓" : "Not Detected ✗"}
+            </div>
+            
             {/* Debugging information */}
             {initStatus && (
-              <div className="text-xs text-white/50 mb-4 max-w-md">
-                <p>SDK loaded: {initStatus.sdkLoaded ? '✅' : '❌'}</p>
-                <p>Creatomate SDK: {initStatus.hasCreatomateSDK ? '✅' : '❌'}</p>
-                <p>Container: {initStatus.hasContainer ? '✅' : '❌'}</p>
-                <p>Template ID: {initStatus.hasTemplateId ? '✅' : '❌'}</p>
-                <p>API Key: {initStatus.apiKey}</p>
-                <p>Attempts: {initStatus.attempts}</p>
+              <div className="text-xs text-white/70 mb-4 max-w-md p-3 bg-black/30 rounded">
+                <h4 className="font-medium mb-1 text-white/90">Debug Information</h4>
+                <div className="grid grid-cols-2 gap-x-4 text-left">
+                  <p>SDK loaded: {initStatus.sdkLoaded ? '✅' : '❌'}</p>
+                  <p>Creatomate SDK: {initStatus.hasCreatomateSDK ? '✅' : '❌'}</p>
+                  <p>Container: {initStatus.hasContainer ? '✅' : '❌'}</p>
+                  <p>Template ID: {initStatus.hasTemplateId ? '✅' : '❌'}</p>
+                  <p>API Key: {initStatus.apiKey}</p>
+                  <p>Attempts: {initStatus.attempts}</p>
+                  <p>Status: {initStatus.initializing ? 'Initializing...' : 'Idle'}</p>
+                </div>
               </div>
             )}
             
-            <Button 
-              size="sm" 
-              variant="outline"
-              className="bg-white/10 hover:bg-white/20 text-white mb-4"
-              onClick={handleRetryInitialization}
-            >
-              <RotateCcw className="h-4 w-4 mr-1" />
-              Retry
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                size="sm" 
+                variant="outline"
+                className="bg-white/10 hover:bg-white/20 text-white mb-4"
+                onClick={handleRetryInitialization}
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
+                Retry
+              </Button>
+              
+              <Button 
+                size="sm" 
+                variant="outline"
+                className="bg-white/10 hover:bg-white/20 text-white mb-4"
+                onClick={handleForceRefresh}
+              >
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Refresh Page
+              </Button>
+            </div>
             
             <img 
               src={previewImageUrl} 
