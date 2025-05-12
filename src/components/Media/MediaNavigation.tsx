@@ -15,13 +15,15 @@ interface MediaNavigationProps {
   onTabChange: (tab: string) => void;
   mediaCount?: number;
   recentUploadsCount?: number;
+  className?: string; // Added className prop to interface
 }
 
 export function MediaNavigation({ 
   activeTab, 
   onTabChange, 
   mediaCount = 0,
-  recentUploadsCount = 0
+  recentUploadsCount = 0,
+  className
 }: MediaNavigationProps) {
   const navigationItems = [
     {
@@ -45,7 +47,7 @@ export function MediaNavigation({
   ];
 
   return (
-    <div className="bg-background border rounded-lg p-4 space-y-1">
+    <div className={cn("bg-background border rounded-lg p-4 space-y-1", className)}>
       <h3 className="font-medium px-4 py-2 text-sm">Media Library</h3>
       <NavigationMenu orientation="vertical" className="w-full max-w-none">
         <NavigationMenuList className="flex-col items-start space-y-1">

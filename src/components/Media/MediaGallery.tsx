@@ -6,6 +6,7 @@ import { useMediaAssets } from "@/hooks/api";
 import { MediaAsset } from "@/types";
 import { Image, Film, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { QueryOptions } from "@tanstack/react-query";
 
 interface MediaGalleryProps {
   contentPackId?: string;
@@ -25,7 +26,7 @@ export function MediaGallery({
   // Only fetch from API if mediaAssets weren't provided as props
   const { data: fetchedMediaAssets, isLoading: isFetching, error } = useMediaAssets(
     contentPackId, 
-    { enabled: !propMediaAssets }
+    { enabled: propMediaAssets === undefined } // Fixed enabled property type issue
   );
   
   // Use either provided media assets or fetched ones
@@ -55,7 +56,7 @@ export function MediaGallery({
     );
   }
   
-  if (!mediaAssets || mediaAssets.length === 0) {
+  if (!mediaAssets || (mediaAssets as MediaAsset[]).length === 0) {
     return (
       <div className="text-center py-8">
         <p className="text-muted-foreground">No uploads yet</p>
@@ -65,7 +66,7 @@ export function MediaGallery({
   
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {mediaAssets.map((media) => (
+      {(mediaAssets as MediaAsset[]).map((media) => (
         <Card 
           key={media.id} 
           className={`cursor-pointer overflow-hidden ${

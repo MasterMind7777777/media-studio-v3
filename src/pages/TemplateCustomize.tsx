@@ -344,14 +344,13 @@ export default function TemplateCustomize() {
       
       <div className={`md:col-span-${hasMediaVariables ? '2' : '3'}`}>
         <Card className="h-full">
-          <div className="p-4 border-b flex items-center justify-between">
+          <div className="p-4 border-b">
             <MediaNavigation 
               activeTab={mediaTab} 
               onTabChange={setMediaTab}
-              className="border-none p-0"
             />
             {mediaTab === "all-uploads" && (
-              <Button size="sm">Upload New</Button>
+              <Button size="sm" className="mt-2">Upload New</Button>
             )}
           </div>
           <div className="p-4">

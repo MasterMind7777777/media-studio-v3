@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { MediaAsset } from "@/types";
 import { Json } from "@/integrations/supabase/types";
-import { QueryOptions } from '@tanstack/react-query';
+import { QueryOptions, QueryKey } from '@tanstack/react-query';
 
 /**
  * Helper function to generate a unique ID (replacing uuid dependency)
@@ -18,10 +18,14 @@ function generateUniqueId() {
   return `${timestamp}-${randomPart}`;
 }
 
+type MediaAssetsOptions = {
+  enabled?: boolean;
+}
+
 /**
  * Hook to fetch all media assets
  */
-export const useMediaAssets = (contentPackId?: string, options?: Partial<QueryOptions>) => {
+export const useMediaAssets = (contentPackId?: string, options?: MediaAssetsOptions) => {
   return useQuery({
     queryKey: ["mediaAssets", { contentPackId }],
     queryFn: async () => {
@@ -41,7 +45,7 @@ export const useMediaAssets = (contentPackId?: string, options?: Partial<QueryOp
       
       return data as MediaAsset[];
     },
-    ...options
+    enabled: options?.enabled
   });
 };
 

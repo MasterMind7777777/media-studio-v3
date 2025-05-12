@@ -20,14 +20,14 @@ export default function Media() {
   
   // Filter media assets based on search query
   const filteredAssets = searchQuery && mediaAssets 
-    ? mediaAssets.filter(asset => 
+    ? (mediaAssets as MediaAsset[]).filter(asset => 
         asset.name.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : mediaAssets;
   
   // Recent uploads - last 5
   const recentUploads = mediaAssets 
-    ? [...mediaAssets]
+    ? [...(mediaAssets as MediaAsset[])]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 5)
     : [];
@@ -55,7 +55,7 @@ export default function Media() {
           <MediaNavigation 
             activeTab={activeTab} 
             onTabChange={setActiveTab}
-            mediaCount={mediaAssets?.length || 0}
+            mediaCount={(mediaAssets as MediaAsset[] | undefined)?.length || 0}
             recentUploadsCount={recentUploads.length}
           />
         </div>
@@ -102,7 +102,7 @@ export default function Media() {
                   <div>
                     <h2 className="text-xl font-semibold mb-4">All Uploads</h2>
                     <MediaGallery 
-                      mediaAssets={filteredAssets} 
+                      mediaAssets={filteredAssets as MediaAsset[] | undefined} 
                       isLoading={isLoading}
                       onMediaSelect={handleMediaSelect}
                       selectedMediaId={selectedMedia?.id}
