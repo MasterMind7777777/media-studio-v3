@@ -137,15 +137,41 @@ Deno.serve(async (req) => {
       }
       
       const templateData = await response.json();
+      console.log('Template data structure:', JSON.stringify(templateData, null, 2));
       
       // Extract platforms (resolutions) from the template
-      const platforms = templateData.outputs.map((output: any) => ({
-        id: output.id || crypto.randomUUID(),
-        name: output.name || `${output.width}x${output.height}`,
-        width: output.width,
-        height: output.height,
-        aspect_ratio: `${output.width}:${output.height}`
-      }));
+      let platforms: Platform[] = [];
+      
+      // Check if templateData.outputs exists before mapping
+      if (templateData.outputs && Array.isArray(templateData.outputs)) {
+        platforms = templateData.outputs.map((output: any) => ({
+          id: output.id || crypto.randomUUID(),
+          name: output.name || `${output.width}x${output.height}`,
+          width: output.width,
+          height: output.height,
+          aspect_ratio: `${output.width}:${output.height}`
+        }));
+      } else {
+        // Create a default platform if no outputs are provided
+        // Check if we can get dimensions from the template itself
+        let width = 1920;
+        let height = 1080;
+        
+        if (templateData.width && templateData.height) {
+          width = templateData.width;
+          height = templateData.height;
+        }
+        
+        platforms = [{
+          id: crypto.randomUUID(),
+          name: `${width}x${height}`,
+          width,
+          height,
+          aspect_ratio: `${width}:${height}`
+        }];
+        
+        console.log('Created default platform:', platforms[0]);
+      }
       
       // Extract variables from the template
       const variables: Record<string, any> = {};
@@ -177,10 +203,10 @@ Deno.serve(async (req) => {
       
       // Create a new template in the database
       const template = {
-        name: templateData.name,
+        name: templateData.name || `Template ${templateId}`,
         description: templateData.description || `Template for various sizes`,
         preview_image_url: templateData.preview_url || '',
-        creatomate_template_id: templateData.id,
+        creatomate_template_id: templateData.id || templateId,
         variables,
         platforms,
         category: 'Imported',
