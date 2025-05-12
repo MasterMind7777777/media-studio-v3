@@ -220,6 +220,3 @@ export function TemplateVariablesEditor({
     </Card>
   );
 }
-
-// Import Card from UI components
-import { Card } from "@/components/ui/card";
