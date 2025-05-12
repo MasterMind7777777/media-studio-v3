@@ -466,12 +466,21 @@ Deno.serve(async (req) => {
       
       // Support both parameter naming conventions for backward compatibility
       // creatomateTemplateId (preferred), template_id (backward compatibility)
-      const { creatomateTemplateId, template_id, variables, platforms } = requestBody;
+      const { 
+        creatomateTemplateId,
+        template_id, 
+        variables, 
+        platforms,
+        user_id, // Add user_id parameter
+        database_job_id // Add database_job_id parameter for tracking
+      } = requestBody;
       
       // Combine both parameters, with creatomateTemplateId taking precedence if both are provided
       const templateIdentifier = creatomateTemplateId || template_id;
       
       console.log('Template identifier provided:', templateIdentifier);
+      console.log('User ID provided:', user_id);
+      console.log('Database job ID provided:', database_job_id);
       
       if (!templateIdentifier) {
         console.error('Missing template ID in request. Request body:', JSON.stringify(requestBody));
@@ -524,8 +533,9 @@ Deno.serve(async (req) => {
             webhook_url: webhookUrl,  // Add the webhook URL
             metadata: JSON.stringify({
               platform_id: platform.id,
-              user_id: requestBody.user_id, // Pass user ID if available
-              template_id: requestBody.template_id // Pass database template ID
+              user_id: user_id, // Pass user ID from request
+              template_id: requestBody.template_id, // Pass database template ID
+              database_job_id: database_job_id // Pass database job ID for correlation
             })
           };
           

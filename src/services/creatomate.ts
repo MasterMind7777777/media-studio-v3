@@ -85,7 +85,8 @@ export async function parseCurlCommand(curlCommand: string): Promise<{
 export async function startRenderJob(
   creatomateTemplateId: string, 
   variables: Record<string, any>,
-  platforms: any[]
+  platforms: any[],
+  database_job_id?: string // Add optional parameter for database job ID
 ): Promise<string[]> {
   try {
     if (!creatomateTemplateId) {
@@ -96,9 +97,16 @@ export async function startRenderJob(
     console.log("Starting render job with Creatomate template ID:", creatomateTemplateId);
     console.log("Variables:", variables);
     console.log("Platforms:", platforms);
+    console.log("Database job ID:", database_job_id);
 
     // Clean variables (remove any duplicated keys)
     const cleanVariables = cleanupVariables(variables);
+
+    // Get the current user ID
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      throw new Error("User not authenticated");
+    }
 
     // Use the consistent parameter name "creatomateTemplateId"
     const { data, error } = await supabase.functions.invoke('creatomate', {
@@ -106,7 +114,9 @@ export async function startRenderJob(
         action: 'start-render',
         creatomateTemplateId: creatomateTemplateId,
         variables: cleanVariables,
-        platforms 
+        platforms,
+        user_id: user.id, // Pass user ID to the edge function
+        database_job_id // Pass database job ID if provided
       },
     });
     

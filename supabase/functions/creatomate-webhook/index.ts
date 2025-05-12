@@ -60,70 +60,87 @@ serve(async (req: Request) => {
     try {
       if (render.metadata) {
         metadata = JSON.parse(render.metadata);
+        console.log('Parsed webhook metadata:', metadata);
       }
     } catch (err) {
       console.error('Failed to parse metadata:', err);
     }
 
-    // Find the render job by ID
-    const { data: existingJobs, error: findError } = await supabase
+    // First approach: Try to find the render job by Creatomate render ID
+    let { data: existingJob, error: findError } = await supabase
       .from('render_jobs')
       .select('*')
-      .eq('id', render.id)
+      .contains('creatomate_render_ids', [render.id])
       .maybeSingle();
 
-    if (findError) {
-      console.error('Error finding render job:', findError);
+    // Second approach: If not found and we have metadata with database_job_id, try to find by that
+    if (!existingJob && metadata?.database_job_id) {
+      console.log(`Job not found by render ID, trying database_job_id: ${metadata.database_job_id}`);
+      const { data: jobByDbId, error: findByDbIdError } = await supabase
+        .from('render_jobs')
+        .select('*')
+        .eq('id', metadata.database_job_id)
+        .maybeSingle();
+      
+      if (findByDbIdError) {
+        console.error('Error finding job by database_job_id:', findByDbIdError);
+      } else if (jobByDbId) {
+        existingJob = jobByDbId;
+        
+        // Add this render ID to the job's creatomate_render_ids array
+        const updatedRenderIds = [...(existingJob.creatomate_render_ids || []), render.id];
+        
+        // Update the job with the new render ID
+        const { error: updateRenderIdsError } = await supabase
+          .from('render_jobs')
+          .update({
+            creatomate_render_ids: updatedRenderIds,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingJob.id);
+        
+        if (updateRenderIdsError) {
+          console.error('Error adding render ID to job:', updateRenderIdsError);
+        }
+      }
     }
 
-    if (!existingJobs) {
-      // This is a new render job we haven't seen before
-      // Create a new entry with the render ID
-      const { error: insertError } = await supabase
-        .from('render_jobs')
-        .insert({
-          id: render.id,
-          status: mappedStatus, // Use mapped status
-          creatomate_render_ids: [render.id],
-          output_urls: {
-            [render.id]: render.url
-          },
-          template_id: metadata?.template_id || render.template_id,
-          user_id: metadata?.user_id || null,
-        });
-
-      if (insertError) {
-        console.error('Error inserting new render job:', insertError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to create render job' }),
-          { status: 500, headers: corsHeaders }
-        );
-      }
-    } else {
-      // Update the existing render job
-      const outputUrls = { ...(existingJobs.output_urls || {}) };
+    if (!existingJob) {
+      console.error(`No render job found for Creatomate render ID: ${render.id}`);
+      console.error('Metadata:', metadata);
       
-      // Add or update the URL for this render
-      if (render.status === 'succeeded' && render.url) {
-        outputUrls[render.id] = render.url;
-      }
+      return new Response(
+        JSON.stringify({ 
+          error: 'Render job not found', 
+          details: 'The webhook received a render status update for a render job that does not exist in the database.'
+        }),
+        { status: 404, headers: corsHeaders }
+      );
+    }
 
-      const { error: updateError } = await supabase
-        .from('render_jobs')
-        .update({
-          status: mappedStatus, // Use mapped status
-          output_urls: outputUrls,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', render.id);
+    // If we found the job, update it with the new status and URL if available
+    const outputUrls = { ...(existingJob.output_urls || {}) };
+    
+    // Add or update the URL for this render
+    if (render.status === 'succeeded' && render.url) {
+      outputUrls[render.id] = render.url;
+    }
 
-      if (updateError) {
-        console.error('Error updating render job:', updateError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to update render job' }),
-          { status: 500, headers: corsHeaders }
-        );
-      }
+    const { error: updateError } = await supabase
+      .from('render_jobs')
+      .update({
+        status: mappedStatus, // Use mapped status
+        output_urls: outputUrls,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', existingJob.id);
+
+    if (updateError) {
+      console.error('Error updating render job:', updateError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to update render job' }),
+        { status: 500, headers: corsHeaders }
+      );
     }
 
     // Return success response (must be fast as required by Creatomate)

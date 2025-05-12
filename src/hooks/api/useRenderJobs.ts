@@ -160,29 +160,52 @@ export const useCreateRenderJob = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("User not authenticated");
         
-        // Start the render job with Creatomate using the creatomate_template_id (not the database ID)
-        const renderIds = await startRenderJob(creatomateTemplateId, variables, platforms);
-        
-        // Create a record in the render_jobs table
-        const { data, error } = await supabase
+        // Create a record in the render_jobs table FIRST
+        const { data: renderJob, error: createError } = await supabase
           .from("render_jobs")
           .insert([{
             user_id: user.id,
             template_id: templateId,
             variables: variables as Json,
             platforms: platforms as unknown as Json,
-            status: 'pending',  // Changed from 'planned' to 'pending' to match our database constraints
-            creatomate_render_ids: renderIds,
+            status: 'pending',  // Start with pending status
+            creatomate_render_ids: [], // Will be populated after Creatomate response
             output_urls: {} as Json
           }])
           .select()
           .single();
           
-        if (error) {
-          throw new Error(`Error creating render job: ${error.message}`);
+        if (createError) {
+          throw new Error(`Error creating render job: ${createError.message}`);
+        }
+
+        if (!renderJob) {
+          throw new Error('Failed to create render job in database');
         }
         
-        return transformRenderJobData(data);
+        // Start the render job with Creatomate using the creatomate_template_id (not the database ID)
+        // Pass the database job ID to link Creatomate renders to our database record
+        const renderIds = await startRenderJob(
+          creatomateTemplateId, 
+          variables, 
+          platforms,
+          renderJob.id // Pass our database ID to Creatomate
+        );
+        
+        // Update the render job with the Creatomate render IDs
+        const { error: updateError } = await supabase
+          .from("render_jobs")
+          .update({
+            creatomate_render_ids: renderIds,
+          })
+          .eq("id", renderJob.id);
+          
+        if (updateError) {
+          console.error("Error updating render job with Creatomate IDs:", updateError);
+          // Continue anyway as this isn't critical
+        }
+        
+        return transformRenderJobData(renderJob);
       } catch (error) {
         console.error("Failed to start render job:", error);
         throw error;
