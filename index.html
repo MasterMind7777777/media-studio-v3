@@ -17,8 +17,12 @@
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
     
-    <!-- Load Creatomate SDK first, using defer to ensure it loads in order but doesn't block rendering -->
-    <script defer src="https://cdn.jsdelivr.net/npm/creatomate@1.2.1/dist/index.min.js"></script>
+    <!-- Load Creatomate SDK with event listener to detect when loaded -->
+    <script 
+      src="https://cdn.jsdelivr.net/npm/creatomate@1.2.1/dist/index.min.js" 
+      id="creatomate-sdk"
+      onload="window.creatomateSDKLoaded = true; window.dispatchEvent(new Event('creatomate-sdk-loaded'));">
+    </script>
   </head>
 
   <body>

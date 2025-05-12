@@ -1,20 +1,14 @@
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { 
   CREATOMATE_PUBLIC_API_KEY, 
   formatVariablesForPlayer,
   MAX_INITIALIZATION_RETRIES,
   SDK_INITIALIZATION_DELAY,
-  RETRY_DELAY,
+  BASE_RETRY_DELAY,
   isCreatomateSDKAvailable,
   waitForCreatomateSDK
 } from '@/integrations/creatomate/config';
-
-declare global {
-  interface Window {
-    Creatomate?: any;
-  }
-}
 
 interface UseCreatomatePreviewOptions {
   creatomateTemplateId?: string;
@@ -23,7 +17,7 @@ interface UseCreatomatePreviewOptions {
   autoPlay?: boolean;
   loop?: boolean;
   muted?: boolean;
-  skipAutoRetry?: boolean; // New option to prevent auto-retries
+  skipAutoRetry?: boolean; // Option to prevent auto-retries
 }
 
 export function useCreatomatePreview({
@@ -42,12 +36,18 @@ export function useCreatomatePreview({
   const sdkLoadedRef = useRef(false);
   const initializationAttempts = useRef(0);
   const timeoutRef = useRef<number | null>(null);
-  const sdkCheckInterval = useRef<number | null>(null);
   const isInitializingRef = useRef(false);
   const manualRetryRef = useRef(false); // Track if this is a manual retry
+  const initializationStartTimeRef = useRef<number | null>(null); // Track when initialization started
 
+  // Calculate exponential backoff delay based on attempt number
+  const getRetryDelay = useCallback((attemptNum: number) => {
+    // Exponential backoff with a cap at 8 seconds
+    return Math.min(BASE_RETRY_DELAY * Math.pow(1.5, attemptNum), 8000);
+  }, []);
+  
   // Function to check SDK and initialize the player when ready
-  const initializePlayerWhenReady = async () => {
+  const initializePlayerWhenReady = useCallback(async () => {
     // Prevent multiple simultaneous initialization attempts
     if (isInitializingRef.current) {
       console.log('Player initialization already in progress...');
@@ -56,11 +56,18 @@ export function useCreatomatePreview({
     
     isInitializingRef.current = true;
     setError(null); // Clear previous errors
+    initializationStartTimeRef.current = Date.now(); // Track when we started
 
     try {
-      // Try to wait for the SDK to load
+      // Log detailed initialization attempt information
+      console.log(`Initialization attempt #${initializationAttempts.current + 1}/${MAX_INITIALIZATION_RETRIES}`);
+      console.log(`SDK available before waiting: ${isCreatomateSDKAvailable() ? 'Yes' : 'No'}`);
+      
+      // Try to wait for the SDK to load with longer timeout
       await waitForCreatomateSDK();
       sdkLoadedRef.current = true;
+      
+      console.log(`SDK available after waiting: ${isCreatomateSDKAvailable() ? 'Yes' : 'No'}`);
       
       // After SDK is loaded, give it a moment before initializing the player
       if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
@@ -81,20 +88,30 @@ export function useCreatomatePreview({
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown SDK loading error';
       console.error('Failed to load Creatomate SDK:', errorMessage);
+      
+      // Calculate time spent trying to load
+      const timeSpent = initializationStartTimeRef.current 
+        ? Date.now() - initializationStartTimeRef.current 
+        : 0;
+      
+      console.log(`Time spent attempting to load SDK: ${timeSpent}ms`);
       setError(`SDK loading error: ${errorMessage}`);
       isInitializingRef.current = false;
       
       // If we have retries left and not skipping auto-retry, try again after delay
       if (!skipAutoRetry && initializationAttempts.current < MAX_INITIALIZATION_RETRIES) {
-        console.log(`Will retry initialization in ${RETRY_DELAY}ms (attempt ${initializationAttempts.current + 1}/${MAX_INITIALIZATION_RETRIES})`);
+        initializationAttempts.current++;
+        const retryDelay = getRetryDelay(initializationAttempts.current);
+        console.log(`Will retry initialization in ${retryDelay}ms (attempt ${initializationAttempts.current}/${MAX_INITIALIZATION_RETRIES})`);
+        
         if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-        timeoutRef.current = window.setTimeout(initializePlayerWhenReady, RETRY_DELAY);
+        timeoutRef.current = window.setTimeout(initializePlayerWhenReady, retryDelay);
       }
     }
-  };
+  }, [creatomateTemplateId, skipAutoRetry, getRetryDelay]);
   
   // Initialization function for the player
-  const initializePlayer = () => {
+  const initializePlayer = useCallback(() => {
     // Check if we've tried too many times already and not a manual retry
     if (!manualRetryRef.current && initializationAttempts.current >= MAX_INITIALIZATION_RETRIES) {
       console.error(`Failed to initialize player after ${MAX_INITIALIZATION_RETRIES} attempts`);
@@ -102,18 +119,26 @@ export function useCreatomatePreview({
       return;
     }
     
-    initializationAttempts.current++;
-    console.log(`Initialization attempt #${initializationAttempts.current}`);
+    // Update the attempt counter
+    if (!manualRetryRef.current) {
+      initializationAttempts.current++;
+    }
     
+    console.log(`Creating player instance (attempt #${initializationAttempts.current})`);
+    
+    // Double-check SDK availability
     if (!isCreatomateSDKAvailable()) {
-      const errorMsg = 'Creatomate SDK not loaded. Please reload the page.';
-      console.error(errorMsg);
+      const errorMsg = 'Creatomate SDK not available for initialization. Please reload the page.';
+      console.error(errorMsg, 'window.Creatomate:', window.Creatomate);
       setError(errorMsg);
       
       // Try again after a delay if not skipping auto retry
       if (!skipAutoRetry && initializationAttempts.current < MAX_INITIALIZATION_RETRIES) {
+        const retryDelay = getRetryDelay(initializationAttempts.current);
+        console.log(`Will retry initialization in ${retryDelay}ms`);
+        
         if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-        timeoutRef.current = window.setTimeout(initializePlayerWhenReady, RETRY_DELAY);
+        timeoutRef.current = window.setTimeout(initializePlayerWhenReady, retryDelay);
       }
       return;
     }
@@ -134,7 +159,6 @@ export function useCreatomatePreview({
     
     try {
       console.log('Initializing Creatomate player with template ID:', creatomateTemplateId);
-      console.log('API key:', CREATOMATE_PUBLIC_API_KEY ? 'Valid (hidden for security)' : 'Missing');
       
       // Dispose existing player if any
       if (playerRef.current) {
@@ -169,6 +193,7 @@ export function useCreatomatePreview({
         muted,
       };
       
+      // Log player options (except API key for security)
       console.log('Player options:', {
         ...playerOptions,
         apiKey: 'Valid (hidden for security)',
@@ -206,10 +231,11 @@ export function useCreatomatePreview({
             (errorMessage.includes('network') || errorMessage.includes('connection') || 
             errorMessage.includes('failed') || errorMessage.includes('template'))) {
           if (initializationAttempts.current < MAX_INITIALIZATION_RETRIES) {
-            console.log('Attempting to reinitialize player due to error...');
-            // Add a delay before retrying
+            const retryDelay = getRetryDelay(initializationAttempts.current);
+            console.log(`Attempting to reinitialize player due to error in ${retryDelay}ms...`);
+            
             if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-            timeoutRef.current = window.setTimeout(initializePlayerWhenReady, RETRY_DELAY);
+            timeoutRef.current = window.setTimeout(initializePlayerWhenReady, retryDelay);
           }
         }
       });
@@ -222,14 +248,16 @@ export function useCreatomatePreview({
       
       // Try again after a delay if it's not the last attempt and not skipping auto retries
       if (!skipAutoRetry && initializationAttempts.current < MAX_INITIALIZATION_RETRIES) {
-        console.log('Retrying player initialization...');
+        const retryDelay = getRetryDelay(initializationAttempts.current);
+        console.log(`Retrying player initialization in ${retryDelay}ms...`);
+        
         if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-        timeoutRef.current = window.setTimeout(initializePlayerWhenReady, RETRY_DELAY);
+        timeoutRef.current = window.setTimeout(initializePlayerWhenReady, retryDelay);
       }
     }
-  };
+  }, [creatomateTemplateId, variables, autoPlay, loop, muted, skipAutoRetry, getRetryDelay]);
   
-  // Initialization effect - run only once on mount, no dependency on creatomateTemplateId
+  // Initialization effect - run only once on mount
   useEffect(() => {
     // Clear previous errors
     setError(null);
@@ -248,12 +276,6 @@ export function useCreatomatePreview({
         timeoutRef.current = null;
       }
       
-      // Clear the SDK check interval
-      if (sdkCheckInterval.current) {
-        window.clearInterval(sdkCheckInterval.current);
-        sdkCheckInterval.current = null;
-      }
-      
       // Cleanup
       if (playerRef.current) {
         try {
@@ -268,19 +290,22 @@ export function useCreatomatePreview({
       // Reset initialization state
       initializationAttempts.current = 0;
     };
-  }, []); // Intentionally empty dependencies to run only once - we'll handle creatomateTemplateId separately
+  }, []); // Intentionally empty dependencies - we don't want this to re-run
   
-  // Handle template ID changes without full reinitializations
+  // Handle template ID changes
   useEffect(() => {
     if (creatomateTemplateId) {
       // Only try to initialize if we don't have a player or if it's not loaded
       if (!playerRef.current || !isLoaded) {
-        console.log('Template ID changed, initializing player');
-        initializationAttempts.current = 0;
+        console.log('Template ID changed or player not loaded, initializing player');
+        // We only reset the attempts if this is a new template ID, not just a retry
+        if (playerRef.current === null) {
+          initializationAttempts.current = 0;
+        }
         initializePlayerWhenReady();
       }
     }
-  }, [creatomateTemplateId]);
+  }, [creatomateTemplateId, isLoaded, initializePlayerWhenReady]);
   
   // Update variables effect
   useEffect(() => {
@@ -296,30 +321,30 @@ export function useCreatomatePreview({
   }, [variables, isLoaded]);
   
   // Player control functions
-  const play = () => {
+  const play = useCallback(() => {
     if (playerRef.current && isLoaded) {
       playerRef.current.play();
       setIsPlaying(true);
     }
-  };
+  }, [isLoaded]);
   
-  const pause = () => {
+  const pause = useCallback(() => {
     if (playerRef.current && isLoaded) {
       playerRef.current.pause();
       setIsPlaying(false);
     }
-  };
+  }, [isLoaded]);
   
-  const toggle = () => {
+  const toggle = useCallback(() => {
     if (isPlaying) {
       pause();
     } else {
       play();
     }
-  };
+  }, [isPlaying, play, pause]);
   
   // Update player with new variables without reinitializing
-  const updateVariables = (newVariables: Record<string, any>) => {
+  const updateVariables = useCallback((newVariables: Record<string, any>) => {
     if (playerRef.current && isLoaded) {
       try {
         const formattedVariables = formatVariablesForPlayer(newVariables);
@@ -328,10 +353,10 @@ export function useCreatomatePreview({
         console.error('Error updating variables:', e);
       }
     }
-  };
+  }, [isLoaded]);
 
   // Helper to check initialization status (for debugging)
-  const getInitializationStatus = () => {
+  const getInitializationStatus = useCallback(() => {
     return {
       sdkLoaded: sdkLoadedRef.current,
       hasWindow: typeof window !== 'undefined',
@@ -343,21 +368,22 @@ export function useCreatomatePreview({
       attempts: initializationAttempts.current,
       initializing: isInitializingRef.current,
     };
-  };
+  }, [creatomateTemplateId]);
 
   // Force a retry of initialization
-  const retryInitialization = () => {
+  const retryInitialization = useCallback(() => {
     console.log('Manually triggering player initialization retry');
     // Reset initialization state for manual retry
     isInitializingRef.current = false;
     manualRetryRef.current = true; // Mark as manual retry
     initializationAttempts.current = 0; // Reset counter for manual retries
+    setError(null); // Clear previous errors
     initializePlayerWhenReady();
     // Reset the manual flag after a short delay
     setTimeout(() => {
       manualRetryRef.current = false;
     }, 5000);
-  };
+  }, [initializePlayerWhenReady]);
 
   return {
     isLoaded,
