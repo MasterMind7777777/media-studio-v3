@@ -61,6 +61,25 @@ export const SDK_LOAD_TIMEOUT = 15000; // Increased from 5000 to 15000
 export const SDK_CHECK_INTERVAL = 500; // Reduced from 1000 to check more frequently
 
 /**
+ * Global state to prevent multiple initialization attempts
+ */
+let globalInitializationInProgress = false;
+
+/**
+ * Set global initialization status
+ */
+export function setGlobalInitializationStatus(status: boolean): void {
+  globalInitializationInProgress = status;
+}
+
+/**
+ * Get global initialization status
+ */
+export function getGlobalInitializationStatus(): boolean {
+  return globalInitializationInProgress;
+}
+
+/**
  * Check if the global SDK loaded flag has been set
  */
 export function isSDKLoadedByEvent(): boolean {
@@ -205,6 +224,59 @@ export function waitForCreatomateSDK(timeout = SDK_LOAD_TIMEOUT): Promise<boolea
         resolve(true);
       }
     }, SDK_CHECK_INTERVAL);
+  });
+}
+
+/**
+ * Fallback method to load Creatomate SDK dynamically
+ */
+export function loadCreatomateSDKManually(): Promise<boolean> {
+  console.log('🔄 Attempting to load Creatomate SDK manually...');
+  
+  return new Promise((resolve, reject) => {
+    // Check if SDK is already loaded
+    if (isCreatomateSDKAvailable()) {
+      console.log('SDK already available, no need to load manually');
+      return resolve(true);
+    }
+    
+    // Check if script already exists
+    const existingScript = document.getElementById('creatomate-sdk');
+    if (existingScript) {
+      console.log('SDK script tag already exists, will not add another one');
+      return waitForCreatomateSDK()
+        .then(() => resolve(true))
+        .catch(err => reject(err));
+    }
+    
+    // Create script element
+    const script = document.createElement('script');
+    script.id = 'creatomate-sdk';
+    script.src = 'https://cdn.jsdelivr.net/npm/creatomate@1.2.1/dist/index.min.js';
+    script.async = true;
+    
+    // Set up loading handlers
+    script.onload = () => {
+      console.log('Manual SDK script loaded successfully');
+      window.creatomateSDKLoaded = true;
+      window.dispatchEvent(new Event('creatomate-sdk-loaded'));
+      
+      // Wait for a moment to ensure SDK is initialized
+      setTimeout(() => {
+        if (isCreatomateSDKAvailable()) {
+          resolve(true);
+        } else {
+          reject(new Error('SDK loaded but not available after script load'));
+        }
+      }, 1000);
+    };
+    
+    script.onerror = () => {
+      reject(new Error('Failed to load Creatomate SDK script manually'));
+    };
+    
+    // Add to document
+    document.body.appendChild(script);
   });
 }
 

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Play, Maximize, Pause, AlertCircle, RotateCcw, RefreshCw } from "lucide-react";
 import { useCreatomatePreview } from "@/hooks/templates";
-import { isCreatomateSDKAvailable, forcePageRefresh } from "@/integrations/creatomate/config";
+import { isCreatomateSDKAvailable, forcePageRefresh, loadCreatomateSDKManually } from "@/integrations/creatomate/config";
 
 interface TemplatePreviewProps {
   previewImageUrl: string;
@@ -26,12 +26,61 @@ export function TemplatePreview({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [sdkStatus, setSdkStatus] = useState<string>("checking");
   const [refreshAttempts, setRefreshAttempts] = useState(0);
+  const [loadingManually, setLoadingManually] = useState(false);
+  const [browserInfo, setBrowserInfo] = useState<string | null>(null);
+  
+  // Check browser compatibility
+  useEffect(() => {
+    const checkBrowser = () => {
+      const userAgent = navigator.userAgent.toLowerCase();
+      let browserName = "unknown";
+      let browserVersion = "unknown";
+      
+      if (userAgent.indexOf("chrome") > -1) {
+        browserName = "chrome";
+        const match = userAgent.match(/chrome\/(\d+)/);
+        if (match) browserVersion = match[1];
+      } else if (userAgent.indexOf("firefox") > -1) {
+        browserName = "firefox";
+        const match = userAgent.match(/firefox\/(\d+)/);
+        if (match) browserVersion = match[1];
+      } else if (userAgent.indexOf("safari") > -1) {
+        browserName = "safari";
+        const match = userAgent.match(/version\/(\d+)/);
+        if (match) browserVersion = match[1];
+      } else if (userAgent.indexOf("edg") > -1) {
+        browserName = "edge";
+        const match = userAgent.match(/edg\/(\d+)/);
+        if (match) browserVersion = match[1];
+      }
+      
+      setBrowserInfo(`${browserName} ${browserVersion}`);
+    };
+    
+    checkBrowser();
+  }, []);
   
   // Check if SDK is available but only once on component mount
   useEffect(() => {
     const checkSdk = () => {
       const available = isCreatomateSDKAvailable();
       setSdkStatus(available ? "loaded" : "not-loaded");
+      
+      // If SDK is not loaded, try loading manually
+      if (!available) {
+        console.log('SDK not detected on mount, trying to load manually...');
+        setLoadingManually(true);
+        loadCreatomateSDKManually()
+          .then(() => {
+            console.log('Manual SDK loading successful on mount');
+            setSdkStatus("loaded");
+            setLoadingManually(false);
+          })
+          .catch(() => {
+            console.log('Manual SDK loading failed on mount');
+            setLoadingManually(false);
+          });
+      }
     };
     
     // Initial check only, no interval to prevent refresh loops
@@ -80,8 +129,18 @@ export function TemplatePreview({
   const handleRetryInitialization = () => {
     // Rate limit the retries
     setRefreshAttempts(prev => prev + 1);
+    setSdkStatus("checking");
+    setLoadingManually(true);
+    
     if (retryInitialization) {
       retryInitialization();
+      
+      // Update SDK status after a delay
+      setTimeout(() => {
+        const available = isCreatomateSDKAvailable();
+        setSdkStatus(available ? "loaded" : "not-loaded");
+        setLoadingManually(false);
+      }, 2000);
     }
   };
   
@@ -123,8 +182,18 @@ export function TemplatePreview({
             <div className={`text-xs px-2 py-1 rounded mb-3 ${
               sdkStatus === "loaded" ? "bg-green-500/30" : "bg-red-500/30"
             }`}>
-              Creatomate SDK: {sdkStatus === "loaded" ? "Detected ✓" : "Not Detected ✗"}
+              Creatomate SDK: {
+                loadingManually ? "Loading..." : 
+                sdkStatus === "loaded" ? "Detected ✓" : "Not Detected ✗"
+              }
             </div>
+            
+            {/* Browser information */}
+            {browserInfo && (
+              <div className="text-xs text-white/70 mb-2">
+                Browser: {browserInfo}
+              </div>
+            )}
             
             {/* Debugging information */}
             {initStatus && (
@@ -137,6 +206,7 @@ export function TemplatePreview({
                   <p>Template ID: {initStatus.hasTemplateId ? '✅' : '❌'}</p>
                   <p>API Key: {initStatus.apiKey}</p>
                   <p>Attempts: {initStatus.attempts}</p>
+                  <p>Global state: {initStatus.globalInitializing ? '⏳' : '✅'}</p>
                 </div>
               </div>
             )}
@@ -147,10 +217,10 @@ export function TemplatePreview({
                 variant="outline"
                 className="bg-white/10 hover:bg-white/20 text-white mb-4"
                 onClick={handleRetryInitialization}
-                disabled={refreshAttempts > 5}
+                disabled={refreshAttempts > 5 || loadingManually}
               >
-                <RotateCcw className="h-4 w-4 mr-1" />
-                Retry
+                <RotateCcw className={`h-4 w-4 mr-1 ${loadingManually ? 'animate-spin' : ''}`} />
+                {loadingManually ? "Loading..." : "Retry"}
               </Button>
               
               <Button 

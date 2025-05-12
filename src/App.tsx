@@ -18,6 +18,7 @@ import Media from "./pages/Media";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 import Index from "./pages/Index";
+import { CreatomateLoader } from "@/components/CreatomateLoader";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -41,6 +42,8 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      {/* Load Creatomate SDK as early as possible */}
+      <CreatomateLoader />
       <BrowserRouter>
         <AuthProvider>
           <Routes>
