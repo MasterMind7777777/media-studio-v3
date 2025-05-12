@@ -6,7 +6,7 @@
 
 // Public token that can be safely exposed in frontend
 export const CREATOMATE_PUBLIC_TOKEN = 
-  import.meta.env.VITE_CREATOMATE_TOKEN ?? '';
+  'public-jb5rna2gay9buhajvtiyp1hb';
   
 // Default template ID as fallback
 export const DEFAULT_TEMPLATE_ID =

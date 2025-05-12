@@ -1,4 +1,3 @@
-
 import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,7 +5,7 @@ import { Play, Maximize, Pause, AlertCircle, RotateCcw } from "lucide-react";
 import { useCreatomatePreview } from "@/hooks/templates";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { DEFAULT_TEMPLATE_ID } from "@/config/creatomate";
-import { getCreatomateToken, getCreatomateTemplateId } from "@/integrations/creatomate/config";
+import { getCreatomateToken } from "@/integrations/creatomate/config";
 import { CREATOMATE_PUBLIC_TOKEN } from "@/config/creatomate";
 
 interface TemplatePreviewProps {
@@ -32,22 +31,19 @@ export function TemplatePreview({
   const [templateId, setTemplateId] = useState<string>(creatomateTemplateId);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Fetch credentials from Supabase
+  // Get the token from config
   useEffect(() => {
     async function fetchCredentials() {
       try {
-        // Try to get token from Supabase
-        const token = await getCreatomateToken();
-        setApiToken(token);
+        // Try to get token from config or function
+        if (!apiToken) {
+          const token = await getCreatomateToken();
+          setApiToken(token);
+        }
         
-        // If no template ID was provided through props, try to get it from Supabase
-        if (!creatomateTemplateId) {
-          try {
-            const id = await getCreatomateTemplateId();
-            setTemplateId(id);
-          } catch (err) {
-            console.warn('Could not get template ID from Supabase:', err);
-          }
+        // Use the template ID from props
+        if (creatomateTemplateId) {
+          setTemplateId(creatomateTemplateId);
         }
       } catch (err) {
         console.error('Failed to fetch Creatomate credentials:', err);
@@ -57,7 +53,7 @@ export function TemplatePreview({
     }
     
     fetchCredentials();
-  }, [creatomateTemplateId]);
+  }, [apiToken, creatomateTemplateId]);
   
   // Check browser compatibility
   useEffect(() => {
@@ -150,7 +146,7 @@ export function TemplatePreview({
               <Alert variant="destructive" className="mb-4 max-w-md">
                 <AlertTitle>Missing Template ID</AlertTitle>
                 <AlertDescription>
-                  Set CREATOMATE_TEMPLATE_ID in Supabase secrets
+                  Check that a valid Creatomate template ID was provided
                 </AlertDescription>
               </Alert>
             )}
