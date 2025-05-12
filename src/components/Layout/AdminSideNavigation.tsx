@@ -1,8 +1,9 @@
 
 import { cn } from "@/lib/utils";
 import { SideNavItem } from "@/types";
-import { LayoutDashboard, Users, Layers, Package, Settings } from "lucide-react";
+import { LayoutDashboard, Users, Layers, Package, Settings, Home } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 interface AdminSideNavigationProps {
   items?: SideNavItem[];
@@ -74,6 +75,18 @@ export function AdminSideNavigation({ items = defaultItems, className }: AdminSi
                 </button>
               );
             })}
+          </div>
+          
+          {/* Return to main app button */}
+          <div className="mt-6 pt-6 border-t">
+            <Button 
+              variant="secondary" 
+              className="w-full flex items-center justify-center gap-2"
+              onClick={() => navigate("/")}
+            >
+              <Home className="h-4 w-4" />
+              <span>Return to Main App</span>
+            </Button>
           </div>
         </div>
       </div>
