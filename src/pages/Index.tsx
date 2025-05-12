@@ -16,7 +16,7 @@ const Index = () => {
         navigate("/dashboard", { replace: true });
       } else {
         // User is not authenticated, navigate to login
-        navigate("/auth", { replace: true });
+        navigate("/login", { replace: true });
       }
     }
   }, [navigate, user, loading]);

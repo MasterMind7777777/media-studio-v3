@@ -16,6 +16,8 @@ import Login from './pages/Auth';
 import Register from './pages/Auth';
 import Account from './pages/Settings';
 import { CreatomateLoader } from './components/CreatomateLoader';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import Dashboard from './pages/Dashboard';
 
 function App() {
   const { user } = useAuth();
@@ -28,67 +30,31 @@ function App() {
     }
   }, [user]);
   
-  const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
-    const location = useLocation();
-    
-    if (!user) {
-      return <Navigate to="/login" replace state={{ from: location }} />;
-    }
-    
-    return <>{children}</>;
-  };
-  
   return (
     <>
       {/* Add the loader near the top of the component tree */}
       <CreatomateLoader />
       
       <Routes>
+        {/* Public routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/auth" element={<Login />} />
         
-        <Route
-          path="/create"
-          element={
-            <PrivateRoute>
-              <Create />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/create/:id/customize"
-          element={
-            <PrivateRoute>
-              <TemplateCustomize />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/templates"
-          element={
-            <PrivateRoute>
-              <Templates />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/projects"
-          element={
-            <PrivateRoute>
-              <Projects />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/account"
-          element={
-            <PrivateRoute>
-              <Account />
-            </PrivateRoute>
-          }
-        />
+        {/* Protected routes with layout */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/create" element={<Create />} />
+          <Route path="/create/:id/customize" element={<TemplateCustomize />} />
+          <Route path="/templates" element={<Templates />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/account" element={<Account />} />
+          <Route path="/settings" element={<Account />} />
+        </Route>
         
-        <Route path="/" element={<Navigate to="/create" />} />
+        {/* Redirects */}
+        <Route path="/" element={<Navigate to="/dashboard" />} />
+        <Route path="*" element={<Navigate to="/dashboard" />} />
       </Routes>
       <Toaster />
     </>

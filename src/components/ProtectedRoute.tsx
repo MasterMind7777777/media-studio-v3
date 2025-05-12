@@ -20,11 +20,10 @@ export const ProtectedRoute = () => {
   // Redirect to login if not authenticated
   if (!user) {
     // Save the location they were trying to access for redirecting after login
-    return <Navigate to="/auth" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
   
-  // Render child routes if authenticated - no special handling for root path
-  // as that's now handled by the Index component
+  // Render child routes inside the MainLayout if authenticated
   return (
     <MainLayout>
       <Outlet />
