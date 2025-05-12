@@ -1,4 +1,3 @@
-
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4'
 
 // Define necessary types directly in the edge function
@@ -244,6 +243,10 @@ Deno.serve(async (req) => {
       );
     }
     
+    // Get the site URL for webhook
+    const siteUrl = Deno.env.get('SITE_URL') || supabaseUrl.replace('.supabase.co', '.functions.supabase.co');
+    const webhookUrl = `${siteUrl}/functions/v1/creatomate-webhook`;
+    
     if (action === 'import-template') {
       // Import template action
       if (req.method !== 'POST') {
@@ -482,29 +485,36 @@ Deno.serve(async (req) => {
       
       console.log('Sending modifications to Creatomate:', modifications);
       
-      // MODIFIED: Instead of sending an array of render jobs, send individual requests for each platform
-      // This ensures the template_id is at the top level of the request as required by Creatomate API
+      // Process each platform as a separate render for now
+      // In future we could batch these as an array if Creatomate supports it
       try {
-        const renderPromises = platforms.map(async (platform) => {
-          // Create a single render request for this platform
-          const singleRenderPayload = {
-            template_id: templateIdentifier, // Top-level template_id (required by Creatomate)
+        const allRenders = [];
+        
+        for (const platform of platforms) {
+          console.log(`Processing platform ${platform.name || `${platform.width}x${platform.height}`}`);
+          
+          // Create a request payload for this platform
+          const payload = {
+            template_id: templateIdentifier,
             output_format: 'mp4',
             width: platform.width,
             height: platform.height,
-            modifications
+            modifications,
+            webhook_url: webhookUrl,
+            metadata: JSON.stringify({
+              platform_id: platform.id,
+              user_id: requestBody.user_id // Pass user ID if available
+            })
           };
-
-          console.log(`Sending request for platform ${platform.name || `${platform.width}x${platform.height}`}`);
           
-          // Send individual request to Creatomate
+          // Send request to Creatomate
           const response = await fetch('https://api.creatomate.com/v1/renders', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${apiKey}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify(singleRenderPayload)
+            body: JSON.stringify(payload)
           });
           
           if (!response.ok) {
@@ -515,22 +525,35 @@ Deno.serve(async (req) => {
           }
           
           const data = await response.json();
-          // Creatomate returns renders array even for single requests
-          if (!data.renders || data.renders.length === 0) {
-            console.error('Unexpected response format from Creatomate:', data);
-            throw new Error('Invalid response from Creatomate API: missing renders array');
-          }
+          console.log('Creatomate response:', JSON.stringify(data));
           
-          // Return the render ID
-          return data.renders[0].id;
-        });
+          // Extract render data from response array
+          if (Array.isArray(data)) {
+            // Direct array response
+            allRenders.push(...data);
+          } else if (data.renders && Array.isArray(data.renders)) {
+            // Nested renders array
+            allRenders.push(...data.renders);
+          } else {
+            console.error('Unexpected response format from Creatomate:', data);
+            throw new Error('Invalid response format from Creatomate API');
+          }
+        }
         
-        // Wait for all render requests to complete
-        const renderIds = await Promise.all(renderPromises);
-        console.log('All render requests completed successfully. Render IDs:', renderIds);
+        console.log('All render requests completed. Total renders:', allRenders.length);
         
-        // Return all render IDs
-        return new Response(JSON.stringify({ renderIds }), { headers: corsHeaders });
+        // Store render IDs for legacy compatibility
+        const renderIds = allRenders.map(render => render.id);
+        
+        // Return both the full render objects and just the IDs for backwards compatibility
+        return new Response(
+          JSON.stringify({ 
+            renders: allRenders,
+            renderIds 
+          }), 
+          { headers: corsHeaders }
+        );
+        
       } catch (error) {
         console.error('Error during render process:', error);
         return new Response(

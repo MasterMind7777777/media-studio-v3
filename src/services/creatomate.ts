@@ -104,7 +104,7 @@ export async function startRenderJob(
     const { data, error } = await supabase.functions.invoke('creatomate', {
       body: { 
         action: 'start-render',
-        creatomateTemplateId: creatomateTemplateId, // Use consistent naming convention
+        creatomateTemplateId: creatomateTemplateId,
         variables: cleanVariables,
         platforms 
       },
@@ -115,11 +115,21 @@ export async function startRenderJob(
       throw new Error(`Error starting render: ${error.message}`);
     }
     
-    if (!data || !data.renderIds) {
+    if (!data) {
       throw new Error("Invalid response from Creatomate edge function");
     }
     
-    return data.renderIds;
+    // The structure is now { renders: [...] } with an array of render objects
+    if (data.renders && Array.isArray(data.renders)) {
+      // Extract render IDs from all render objects
+      return data.renders.map((render: any) => render.id);
+    } else if (data.renderIds && Array.isArray(data.renderIds)) {
+      // Backwards compatibility with old response format
+      return data.renderIds;
+    } else {
+      console.error("Unexpected response format:", data);
+      throw new Error("Invalid response format from Creatomate edge function");
+    }
   } catch (error) {
     console.error('Error starting render job:', error);
     throw error;
@@ -160,6 +170,7 @@ function cleanupVariables(variables: Record<string, any>): Record<string, any> {
 
 /**
  * Check status of a render job via secure Edge Function
+ * This will be deprecated in favor of the webhook approach
  */
 export async function checkRenderStatus(renderIds: string[]): Promise<Record<string, any>> {
   try {

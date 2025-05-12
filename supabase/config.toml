@@ -3,3 +3,6 @@ project_id = "yfycfcpyvupjpmngnxfi"
 
 [functions.creatomate]
 verify_jwt = true
+
+[functions.creatomate-webhook]
+verify_jwt = false

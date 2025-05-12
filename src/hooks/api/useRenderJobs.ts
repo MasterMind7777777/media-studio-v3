@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { RenderJob, Platform } from "@/types";
 import { startRenderJob, checkRenderStatus } from "@/services/creatomate";
 import { Json } from "@/integrations/supabase/types";
+import { useEffect } from "react";
 
 // Helper function to transform render job data from Supabase
 const transformRenderJobData = (item: any): RenderJob => ({
@@ -50,6 +51,32 @@ export const useRenderJobs = () => {
  * Hook to fetch a single render job by ID
  */
 export const useRenderJob = (id: string | undefined) => {
+  const queryClient = useQueryClient();
+  
+  // Set up a realtime subscription for this render job
+  useEffect(() => {
+    if (!id) return;
+    
+    // Subscribe to changes for this particular render job
+    const channel = supabase
+      .channel(`render_job_${id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'render_jobs',
+        filter: `id=eq.${id}`
+      }, (payload) => {
+        // When the job is updated (by the webhook), refresh the data
+        queryClient.invalidateQueries({ queryKey: ["renderJobs", id] });
+      })
+      .subscribe();
+    
+    // Clean up subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, queryClient]);
+  
   return useQuery({
     queryKey: ["renderJobs", id],
     queryFn: async () => {
@@ -115,13 +142,13 @@ export const useCreateRenderJob = () => {
       console.log(`Starting render for template ${templateId} with Creatomate ID: ${creatomateTemplateId}`);
       
       try {
-        // Start the render job with Creatomate using the creatomate_template_id (not the database ID)
-        const renderIds = await startRenderJob(creatomateTemplateId, variables, platforms);
-        
         // Need to get the current user ID
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error("User not authenticated");
-
+        
+        // Start the render job with Creatomate using the creatomate_template_id (not the database ID)
+        const renderIds = await startRenderJob(creatomateTemplateId, variables, platforms);
+        
         // Create a record in the render_jobs table
         const { data, error } = await supabase
           .from("render_jobs")
@@ -196,7 +223,7 @@ export const useUpdateRenderJob = () => {
 };
 
 /**
- * Hook to check render status and update job
+ * Hook to check render status and update job (legacy, will be deprecated in favor of webhooks)
  */
 export const useCheckRenderStatus = () => {
   const queryClient = useQueryClient();
