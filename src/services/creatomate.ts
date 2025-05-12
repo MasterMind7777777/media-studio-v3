@@ -28,12 +28,13 @@ export async function fetchCreatomateTemplates(): Promise<any[]> {
 /**
  * Imports a template from Creatomate to our database via secure Edge Function
  */
-export async function importCreatomateTemplate(templateId: string): Promise<Template> {
+export async function importCreatomateTemplate(templateId: string, curlCommand?: string): Promise<Template> {
   try {
     const { data, error } = await supabase.functions.invoke('creatomate', {
       body: { 
         action: 'import-template',
-        templateId 
+        templateId,
+        curlCommand 
       },
     });
     
@@ -44,6 +45,35 @@ export async function importCreatomateTemplate(templateId: string): Promise<Temp
     return data as Template;
   } catch (error) {
     console.error('Error importing Creatomate template:', error);
+    throw error;
+  }
+}
+
+/**
+ * Parses a CURL command to extract template ID and modifications
+ */
+export async function parseCurlCommand(curlCommand: string): Promise<{
+  templateId: string | null;
+  modifications: Record<string, any>;
+}> {
+  try {
+    const { data, error } = await supabase.functions.invoke('creatomate', {
+      body: {
+        action: 'parse-curl',
+        curlCommand
+      },
+    });
+    
+    if (error) {
+      throw new Error(`Error parsing CURL command: ${error.message}`);
+    }
+    
+    return {
+      templateId: data.templateId || null,
+      modifications: data.modifications || {}
+    };
+  } catch (error) {
+    console.error('Error parsing CURL command:', error);
     throw error;
   }
 }

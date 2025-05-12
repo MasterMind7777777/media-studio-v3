@@ -58,9 +58,54 @@ async function getCreatomateApiKey(supabaseClient: any) {
   }
 }
 
+// Enhanced function to extract variables from CURL example in text
+function extractVariablesFromCurl(text: string): Record<string, any> | null {
+  try {
+    // More robust regex pattern to match "modifications" JSON object in curl commands
+    // This pattern looks for the modifications object with various formatting possibilities
+    const curlMatch = text.match(/modifications"?\s*:?\s*(\{[^}]+\})/);
+    if (!curlMatch || !curlMatch[1]) {
+      console.log('No modifications found in curl example');
+      return null;
+    }
+
+    // Clean up the JSON string to make it parsable
+    let jsonStr = curlMatch[1].replace(/'/g, '"');
+    
+    // Handle trailing commas which are invalid in JSON
+    jsonStr = jsonStr.replace(/,\s*}/g, '}');
+    
+    // Replace multiple whitespace with single space
+    jsonStr = jsonStr.replace(/\s+/g, ' ');
+    
+    console.log('Extracted modifications string from curl:', jsonStr);
+    
+    try {
+      // First try to parse directly
+      return JSON.parse(jsonStr);
+    } catch (e) {
+      console.log('Failed to parse JSON directly, trying with additional cleanup:', e);
+      
+      // Additional cleanup for malformed JSON
+      // Replace unquoted keys with quoted keys
+      jsonStr = jsonStr.replace(/(\{|\,)\s*([a-zA-Z0-9_\.\-]+)\s*:/g, '$1"$2":');
+      
+      // Ensure all string values are properly quoted
+      jsonStr = jsonStr.replace(/:\s*([^",\{\}\[\]\s][^,\}\]]*)/g, ':"$1"');
+      
+      console.log('After additional cleanup:', jsonStr);
+      return JSON.parse(jsonStr);
+    }
+  } catch (e) {
+    console.error('Failed to extract variables from curl example:', e);
+    return null;
+  }
+}
+
 // Helper function to get test render info for a template to extract variable modifications
 async function getTemplateRenderInfo(templateId: string, apiKey: string) {
   try {
+    console.log(`Fetching render examples for template ${templateId}`);
     const response = await fetch(`https://api.creatomate.com/v1/renders?template_id=${templateId}&limit=1`, {
       headers: {
         'Authorization': `Bearer ${apiKey}`,
@@ -69,7 +114,7 @@ async function getTemplateRenderInfo(templateId: string, apiKey: string) {
     });
     
     if (!response.ok) {
-      console.log('Could not fetch render examples for template', response.status);
+      console.log(`Could not fetch render examples for template ${response.status}`);
       return null;
     }
     
@@ -84,6 +129,78 @@ async function getTemplateRenderInfo(templateId: string, apiKey: string) {
     console.error('Error fetching template render info:', error);
     return null;
   }
+}
+
+// Improved function to extract variables from template elements
+function extractVariablesFromElements(elements: any[]): Record<string, any> {
+  const variables: Record<string, any> = {};
+  
+  if (!elements || !Array.isArray(elements)) {
+    console.log('No elements array found or elements is not an array');
+    return variables;
+  }
+  
+  console.log(`Processing ${elements.length} elements to extract variables`);
+  
+  elements.forEach((element, index) => {
+    if (!element) return;
+    
+    // Extract element name, defaulting to element type + index if name not available
+    const elementName = element.name || `${element.type || 'Element'}${index}`;
+    console.log(`Processing element: ${elementName} (type: ${element.type || 'unknown'})`);
+    
+    // Check for text property in different locations
+    if (element.text !== undefined) {
+      variables[`${elementName}.text`] = element.text;
+      console.log(`Added text variable: ${elementName}.text = ${element.text}`);
+    } 
+    else if (element.properties && element.properties.text !== undefined) {
+      variables[`${elementName}.text`] = element.properties.text;
+      console.log(`Added text variable from properties: ${elementName}.text = ${element.properties.text}`);
+    }
+    
+    // Check for source property in different locations
+    if (element.source !== undefined) {
+      variables[`${elementName}.source`] = element.source;
+      console.log(`Added source variable: ${elementName}.source = ${element.source}`);
+    } 
+    else if (element.properties && element.properties.source !== undefined) {
+      variables[`${elementName}.source`] = element.properties.source;
+      console.log(`Added source variable from properties: ${elementName}.source = ${element.properties.source}`);
+    }
+    
+    // Check for fill_color property
+    if (element.fill_color !== undefined) {
+      variables[`${elementName}.fill`] = element.fill_color;
+      console.log(`Added fill variable: ${elementName}.fill = ${element.fill_color}`);
+    } 
+    else if (element.properties && element.properties.fill_color !== undefined) {
+      variables[`${elementName}.fill`] = element.properties.fill_color;
+      console.log(`Added fill variable from properties: ${elementName}.fill = ${element.properties.fill_color}`);
+    }
+    
+    // Check for other dynamic properties marked with "dynamic": true
+    if (element.dynamic === true) {
+      // If the element is marked as dynamic but we didn't capture any specific property,
+      // add a placeholder based on the element type
+      if (element.type === 'text' && !variables[`${elementName}.text`]) {
+        variables[`${elementName}.text`] = `Text for ${elementName}`;
+        console.log(`Added placeholder text variable: ${elementName}.text = Text for ${elementName}`);
+      } 
+      else if ((element.type === 'image' || element.type === 'video' || element.type === 'audio') && !variables[`${elementName}.source`]) {
+        variables[`${elementName}.source`] = element.source || '';
+        console.log(`Added placeholder source variable: ${elementName}.source = ${element.source || ''}`);
+      }
+    }
+    
+    // Process nested elements if any
+    if (element.elements && Array.isArray(element.elements)) {
+      const nestedVariables = extractVariablesFromElements(element.elements);
+      Object.assign(variables, nestedVariables);
+    }
+  });
+  
+  return variables;
 }
 
 Deno.serve(async (req) => {
@@ -136,7 +253,7 @@ Deno.serve(async (req) => {
         });
       }
       
-      const { templateId } = requestBody;
+      const { templateId, curlCommand } = requestBody;
       if (!templateId) {
         return new Response(JSON.stringify({ error: 'Template ID is required' }), {
           status: 400,
@@ -145,6 +262,16 @@ Deno.serve(async (req) => {
       }
       
       console.log('Importing template:', templateId);
+      
+      // If curl command was provided, parse it to extract variables
+      let curlModifications = null;
+      if (curlCommand) {
+        console.log('Processing provided CURL command');
+        curlModifications = extractVariablesFromCurl(curlCommand);
+        if (curlModifications) {
+          console.log('Successfully parsed modifications from CURL command:', curlModifications);
+        }
+      }
       
       // Fetch template from Creatomate API
       const response = await fetch(`https://api.creatomate.com/v1/templates/${templateId}`, {
@@ -204,68 +331,77 @@ Deno.serve(async (req) => {
         console.log('Created default platform:', platforms[0]);
       }
       
-      // Extract variables from the template
+      // Initialize variables object
       const variables: Record<string, any> = {};
       
-      // First, try to extract variables from the template elements
-      if (templateData.source && templateData.source.elements) {
-        templateData.source.elements.forEach((element: any) => {
-          if (element.name) {
-            if (element.properties && element.properties.text) {
-              variables[`${element.name}.text`] = element.text || element.properties.text;
-            } else if (element.source || (element.properties && element.properties.source)) {
-              variables[`${element.name}.source`] = element.source || element.properties.source;
-            } else if (element.properties && element.properties.fill_color) {
-              variables[`${element.name}.fill`] = element.properties.fill_color;
-            }
-          }
+      // 1. First use the variables provided in the curl command if available
+      if (curlModifications) {
+        Object.entries(curlModifications).forEach(([key, value]) => {
+          variables[key] = value;
         });
-      } else if (templateData.elements) {
-        // Alternative path for elements directly in templateData
-        templateData.elements.forEach((element: any) => {
-          if (element.name) {
-            if (element.text) {
-              variables[`${element.name}.text`] = element.text;
-            } else if (element.source) {
-              variables[`${element.name}.source`] = element.source;
-            } else if (element.fill_color) {
-              variables[`${element.name}.fill`] = element.fill_color;
-            }
-          }
-        });
+        console.log('Added variables from curl command:', variables);
       }
       
-      // Additionally, try to fetch a sample render for this template to extract modification variables
+      // 2. Extract variables from template elements
+      let elementsToProcess: any[] = [];
+      
+      // Get elements from the right place in the structure
+      if (templateData.source && templateData.source.elements) {
+        elementsToProcess = templateData.source.elements;
+        console.log('Using templateData.source.elements for variable extraction');
+      } else if (templateData.elements) {
+        elementsToProcess = templateData.elements;
+        console.log('Using templateData.elements for variable extraction');
+      }
+      
+      // Process elements to extract variables
+      if (elementsToProcess.length > 0) {
+        const elementVariables = extractVariablesFromElements(elementsToProcess);
+        
+        // Add element variables that don't already exist from curl command
+        Object.entries(elementVariables).forEach(([key, value]) => {
+          if (!variables[key]) {
+            variables[key] = value;
+          }
+        });
+        
+        console.log('Extracted variables from elements:', elementVariables);
+      } else {
+        console.log('No elements found for variable extraction');
+      }
+      
+      // 3. Additionally, try to fetch a sample render for this template to extract modification variables
       const renderModifications = await getTemplateRenderInfo(templateId, apiKey);
       
       if (renderModifications) {
         // Add all modifications as variables if they don't exist yet
         Object.entries(renderModifications).forEach(([key, value]) => {
           if (typeof value === 'string' || typeof value === 'number') {
-            variables[key] = value;
+            if (!variables[key]) {
+              variables[key] = value;
+            }
           }
         });
+        console.log('Added variables from render example:', renderModifications);
       }
       
-      console.log('Extracted variables:', variables);
-      
-      // If we still don't have variables, try to parse from curl examples in the description
+      // 4. If we still don't have variables, try to parse from curl examples in the description
       if (Object.keys(variables).length === 0 && templateData.description) {
-        const curlMatch = templateData.description.match(/modifications":\s*({[^}]+})/);
-        if (curlMatch && curlMatch[1]) {
-          try {
-            const parsedVars = JSON.parse(curlMatch[1].replace(/'/g, '"'));
-            Object.entries(parsedVars).forEach(([key, value]) => {
-              if (typeof value === 'string' || typeof value === 'number') {
-                variables[key] = value;
-              }
-            });
-            console.log('Parsed variables from curl example:', variables);
-          } catch (e) {
-            console.error('Failed to parse variables from curl example:', e);
-          }
+        const descriptionVariables = extractVariablesFromCurl(templateData.description);
+        
+        if (descriptionVariables) {
+          Object.entries(descriptionVariables).forEach(([key, value]) => {
+            if (!variables[key] && (typeof value === 'string' || typeof value === 'number')) {
+              variables[key] = value;
+            }
+          });
+          console.log('Parsed variables from template description:', descriptionVariables);
+        } else {
+          console.log('No variables found in template description');
         }
       }
+      
+      console.log('Final extracted variables:', variables);
       
       // Create a new template in the database
       const template = {
@@ -417,6 +553,60 @@ Deno.serve(async (req) => {
       });
       
       return new Response(JSON.stringify(statusMap), { headers: corsHeaders });
+      
+    } else if (action === 'parse-curl') {
+      // New action to parse a CURL command and extract variables
+      if (req.method !== 'POST') {
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+          status: 405,
+          headers: corsHeaders,
+        });
+      }
+      
+      const { curlCommand } = requestBody;
+      if (!curlCommand) {
+        return new Response(JSON.stringify({ error: 'CURL command is required' }), {
+          status: 400,
+          headers: corsHeaders,
+        });
+      }
+      
+      console.log('Parsing CURL command:', curlCommand);
+      
+      // Extract template ID
+      let templateId = null;
+      
+      // Pattern 1: Extract from URL - templates/{id}
+      const templateUrlMatch = curlCommand.match(/templates\/([a-f0-9-]{36})/i);
+      
+      // Pattern 2: Extract from JSON - "template_id": "{id}"
+      const templateJsonMatch = curlCommand.match(/"template_id":\s*"([a-f0-9-]{36})"/i);
+      
+      // Use the first match found
+      if (templateUrlMatch && templateUrlMatch[1]) {
+        templateId = templateUrlMatch[1];
+      } else if (templateJsonMatch && templateJsonMatch[1]) {
+        templateId = templateJsonMatch[1];
+      }
+      
+      // Extract modifications from CURL
+      const modifications = extractVariablesFromCurl(curlCommand);
+      
+      if (!templateId && !modifications) {
+        return new Response(JSON.stringify({
+          error: 'Could not extract template ID or modifications from CURL command'
+        }), {
+          status: 400,
+          headers: corsHeaders
+        });
+      }
+      
+      return new Response(JSON.stringify({
+        templateId,
+        modifications: modifications || {}
+      }), {
+        headers: corsHeaders
+      });
       
     } else {
       return new Response(JSON.stringify({ error: 'Unknown action' }), {
