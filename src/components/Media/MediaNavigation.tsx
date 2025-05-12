@@ -9,13 +9,20 @@ import {
 } from "@/components/ui/navigation-menu";
 import { Image, Clock, FolderOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { 
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 interface MediaNavigationProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
   mediaCount?: number;
   recentUploadsCount?: number;
-  className?: string; // Added className prop to interface
+  className?: string;
+  compact?: boolean;
 }
 
 export function MediaNavigation({ 
@@ -23,7 +30,8 @@ export function MediaNavigation({
   onTabChange, 
   mediaCount = 0,
   recentUploadsCount = 0,
-  className
+  className,
+  compact = false
 }: MediaNavigationProps) {
   const navigationItems = [
     {
@@ -45,6 +53,33 @@ export function MediaNavigation({
       count: null
     }
   ];
+
+  if (compact) {
+    return (
+      <div className={cn("flex space-x-2", className)}>
+        {navigationItems.map((item) => (
+          <button
+            key={item.id}
+            className={cn(
+              "flex items-center gap-1 px-3 py-1 text-sm rounded-md",
+              activeTab === item.id 
+                ? "bg-accent text-accent-foreground" 
+                : "hover:bg-accent hover:text-accent-foreground"
+            )}
+            onClick={() => onTabChange(item.id)}
+          >
+            <item.icon className="h-3 w-3" />
+            <span>{item.label}</span>
+            {item.count !== null && (
+              <Badge variant="outline" className="ml-1 text-xs py-0 h-5">
+                {item.count}
+              </Badge>
+            )}
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className={cn("bg-background border rounded-lg p-4 space-y-1", className)}>
