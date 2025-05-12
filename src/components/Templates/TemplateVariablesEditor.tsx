@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
@@ -39,6 +40,15 @@ export function TemplateVariablesEditor({
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [outputOpen, setOutputOpen] = useState(true);
 
+  // Helper function to format variable display names
+  const formatVariableName = (key: string) => {
+    // Remove .source, .text, etc. suffixes for display
+    const baseName = key.split('.')[0];
+    // Replace underscores with spaces and capitalize first letter
+    return baseName.replace(/_/g, ' ')
+      .replace(/\b\w/g, l => l.toUpperCase());
+  };
+
   return (
     <Card className="h-full">
       <div className="p-4 border-b">
@@ -63,7 +73,7 @@ export function TemplateVariablesEditor({
               {textVariables.map(({key, value}) => (
                 <div key={key} className="space-y-1">
                   <label className="text-sm text-muted-foreground">
-                    {key.replace(/_/g, ' ')}
+                    {formatVariableName(key)}
                   </label>
                   <input 
                     type="text" 
@@ -94,19 +104,23 @@ export function TemplateVariablesEditor({
             <CollapsibleContent className="p-4 pt-0 space-y-3">
               {mediaVariables.map(({key, value}) => {
                 const mediaAsset = selectedMedia[key];
+                const displayName = formatVariableName(key);
+                
                 return (
                   <div key={key} className="flex items-center gap-2">
                     <div className="h-10 w-10 bg-muted rounded flex items-center justify-center overflow-hidden">
                       {value ? (
-                        <img src={value} className="w-full h-full object-cover" alt={key} />
+                        <img src={value} className="w-full h-full object-cover" alt={displayName} />
                       ) : (
                         <Image className="h-4 w-4 text-muted-foreground" />
                       )}
                     </div>
                     <div className="flex-grow">
-                      <div className="text-sm">{key.replace(/_/g, ' ')}</div>
+                      <div className="text-sm font-medium">{displayName}</div>
                       {mediaAsset && (
-                        <div className="text-xs text-muted-foreground">{mediaAsset.name}</div>
+                        <div className="text-xs text-muted-foreground truncate max-w-[150px]">
+                          {mediaAsset.name}
+                        </div>
                       )}
                     </div>
                     <Button 
@@ -140,7 +154,7 @@ export function TemplateVariablesEditor({
             <CollapsibleContent className="p-4 pt-0 space-y-3">
               {colorVariables.map(({key, value}) => (
                 <div key={key} className="flex items-center justify-between">
-                  <label className="text-sm">{key.replace(/_/g, ' ')}</label>
+                  <label className="text-sm">{formatVariableName(key)}</label>
                   <div className="flex items-center gap-2">
                     <input 
                       type="color"

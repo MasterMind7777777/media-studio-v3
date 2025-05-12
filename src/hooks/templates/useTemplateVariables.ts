@@ -39,30 +39,42 @@ export function useTemplateVariables(template: Template | null): VariablesByType
       const variableName = parts[0];
       const variableType = parts.length > 1 ? parts[1] : '';
       
+      // Handle nested source properties (e.g., "avatar-1.source.source")
+      // This prevents duplicate entries for the same media element
+      if (key.includes('.source.source')) {
+        // Skip these as they're duplicates
+        return;
+      }
+      
       // Categorize by type
       if (variableType === 'text') {
         result.textVariables.push({
           key,
-          variableName: variableName.replace(/_/g, ' '),
+          variableName: variableName,
           value: String(value),
           property: 'text'
         });
       } else if (variableType === 'source') {
         result.mediaVariables.push({
           key,
-          variableName: variableName.replace(/_/g, ' '),
+          variableName: variableName,
           value: String(value),
           property: 'source'
         });
       } else if (variableType === 'fill') {
         result.colorVariables.push({
           key,
-          variableName: variableName.replace(/_/g, ' '),
+          variableName: variableName,
           value: String(value),
           property: 'fill'
         });
       }
     });
+    
+    // Sort variables alphabetically by variableName for consistent display
+    result.textVariables.sort((a, b) => a.variableName.localeCompare(b.variableName));
+    result.mediaVariables.sort((a, b) => a.variableName.localeCompare(b.variableName));
+    result.colorVariables.sort((a, b) => a.variableName.localeCompare(b.variableName));
     
     result.hasVariables = 
       result.textVariables.length > 0 || 

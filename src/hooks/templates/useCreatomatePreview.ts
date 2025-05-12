@@ -1,6 +1,6 @@
 
 import { useState, useEffect, useRef } from 'react';
-import { formatVariablesForPlayer, isCreatomateSDKAvailable } from '@/integrations/creatomate/config';
+import { isCreatomateSDKAvailable } from '@/integrations/creatomate/config';
 import { toast } from 'sonner';
 
 interface UseCreatomatePreviewProps {
@@ -31,7 +31,7 @@ export function useCreatomatePreview({
   const previewRef = useRef<any>(null);
   
   // Format the variables for the preview
-  const formattedVariables = formatVariablesForPlayer(variables);
+  const formattedVariables = variables || {};
   
   // Function to retry initialization
   const retryInitialization = () => {
@@ -61,7 +61,7 @@ export function useCreatomatePreview({
       return;
     }
 
-    // Check if the SDK is available
+    // Check if the SDK is available - we no longer try to load it manually here
     if (!isCreatomateSDKAvailable()) {
       console.log('Preview initialization skipped: SDK not available');
       setError(new Error('Creatomate SDK not loaded. Please refresh the page and try again.'));
@@ -86,7 +86,7 @@ export function useCreatomatePreview({
     setIsLoading(true);
 
     try {
-      // Create a new preview instance
+      // Create a new preview instance using the already loaded SDK
       const preview = new window.Creatomate.Preview(
         container, 
         'player', 

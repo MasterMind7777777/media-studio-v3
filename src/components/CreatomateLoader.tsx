@@ -12,7 +12,6 @@ export function CreatomateLoader() {
   
   useEffect(() => {
     // Only check if SDK is available without trying to load it manually
-    // The SDK should already be loaded via the script tag in index.html
     const checkSDK = () => {
       if (isCreatomateSDKAvailable()) {
         console.log('Creatomate SDK detected');
@@ -27,8 +26,15 @@ export function CreatomateLoader() {
       setSDKChecked(true);
     };
     
-    // Wait a short time for the script to load
-    const timer = setTimeout(checkSDK, 1000);
+    // First check immediately
+    if (isCreatomateSDKAvailable()) {
+      console.log('Creatomate SDK already loaded');
+      setSDKChecked(true);
+      return;
+    }
+    
+    // If not found, wait a short time to check again as the script might still be loading
+    const timer = setTimeout(checkSDK, 2000);
     
     return () => clearTimeout(timer);
   }, []);
