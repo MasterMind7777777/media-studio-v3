@@ -5,11 +5,12 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Search, Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useTemplates } from "@/hooks/api";
 import { Platform } from "@/types";
 import { toast } from "@/components/ui/sonner";
+import TemplateCard from "@/components/Templates/TemplateCard";
 
 export default function Create() {
   const navigate = useNavigate();
@@ -18,35 +19,42 @@ export default function Create() {
   const [selectedCategory, setSelectedCategory] = useState<string | "all">("all");
   const [selectedAspectRatio, setSelectedAspectRatio] = useState<string | "all">("all");
   
-  // Fetch templates using our API hook instead of mock data
+  // Fetch templates using our API hook
   const { data: templates, isLoading, error } = useTemplates();
   
-  // Get unique categories from actual templates
-  const categories = templates 
-    ? Array.from(new Set(templates.filter(t => t.category).map(t => t.category)))
-    : [];
+  // Memoize categories to prevent recalculation on every render
+  const categories = useMemo(() => {
+    if (!templates) return [];
+    return Array.from(new Set(templates.filter(t => t.category).map(t => t.category)));
+  }, [templates]);
   
-  // Get unique aspect ratios from actual templates
-  const aspectRatios = templates
-    ? Array.from(
-        new Set(
-          templates.flatMap(t => 
-            t.platforms.map((p: Platform) => p.aspect_ratio)
-          )
+  // Memoize aspect ratios to prevent recalculation on every render
+  const aspectRatios = useMemo(() => {
+    if (!templates) return [];
+    const ratios = Array.from(
+      new Set(
+        templates.flatMap(t => 
+          t.platforms.map((p: Platform) => p.aspect_ratio)
         )
-      ).sort()
-    : [];
+      )
+    ).sort();
+    return ratios;
+  }, [templates]);
 
   // Get selected template from URL if present
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const templateId = searchParams.get("template");
+    
     if (templateId && templates) {
+      console.log(`Looking for template with ID ${templateId} in ${templates.length} templates`);
       const template = templates.find(t => t.id === templateId);
+      
       if (template) {
+        console.log(`Found template "${template.name}", navigating to customize page`);
         navigate(`/create/${templateId}/customize`);
       } else {
-        // Template not found in the loaded templates
+        console.error(`Template with ID ${templateId} not found`);
         toast.error("Template not found", {
           description: `The template with ID ${templateId} could not be found.`
         });
@@ -54,20 +62,28 @@ export default function Create() {
     }
   }, [location, navigate, templates]);
 
-  // Filter templates based on search, category, and aspect ratio
-  const filteredTemplates = templates?.filter(template => {
-    const matchesSearch = template.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          (template.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
+  // Memoize filtered templates for better performance
+  const filteredTemplates = useMemo(() => {
+    if (!templates) return [];
     
-    const matchesCategory = selectedCategory === "all" || template.category === selectedCategory;
-    
-    const matchesAspectRatio = selectedAspectRatio === "all" || 
-                              template.platforms.some(p => p.aspect_ratio === selectedAspectRatio);
-    
-    return matchesSearch && matchesCategory && matchesAspectRatio;
-  });
+    return templates.filter(template => {
+      const matchesSearch = 
+        !searchTerm || 
+        template.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        (template.description?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
+      
+      const matchesCategory = selectedCategory === "all" || template.category === selectedCategory;
+      
+      const matchesAspectRatio = selectedAspectRatio === "all" || 
+                                template.platforms.some(p => p.aspect_ratio === selectedAspectRatio);
+      
+      return matchesSearch && matchesCategory && matchesAspectRatio;
+    });
+  }, [templates, searchTerm, selectedCategory, selectedAspectRatio]);
 
-  const handleTemplateSelect = (templateId: string) => {
+  // Template selection handler using useCallback to prevent recreation on every render
+  const handleTemplateSelect = useCallback((templateId: string) => {
+    console.log(`Template selected with ID: ${templateId}`);
     if (templates?.find(t => t.id === templateId)) {
       navigate(`/create/${templateId}/customize`);
     } else {
@@ -75,7 +91,7 @@ export default function Create() {
         description: `The template with ID ${templateId} could not be found.`
       });
     }
-  };
+  }, [templates, navigate]);
 
   // Show error toast if templates fail to load
   useEffect(() => {
@@ -158,43 +174,11 @@ export default function Create() {
               ) : filteredTemplates && filteredTemplates.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {filteredTemplates.map((template) => (
-                    <Card key={template.id} className="overflow-hidden cursor-pointer hover-scale">
-                      <div 
-                        className="group relative"
-                        onClick={() => handleTemplateSelect(template.id)}
-                      >
-                        <div className="aspect-video w-full overflow-hidden">
-                          <img
-                            src={template.preview_image_url || "/placeholder.svg"}
-                            alt={template.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                          <h3 className="text-white font-medium">{template.name}</h3>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {template.platforms.slice(0, 2).map((platform, index) => (
-                              <span key={index} className="text-xs text-white/80 bg-white/20 px-1.5 py-0.5 rounded">
-                                {platform.aspect_ratio}
-                              </span>
-                            ))}
-                            {template.platforms.length > 2 && (
-                              <span className="text-xs text-white/80 bg-white/20 px-1.5 py-0.5 rounded">
-                                +{template.platforms.length - 2}
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-2">
-                            <Button 
-                              className="w-full bg-white text-gray-800 hover:bg-gray-200"
-                              size="sm"
-                            >
-                              Select Template
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
+                    <TemplateCard 
+                      key={template.id} 
+                      template={template} 
+                      onSelect={handleTemplateSelect} 
+                    />
                   ))}
                 </div>
               ) : (
@@ -223,43 +207,11 @@ export default function Create() {
               ) : templates ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {templates.slice(0, 4).map((template) => (
-                    <Card key={template.id} className="overflow-hidden cursor-pointer hover-scale">
-                      <div 
-                        className="group relative"
-                        onClick={() => handleTemplateSelect(template.id)}
-                      >
-                        <div className="aspect-video w-full overflow-hidden">
-                          <img
-                            src={template.preview_image_url || "/placeholder.svg"}
-                            alt={template.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                          <h3 className="text-white font-medium">{template.name}</h3>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {template.platforms.slice(0, 2).map((platform, index) => (
-                              <span key={index} className="text-xs text-white/80 bg-white/20 px-1.5 py-0.5 rounded">
-                                {platform.aspect_ratio}
-                              </span>
-                            ))}
-                            {template.platforms.length > 2 && (
-                              <span className="text-xs text-white/80 bg-white/20 px-1.5 py-0.5 rounded">
-                                +{template.platforms.length - 2}
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-2">
-                            <Button 
-                              className="w-full bg-white text-gray-800 hover:bg-gray-200"
-                              size="sm"
-                            >
-                              Select Template
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    </Card>
+                    <TemplateCard 
+                      key={template.id} 
+                      template={template} 
+                      onSelect={handleTemplateSelect}
+                    />
                   ))}
                 </div>
               ) : null}

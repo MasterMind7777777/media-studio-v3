@@ -1,4 +1,3 @@
-
 import { MainLayout } from "@/components/Layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -19,11 +18,25 @@ export default function TemplateCustomize() {
   const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
   const [updatedTemplate, setUpdatedTemplate] = useState<Template | null>(null);
   
-  // Fetch template data using our custom hook
+  // Validate template ID
+  useEffect(() => {
+    if (!id) {
+      console.error("Template ID is missing from route parameters");
+      toast.error("Missing template information", {
+        description: "No template ID was provided."
+      });
+      navigate("/create");
+    } else {
+      console.log(`TemplateCustomize page loaded with template ID: ${id}`);
+    }
+  }, [id, navigate]);
+  
+  // Fetch template data using our custom hook with improved error handling
   const { 
     data: template, 
     isLoading, 
-    error 
+    error,
+    isError
   } = useTemplate(id);
 
   const { 
@@ -39,6 +52,7 @@ export default function TemplateCustomize() {
   // Update our local state when template data is loaded
   useEffect(() => {
     if (template && !updatedTemplate) {
+      console.log(`Template data loaded successfully: ${template.name}`);
       setUpdatedTemplate(template);
     }
   }, [template, updatedTemplate]);
@@ -85,7 +99,31 @@ export default function TemplateCustomize() {
     return getMediaVariables.length > 0;
   }, [getMediaVariables]);
 
-  // If template is loading or not found, show loading or redirect
+  // Handle template loading errors with better error messages
+  useEffect(() => {
+    if (isError && error) {
+      console.error("Template loading error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      // Provide more specific error messages based on the error
+      if (errorMessage.includes("not found")) {
+        toast.error("Template not found", {
+          description: `The template with ID ${id} could not be found. It may have been deleted or is unavailable.`,
+        });
+      } else {
+        toast.error("Failed to load template", {
+          description: errorMessage
+        });
+      }
+      
+      // Redirect after a short delay to allow the toast to be seen
+      setTimeout(() => {
+        navigate("/create");
+      }, 1500);
+    }
+  }, [isError, error, id, navigate]);
+
+  // If template is loading, show loading state
   if (isLoading) {
     return (
       <MainLayout>
@@ -99,13 +137,11 @@ export default function TemplateCustomize() {
     );
   }
   
-  if (error || !template || !updatedTemplate) {
-    // Show error toast before redirecting
-    toast.error("Template not found", {
-      description: "The template you requested could not be found.",
-    });
-    navigate("/create");
-    return null;
+  // If template is not found or there is an error, the redirect will happen via the useEffect
+  // This prevents flashing of error UI before redirect
+  
+  if (!template || !updatedTemplate) {
+    return null; // Return null while redirect happens via the useEffect
   }
 
   const handleStepChange = (step: number) => {
