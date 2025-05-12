@@ -5,16 +5,9 @@ import {
   NavigationMenuItem,
   NavigationMenuLink,
   NavigationMenuList,
-  navigationMenuTriggerStyle
 } from "@/components/ui/navigation-menu";
 import { Image, Clock, FolderOpen } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 
 interface MediaNavigationProps {
   activeTab: string;
