@@ -145,7 +145,7 @@ export default function Create() {
                   </Button>
                 </div>
               ) : filteredTemplates && filteredTemplates.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {filteredTemplates.map((template) => (
                     <Card key={template.id} className="overflow-hidden cursor-pointer hover-scale">
                       <div 
@@ -210,7 +210,7 @@ export default function Create() {
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
               ) : templates ? (
-                <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {templates.slice(0, 4).map((template) => (
                     <Card key={template.id} className="overflow-hidden cursor-pointer hover-scale">
                       <div 

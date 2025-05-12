@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, ChevronRight, Cog, Image, Type } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTemplate, useCreateRenderJob } from "@/hooks/api";
+import { toast } from "@/components/ui/sonner";
 
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
@@ -24,6 +25,48 @@ export default function TemplateCustomize() {
     isPending: isRendering 
   } = useCreateRenderJob();
   
+  // Helper functions to extract variables by type from the flattened structure
+  const getTextVariables = useMemo(() => {
+    if (!template?.variables) return [];
+    
+    return Object.entries(template.variables).filter(([key]) => {
+      return key.endsWith('.text');
+    }).map(([key, value]) => ({
+      key: key.split('.')[0],
+      property: key.split('.')[1],
+      value
+    }));
+  }, [template?.variables]);
+  
+  const getMediaVariables = useMemo(() => {
+    if (!template?.variables) return [];
+    
+    return Object.entries(template.variables).filter(([key]) => {
+      return key.endsWith('.source');
+    }).map(([key, value]) => ({
+      key: key.split('.')[0],
+      property: key.split('.')[1],
+      value
+    }));
+  }, [template?.variables]);
+  
+  const getColorVariables = useMemo(() => {
+    if (!template?.variables) return [];
+    
+    return Object.entries(template.variables).filter(([key]) => {
+      return key.endsWith('.fill');
+    }).map(([key, value]) => ({
+      key: key.split('.')[0],
+      property: key.split('.')[1],
+      value
+    }));
+  }, [template?.variables]);
+  
+  // Check if we have any media variables at all
+  const hasMediaVariables = useMemo(() => {
+    return getMediaVariables.length > 0;
+  }, [getMediaVariables]);
+
   // If template is loading or not found, show loading or redirect
   if (isLoading) {
     return (
@@ -39,6 +82,10 @@ export default function TemplateCustomize() {
   }
   
   if (error || !template) {
+    // Show error toast before redirecting
+    toast.error("Template not found", {
+      description: "The template you requested could not be found.",
+    });
     navigate("/create");
     return null;
   }
@@ -110,13 +157,12 @@ export default function TemplateCustomize() {
 
   const renderMediaSelectionStep = () => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
-      <div className="md:col-span-1">
-        <Card className="p-4 h-full">
-          <h3 className="font-medium mb-4">Required Media</h3>
-          <div className="space-y-4">
-            {Object.entries(template.variables)
-              .filter(([_, v]) => v.type === "media")
-              .map(([key, value]) => (
+      {hasMediaVariables && (
+        <div className="md:col-span-1">
+          <Card className="p-4 h-full">
+            <h3 className="font-medium mb-4">Required Media</h3>
+            <div className="space-y-4">
+              {getMediaVariables.map(({key, property, value}) => (
                 <div key={key} className="border rounded-md p-3">
                   <div className="text-sm font-medium mb-2">{key.replace(/_/g, ' ')}</div>
                   <div className="aspect-video bg-muted rounded-md flex items-center justify-center">
@@ -129,10 +175,12 @@ export default function TemplateCustomize() {
                   </div>
                 </div>
               ))}
-          </div>
-        </Card>
-      </div>
-      <div className="md:col-span-2">
+            </div>
+          </Card>
+        </div>
+      )}
+      
+      <div className={`md:col-span-${hasMediaVariables ? '2' : '3'}`}>
         <Card className="h-full">
           <Tabs defaultValue="my-uploads">
             <TabsList className="w-full">
@@ -221,38 +269,38 @@ export default function TemplateCustomize() {
       <div className="md:col-span-4">
         <Card className="h-full">
           <div className="p-4 border-b">
-            <h3 className="font-medium">Edit Template</h3>
+            <h3 className="font-medium">Edit Template: {template.name}</h3>
           </div>
           <div className="p-4 space-y-6">
-            <div>
-              <h4 className="text-sm font-medium flex items-center mb-2">
-                <Type className="h-4 w-4 mr-1" /> Text Elements
-              </h4>
-              <div className="space-y-3">
-                {Object.entries(template.variables)
-                  .filter(([_, v]) => v.type === "text")
-                  .map(([key, value]) => (
+            {getTextVariables.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium flex items-center mb-2">
+                  <Type className="h-4 w-4 mr-1" /> Text Elements
+                </h4>
+                <div className="space-y-3">
+                  {getTextVariables.map(({key, value}) => (
                     <div key={key} className="space-y-1">
                       <label className="text-sm text-muted-foreground">
                         {key.replace(/_/g, ' ')}
                       </label>
                       <input 
                         type="text" 
-                        defaultValue={value.default}
+                        defaultValue={value}
                         className="w-full px-3 py-1 border rounded-md text-sm"
                       />
                     </div>
                   ))}
+                </div>
               </div>
-            </div>
-            <div>
-              <h4 className="text-sm font-medium flex items-center mb-2">
-                <Image className="h-4 w-4 mr-1" /> Media Elements
-              </h4>
-              <div className="space-y-3">
-                {Object.entries(template.variables)
-                  .filter(([_, v]) => v.type === "media")
-                  .map(([key, _]) => (
+            )}
+            
+            {getMediaVariables.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium flex items-center mb-2">
+                  <Image className="h-4 w-4 mr-1" /> Media Elements
+                </h4>
+                <div className="space-y-3">
+                  {getMediaVariables.map(({key}) => (
                     <div key={key} className="flex items-center gap-2">
                       <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
                         <Image className="h-4 w-4 text-muted-foreground" />
@@ -263,34 +311,42 @@ export default function TemplateCustomize() {
                       <Button size="sm" variant="outline">Change</Button>
                     </div>
                   ))}
+                </div>
               </div>
-            </div>
-            <div>
-              <h4 className="text-sm font-medium flex items-center mb-2">
-                <Cog className="h-4 w-4 mr-1" /> Settings
-              </h4>
-              <div className="space-y-3">
-                {Object.entries(template.variables)
-                  .filter(([_, v]) => v.type === "color")
-                  .map(([key, value]) => (
+            )}
+            
+            {getColorVariables.length > 0 && (
+              <div>
+                <h4 className="text-sm font-medium flex items-center mb-2">
+                  <Cog className="h-4 w-4 mr-1" /> Settings
+                </h4>
+                <div className="space-y-3">
+                  {getColorVariables.map(({key, value}) => (
                     <div key={key} className="flex items-center justify-between">
                       <label className="text-sm">{key.replace(/_/g, ' ')}</label>
                       <div className="flex items-center gap-2">
                         <input 
                           type="color"
-                          defaultValue={value.default}
+                          defaultValue={value}
                           className="w-8 h-8 rounded-md cursor-pointer"
                         />
                         <input 
                           type="text"
-                          defaultValue={value.default}
+                          defaultValue={value}
                           className="w-24 px-2 py-1 border rounded-md text-xs"
                         />
                       </div>
                     </div>
                   ))}
+                </div>
               </div>
-            </div>
+            )}
+            
+            {getTextVariables.length === 0 && getMediaVariables.length === 0 && getColorVariables.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <p className="text-muted-foreground">This template has no editable elements</p>
+              </div>
+            )}
           </div>
         </Card>
       </div>
@@ -370,168 +426,8 @@ export default function TemplateCustomize() {
         
         <div className="min-h-[60vh]">
           {activeStep === 1 && renderMediaSelectionStep()}
-          {activeStep === 2 && (
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 animate-fade-in">
-              <div className="md:col-span-8">
-                <Card className="h-full">
-                  <div className="aspect-video bg-black/80 rounded-t-md flex items-center justify-center">
-                    <div className="text-white text-center p-8">
-                      <div className="text-xl font-medium mb-4">Preview</div>
-                      <p className="text-white/70 mb-4">
-                        Creatomate Preview SDK would be integrated here
-                      </p>
-                      <img 
-                        src={template.preview_image_url} 
-                        alt="Preview" 
-                        className="max-w-full max-h-60 mx-auto rounded-md shadow-lg"
-                      />
-                    </div>
-                  </div>
-                  <div className="p-4 flex items-center justify-between border-t">
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline">Play</Button>
-                      <Button size="sm" variant="outline">Fullscreen</Button>
-                    </div>
-                    <div className="text-muted-foreground text-sm">
-                      {template.platforms[0]?.width} × {template.platforms[0]?.height}
-                    </div>
-                  </div>
-                </Card>
-              </div>
-              <div className="md:col-span-4">
-                <Card className="h-full">
-                  <div className="p-4 border-b">
-                    <h3 className="font-medium">Edit Template</h3>
-                  </div>
-                  <div className="p-4 space-y-6">
-                    <div>
-                      <h4 className="text-sm font-medium flex items-center mb-2">
-                        <Type className="h-4 w-4 mr-1" /> Text Elements
-                      </h4>
-                      <div className="space-y-3">
-                        {Object.entries(template.variables)
-                          .filter(([_, v]) => v.type === "text")
-                          .map(([key, value]) => (
-                            <div key={key} className="space-y-1">
-                              <label className="text-sm text-muted-foreground">
-                                {key.replace(/_/g, ' ')}
-                              </label>
-                              <input 
-                                type="text" 
-                                defaultValue={value.default}
-                                className="w-full px-3 py-1 border rounded-md text-sm"
-                              />
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium flex items-center mb-2">
-                        <Image className="h-4 w-4 mr-1" /> Media Elements
-                      </h4>
-                      <div className="space-y-3">
-                        {Object.entries(template.variables)
-                          .filter(([_, v]) => v.type === "media")
-                          .map(([key, _]) => (
-                            <div key={key} className="flex items-center gap-2">
-                              <div className="h-10 w-10 bg-muted rounded flex items-center justify-center">
-                                <Image className="h-4 w-4 text-muted-foreground" />
-                              </div>
-                              <div className="flex-grow">
-                                <div className="text-sm">{key.replace(/_/g, ' ')}</div>
-                              </div>
-                              <Button size="sm" variant="outline">Change</Button>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-medium flex items-center mb-2">
-                        <Cog className="h-4 w-4 mr-1" /> Settings
-                      </h4>
-                      <div className="space-y-3">
-                        {Object.entries(template.variables)
-                          .filter(([_, v]) => v.type === "color")
-                          .map(([key, value]) => (
-                            <div key={key} className="flex items-center justify-between">
-                              <label className="text-sm">{key.replace(/_/g, ' ')}</label>
-                              <div className="flex items-center gap-2">
-                                <input 
-                                  type="color"
-                                  defaultValue={value.default}
-                                  className="w-8 h-8 rounded-md cursor-pointer"
-                                />
-                                <input 
-                                  type="text"
-                                  defaultValue={value.default}
-                                  className="w-24 px-2 py-1 border rounded-md text-xs"
-                                />
-                              </div>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              </div>
-            </div>
-          )}
-          {activeStep === 3 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
-              <Card className="p-6">
-                <h3 className="font-medium mb-4">Output Formats</h3>
-                <p className="text-muted-foreground text-sm mb-6">
-                  Select the platforms where you want to render this template
-                </p>
-                <div className="space-y-3">
-                  {template.platforms.map(platform => (
-                    <div key={platform.id} className="flex items-center space-x-2">
-                      <input 
-                        type="checkbox" 
-                        id={platform.id} 
-                        className="rounded text-studio-600 focus:ring-studio-600"
-                        defaultChecked
-                      />
-                      <label htmlFor={platform.id} className="flex-1">
-                        {platform.name}
-                        <span className="text-xs text-muted-foreground ml-2">
-                          ({platform.width}×{platform.height}) - {platform.aspect_ratio}
-                        </span>
-                      </label>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-6 p-3 border rounded-md bg-muted/50">
-                  <p className="text-sm text-muted-foreground">
-                    Need a custom size? <span className="text-studio-600">Contact support</span>
-                  </p>
-                </div>
-              </Card>
-              <Card className="p-6">
-                <h3 className="font-medium mb-4">Render Summary</h3>
-                <div className="space-y-4">
-                  <div>
-                    <div className="text-sm text-muted-foreground">Template</div>
-                    <div className="font-medium">{template.name}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Selected Platforms</div>
-                    <div>
-                      {template.platforms.map(platform => (
-                        <div key={platform.id} className="text-sm">
-                          {platform.name} - {platform.width}×{platform.height}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="pt-4 border-t">
-                    <div className="text-studio-600 font-medium">Estimated Time</div>
-                    <div className="text-sm">1-2 minutes for all formats</div>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
+          {activeStep === 2 && renderCustomizationStep()}
+          {activeStep === 3 && renderRenderOptionsStep()}
         </div>
         
         <div className="flex justify-end mt-8">
