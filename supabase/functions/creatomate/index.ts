@@ -1,6 +1,27 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4'
-import { Template } from '../../../src/types';
+
+// Define necessary types directly in the edge function
+interface Platform {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  aspect_ratio: string;
+}
+
+interface Template {
+  id: string;
+  name: string;
+  description: string;
+  preview_image_url: string;
+  creatomate_template_id: string;
+  variables: Record<string, any>;
+  platforms: Platform[];
+  category: string;
+  is_active: boolean;
+  created_at: string;
+}
 
 // Define Cors headers for cross-origin requests
 const corsHeaders = {

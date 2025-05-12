@@ -3,6 +3,27 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RenderJob, Platform } from "@/types";
 import { startRenderJob, checkRenderStatus } from "@/services/creatomate";
+import { Json } from "@/integrations/supabase/types";
+
+// Helper function to transform render job data from Supabase
+const transformRenderJobData = (item: any): RenderJob => ({
+  id: item.id,
+  user_id: item.user_id,
+  template_id: item.template_id,
+  variables: item.variables || {},
+  platforms: Array.isArray(item.platforms) ? item.platforms.map((platform: any) => ({
+    id: platform.id || '',
+    name: platform.name || '',
+    width: platform.width || 0,
+    height: platform.height || 0,
+    aspect_ratio: platform.aspect_ratio || '1:1'
+  })) : [],
+  status: item.status || 'pending',
+  creatomate_render_ids: item.creatomate_render_ids || [],
+  output_urls: item.output_urls || {},
+  created_at: item.created_at,
+  updated_at: item.updated_at
+});
 
 /**
  * Hook to fetch all render jobs
@@ -20,7 +41,7 @@ export const useRenderJobs = () => {
         throw new Error(`Error fetching render jobs: ${error.message}`);
       }
       
-      return data as RenderJob[];
+      return (data || []).map(item => transformRenderJobData(item));
     }
   });
 };
@@ -48,7 +69,7 @@ export const useRenderJob = (id: string | undefined) => {
         throw new Error(`Render job not found with ID: ${id}`);
       }
       
-      return data as RenderJob;
+      return transformRenderJobData(data);
     },
     enabled: !!id
   });
@@ -73,16 +94,21 @@ export const useCreateRenderJob = () => {
       // Start the render job with Creatomate
       const renderIds = await startRenderJob(templateId, variables, platforms);
       
+      // Need to get the current user ID
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
       // Create a record in the render_jobs table
       const { data, error } = await supabase
         .from("render_jobs")
         .insert([{
+          user_id: user.id,
           template_id: templateId,
-          variables,
-          platforms,
+          variables: variables as Json,
+          platforms: platforms as unknown as Json,
           status: 'pending',
           creatomate_render_ids: renderIds,
-          output_urls: {}
+          output_urls: {} as Json
         }])
         .select()
         .single();
@@ -91,7 +117,7 @@ export const useCreateRenderJob = () => {
         throw new Error(`Error creating render job: ${error.message}`);
       }
       
-      return data as RenderJob;
+      return transformRenderJobData(data);
     },
     onSuccess: () => {
       // Invalidate render jobs query to refetch data
@@ -108,9 +134,21 @@ export const useUpdateRenderJob = () => {
   
   return useMutation({
     mutationFn: async ({ id, ...renderJob }: Partial<RenderJob> & { id: string }) => {
+      // Convert Platform[] to Json for Supabase
+      const updateData: any = { ...renderJob };
+      if (renderJob.platforms) {
+        updateData.platforms = renderJob.platforms as unknown as Json;
+      }
+      if (renderJob.variables) {
+        updateData.variables = renderJob.variables as unknown as Json;
+      }
+      if (renderJob.output_urls) {
+        updateData.output_urls = renderJob.output_urls as unknown as Json;
+      }
+
       const { data, error } = await supabase
         .from("render_jobs")
-        .update(renderJob)
+        .update(updateData)
         .eq("id", id)
         .select()
         .single();
@@ -119,7 +157,7 @@ export const useUpdateRenderJob = () => {
         throw new Error(`Error updating render job: ${error.message}`);
       }
       
-      return data as RenderJob;
+      return transformRenderJobData(data);
     },
     onSuccess: (_, variables) => {
       // Invalidate specific render job query and list
@@ -170,7 +208,7 @@ export const useCheckRenderStatus = () => {
         .from("render_jobs")
         .update({
           status: overallStatus,
-          output_urls: {...renderJob.output_urls, ...outputUrls},
+          output_urls: {...renderJob.output_urls, ...outputUrls} as unknown as Json,
           updated_at: new Date().toISOString()
         })
         .eq("id", renderJob.id)
@@ -181,7 +219,7 @@ export const useCheckRenderStatus = () => {
         throw new Error(`Error updating render job status: ${error.message}`);
       }
       
-      return data as RenderJob;
+      return transformRenderJobData(data);
     },
     onSuccess: (data) => {
       // Invalidate specific render job query and list

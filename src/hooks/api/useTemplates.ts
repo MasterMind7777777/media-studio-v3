@@ -2,10 +2,15 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Template } from "@/types";
+import { Json } from "@/integrations/supabase/types";
 
 // Helper function to transform template data from Supabase
 const transformTemplateData = (item: any): Template => ({
-  ...item,
+  id: item.id,
+  name: item.name,
+  description: item.description || '',
+  preview_image_url: item.preview_image_url || '',
+  creatomate_template_id: item.creatomate_template_id,
   // Transform platforms from Json to Platform[] type
   platforms: Array.isArray(item.platforms)
     ? item.platforms.map((platform: any) => ({
@@ -18,6 +23,9 @@ const transformTemplateData = (item: any): Template => ({
     : [],
   // Ensure variables is a proper Record type
   variables: item.variables || {},
+  category: item.category || '',
+  is_active: item.is_active !== undefined ? item.is_active : true,
+  created_at: item.created_at || new Date().toISOString()
 });
 
 /**
@@ -80,9 +88,21 @@ export const useCreateTemplate = () => {
   
   return useMutation({
     mutationFn: async (template: Omit<Template, "id" | "created_at">) => {
+      // Prepare the template data for Supabase by converting platform objects to Json
+      const supabaseTemplate = {
+        name: template.name,
+        description: template.description,
+        preview_image_url: template.preview_image_url,
+        creatomate_template_id: template.creatomate_template_id,
+        variables: template.variables as unknown as Json,
+        platforms: template.platforms as unknown as Json,
+        category: template.category,
+        is_active: template.is_active
+      };
+
       const { data, error } = await supabase
         .from("templates")
-        .insert([template])
+        .insert([supabaseTemplate])
         .select()
         .single();
         
@@ -107,9 +127,19 @@ export const useUpdateTemplate = () => {
   
   return useMutation({
     mutationFn: async ({ id, ...template }: Partial<Template> & { id: string }) => {
+      // Prepare the template data for Supabase
+      const updateData: any = { ...template };
+      
+      if (template.platforms) {
+        updateData.platforms = template.platforms as unknown as Json;
+      }
+      if (template.variables) {
+        updateData.variables = template.variables as unknown as Json;
+      }
+
       const { data, error } = await supabase
         .from("templates")
-        .update(template)
+        .update(updateData)
         .eq("id", id)
         .select()
         .single();

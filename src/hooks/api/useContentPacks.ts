@@ -3,6 +3,18 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ContentPack } from "@/types";
 
+// Helper function to transform content pack data from Supabase
+const transformContentPackData = (item: any): ContentPack => ({
+  id: item.id,
+  name: item.name,
+  description: item.description || '',
+  category: item.category || '',
+  thumbnail_url: item.thumbnail_url || '',
+  is_active: item.is_active !== undefined ? item.is_active : true,
+  created_by: item.created_by || '',
+  created_at: item.created_at || new Date().toISOString()
+});
+
 /**
  * Hook to fetch all content packs
  */
@@ -19,7 +31,7 @@ export const useContentPacks = () => {
         throw new Error(`Error fetching content packs: ${error.message}`);
       }
       
-      return data as ContentPack[];
+      return (data || []).map(item => transformContentPackData(item));
     }
   });
 };
@@ -47,7 +59,7 @@ export const useContentPack = (id: string | undefined) => {
         throw new Error(`Content pack not found with ID: ${id}`);
       }
       
-      return data as ContentPack;
+      return transformContentPackData(data);
     },
     enabled: !!id
   });
@@ -71,7 +83,7 @@ export const useCreateContentPack = () => {
         throw new Error(`Error creating content pack: ${error.message}`);
       }
       
-      return data as ContentPack;
+      return transformContentPackData(data);
     },
     onSuccess: () => {
       // Invalidate content packs query to refetch data
@@ -99,7 +111,7 @@ export const useUpdateContentPack = () => {
         throw new Error(`Error updating content pack: ${error.message}`);
       }
       
-      return data as ContentPack;
+      return transformContentPackData(data);
     },
     onSuccess: (_, variables) => {
       // Invalidate specific content pack query and list
