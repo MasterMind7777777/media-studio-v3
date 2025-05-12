@@ -58,6 +58,34 @@ async function getCreatomateApiKey(supabaseClient: any) {
   }
 }
 
+// Helper function to get test render info for a template to extract variable modifications
+async function getTemplateRenderInfo(templateId: string, apiKey: string) {
+  try {
+    const response = await fetch(`https://api.creatomate.com/v1/renders?template_id=${templateId}&limit=1`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      console.log('Could not fetch render examples for template', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    if (data.renders && data.renders.length > 0 && data.renders[0].modifications) {
+      console.log('Found render example with modifications:', data.renders[0].modifications);
+      return data.renders[0].modifications;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error fetching template render info:', error);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   // Handle CORS
   const corsResponse = handleCors(req);
@@ -157,7 +185,10 @@ Deno.serve(async (req) => {
         let width = 1920;
         let height = 1080;
         
-        if (templateData.width && templateData.height) {
+        if (templateData.source && templateData.source.width && templateData.source.height) {
+          width = templateData.source.width;
+          height = templateData.source.height;
+        } else if (templateData.width && templateData.height) {
           width = templateData.width;
           height = templateData.height;
         }
@@ -175,30 +206,65 @@ Deno.serve(async (req) => {
       
       // Extract variables from the template
       const variables: Record<string, any> = {};
-      if (templateData.elements) {
-        templateData.elements.forEach((element: any) => {
+      
+      // First, try to extract variables from the template elements
+      if (templateData.source && templateData.source.elements) {
+        templateData.source.elements.forEach((element: any) => {
           if (element.name) {
             if (element.properties && element.properties.text) {
-              variables[element.name] = {
-                type: 'text',
-                default: element.properties.text,
-                value: element.properties.text
-              };
-            } else if (element.properties && element.properties.source) {
-              variables[element.name] = {
-                type: 'media',
-                default: element.properties.source,
-                value: element.properties.source
-              };
+              variables[`${element.name}.text`] = element.text || element.properties.text;
+            } else if (element.source || (element.properties && element.properties.source)) {
+              variables[`${element.name}.source`] = element.source || element.properties.source;
             } else if (element.properties && element.properties.fill_color) {
-              variables[element.name] = {
-                type: 'color',
-                default: element.properties.fill_color,
-                value: element.properties.fill_color
-              };
+              variables[`${element.name}.fill`] = element.properties.fill_color;
             }
           }
         });
+      } else if (templateData.elements) {
+        // Alternative path for elements directly in templateData
+        templateData.elements.forEach((element: any) => {
+          if (element.name) {
+            if (element.text) {
+              variables[`${element.name}.text`] = element.text;
+            } else if (element.source) {
+              variables[`${element.name}.source`] = element.source;
+            } else if (element.fill_color) {
+              variables[`${element.name}.fill`] = element.fill_color;
+            }
+          }
+        });
+      }
+      
+      // Additionally, try to fetch a sample render for this template to extract modification variables
+      const renderModifications = await getTemplateRenderInfo(templateId, apiKey);
+      
+      if (renderModifications) {
+        // Add all modifications as variables if they don't exist yet
+        Object.entries(renderModifications).forEach(([key, value]) => {
+          if (typeof value === 'string' || typeof value === 'number') {
+            variables[key] = value;
+          }
+        });
+      }
+      
+      console.log('Extracted variables:', variables);
+      
+      // If we still don't have variables, try to parse from curl examples in the description
+      if (Object.keys(variables).length === 0 && templateData.description) {
+        const curlMatch = templateData.description.match(/modifications":\s*({[^}]+})/);
+        if (curlMatch && curlMatch[1]) {
+          try {
+            const parsedVars = JSON.parse(curlMatch[1].replace(/'/g, '"'));
+            Object.entries(parsedVars).forEach(([key, value]) => {
+              if (typeof value === 'string' || typeof value === 'number') {
+                variables[key] = value;
+              }
+            });
+            console.log('Parsed variables from curl example:', variables);
+          } catch (e) {
+            console.error('Failed to parse variables from curl example:', e);
+          }
+        }
       }
       
       // Create a new template in the database
@@ -246,13 +312,26 @@ Deno.serve(async (req) => {
         });
       }
       
+      // Prepare the modifications object for Creatomate
+      const modifications = {};
+      
+      // If variables are provided, transform them into the format Creatomate expects
+      if (variables) {
+        Object.entries(variables).forEach(([key, value]) => {
+          // Add directly to modifications as Creatomate expects this format
+          modifications[key] = value;
+        });
+      }
+      
+      console.log('Sending modifications to Creatomate:', modifications);
+      
       // Create render configurations for each platform
       const renders = platforms.map(platform => ({
         template_id: templateId,
         output_format: 'mp4',
         width: platform.width,
         height: platform.height,
-        modifications: variables
+        modifications
       }));
       
       // Send render request to Creatomate
@@ -266,6 +345,9 @@ Deno.serve(async (req) => {
       });
       
       if (!response.ok) {
+        console.error('Creatomate API error:', response.status);
+        const errorText = await response.text();
+        console.error('Error response body:', errorText);
         return new Response(
           JSON.stringify({ error: `Creatomate API error: ${response.statusText}` }),
           { status: response.status, headers: corsHeaders }

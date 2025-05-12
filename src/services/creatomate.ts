@@ -57,6 +57,9 @@ export async function startRenderJob(
   platforms: any[]
 ): Promise<string[]> {
   try {
+    // For debugging
+    console.log("Starting render job with variables:", variables);
+
     const { data, error } = await supabase.functions.invoke('creatomate', {
       body: { 
         action: 'start-render',
