@@ -1,84 +1,64 @@
 
-import { useMemo } from "react";
-import { Template } from "@/types";
-import { formatVariablesForPlayer } from "@/integrations/creatomate/config";
+import { useMemo } from 'react';
+import { Template } from '@/types';
 
-export function useTemplateVariables(template: Template | null) {
-  // Helper function to validate if we have a valid template with variables
-  const hasVariables = useMemo(() => {
-    return !!template?.variables && Object.keys(template.variables).length > 0;
-  }, [template]);
+interface VariablesByType {
+  textVariables: Array<{ key: string, variableName: string, value: string }>;
+  mediaVariables: Array<{ key: string, variableName: string, value: string }>;
+  colorVariables: Array<{ key: string, variableName: string, value: string }>;
+  hasVariables: boolean;
+}
 
-  // Extract text variables from template
-  const textVariables = useMemo(() => {
-    if (!hasVariables) return [];
-    
-    return Object.entries(template!.variables)
-      .filter(([key]) => key.includes('.text'))
-      .map(([key, value]) => ({
-        key: key.split('.')[0],
-        property: 'text',
-        value
-      }));
-  }, [hasVariables, template?.variables]);
-  
-  // Extract media variables from template
-  const mediaVariables = useMemo(() => {
-    if (!hasVariables) return [];
-    
-    return Object.entries(template!.variables)
-      .filter(([key]) => key.includes('.source'))
-      .map(([key, value]) => ({
-        key: key.split('.')[0],
-        property: 'source',
-        value
-      }));
-  }, [hasVariables, template?.variables]);
-  
-  // Extract color variables from template
-  const colorVariables = useMemo(() => {
-    if (!hasVariables) return [];
-    
-    return Object.entries(template!.variables)
-      .filter(([key]) => key.includes('.fill'))
-      .map(([key, value]) => ({
-        key: key.split('.')[0],
-        property: 'fill',
-        value
-      }));
-  }, [hasVariables, template?.variables]);
-
-  // Format variables for Creatomate Player - ensuring correct format
-  const formattedVariables = useMemo(() => {
-    if (!hasVariables) return {};
-    
-    try {
-      // Use our formatter helper to ensure variables are in the right format
-      return formatVariablesForPlayer(template!.variables);
-    } catch (error) {
-      console.error('Error formatting variables:', error);
-      return {};
-    }
-  }, [hasVariables, template?.variables]);
-
-  // Debug function to check variable structure
-  const debugVariables = useMemo(() => {
-    return {
-      hasVariables,
-      variableCount: hasVariables ? Object.keys(template!.variables).length : 0,
-      textCount: textVariables.length,
-      mediaCount: mediaVariables.length,
-      colorCount: colorVariables.length,
-      formattedKeys: hasVariables ? Object.keys(formattedVariables) : []
+export function useTemplateVariables(template: Template | null): VariablesByType {
+  return useMemo(() => {
+    const result = {
+      textVariables: [] as Array<{ key: string, variableName: string, value: string }>,
+      mediaVariables: [] as Array<{ key: string, variableName: string, value: string }>,
+      colorVariables: [] as Array<{ key: string, variableName: string, value: string }>,
+      hasVariables: false
     };
-  }, [hasVariables, template?.variables, textVariables.length, mediaVariables.length, colorVariables.length, formattedVariables]);
 
-  return {
-    textVariables,
-    mediaVariables,
-    colorVariables,
-    formattedVariables,
-    hasVariables,
-    debugVariables
-  };
+    if (!template?.variables) {
+      return result;
+    }
+    
+    // Process each variable
+    Object.entries(template.variables).forEach(([key, value]) => {
+      // Skip empty or null values
+      if (value === undefined || value === null) return;
+      
+      // Extract the variable name from the key (e.g., "title.text" -> "title")
+      const parts = key.split('.');
+      const variableName = parts[0];
+      const variableType = parts.length > 1 ? parts[1] : '';
+      
+      // Categorize by type
+      if (variableType === 'text') {
+        result.textVariables.push({
+          key,
+          variableName: variableName.replace(/_/g, ' '),
+          value: String(value)
+        });
+      } else if (variableType === 'source') {
+        result.mediaVariables.push({
+          key,
+          variableName: variableName.replace(/_/g, ' '),
+          value: String(value)
+        });
+      } else if (variableType === 'fill') {
+        result.colorVariables.push({
+          key,
+          variableName: variableName.replace(/_/g, ' '),
+          value: String(value)
+        });
+      }
+    });
+    
+    result.hasVariables = 
+      result.textVariables.length > 0 || 
+      result.mediaVariables.length > 0 || 
+      result.colorVariables.length > 0;
+    
+    return result;
+  }, [template?.variables]);
 }

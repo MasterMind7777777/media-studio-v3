@@ -99,14 +99,14 @@ export function loadCreatomateSDKManually(): Promise<void> {
     // Create new script element if none exists
     const script = document.createElement('script');
     script.id = 'creatomate-sdk';
-    script.src = 'https://cdn.jsdelivr.net/npm/@creatomate/preview@1.5.1/dist/preview.min.js';
+    script.src = 'https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.js';
     script.crossOrigin = 'anonymous';
     
     // Add fallback for CDN failures
     script.onerror = () => {
       console.warn('[Creatomate] jsDelivr failed, switching to unpkg');
       script.onerror = null;
-      script.src = 'https://unpkg.com/@creatomate/preview@1.5.1/dist/preview.min.js';
+      script.src = 'https://unpkg.com/@creatomate/preview@1.6.0/dist/Preview.js';
     };
     
     // Set up event handlers

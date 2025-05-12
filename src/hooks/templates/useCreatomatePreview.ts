@@ -1,248 +1,219 @@
 
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { formatVariablesForPlayer, isCreatomateSDKAvailable, loadCreatomateSDKManually } from '@/integrations/creatomate/config';
-import { CREATOMATE_PUBLIC_TOKEN, BASIC_COMPOSITION } from '@/config/creatomate';
+import { useState, useEffect, useRef } from 'react';
+import { formatVariablesForPlayer } from '@/integrations/creatomate/config';
+import { toast } from 'sonner';
 
-interface UseCreatomatePreviewOptions {
-  creatomateTemplateId?: string;
-  creatomateToken?: string;
+interface UseCreatomatePreviewProps {
+  containerId: string;
+  templateId?: string;
   variables?: Record<string, any>;
-  containerRef: React.RefObject<HTMLDivElement>;
   autoPlay?: boolean;
-  loop?: boolean;
-  muted?: boolean;
-}
-
-interface PreviewError {
-  message: string;
-  details?: string;
+  onReady?: () => void;
+  onError?: (error: Error) => void;
 }
 
 export function useCreatomatePreview({
-  creatomateTemplateId,
-  creatomateToken = CREATOMATE_PUBLIC_TOKEN,
-  variables,
-  containerRef,
+  containerId,
+  templateId,
+  variables = {},
   autoPlay = false,
-  loop = true,
-  muted = true,
-}: UseCreatomatePreviewOptions) {
-  const [isLoaded, setIsLoaded] = useState(false);
+  onReady,
+  onError
+}: UseCreatomatePreviewProps) {
+  const [isReady, setIsReady] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const previewRef = useRef<any>(null);
-  const isInitializingRef = useRef(false);
-
-  // Check for mobile/touch-only device
-  const [isTouch, setIsTouch] = useState(false);
-  useEffect(() => {
-    // Check if we're on a touch-only device (for mobile fallback)
-    setIsTouch(window.matchMedia('(hover: none)').matches);
-  }, []);
-
-  // Use player mode for touch devices, interactive for desktop
-  const previewMode = isTouch ? 'player' : 'interactive';
+  const [currentTime, setCurrentTime] = useState(0);
   
-  // Initialize Creatomate Preview when DOM is ready
-  const initializePreview = useCallback(() => {
-    // Skip if already initializing
-    if (isInitializingRef.current) {
+  // Ref to store the preview instance
+  const previewRef = useRef<any>(null);
+  
+  // Format the variables for the preview
+  const formattedVariables = formatVariablesForPlayer(variables);
+  
+  // Initialize the preview
+  useEffect(() => {
+    // Skip if no container ID or if window/Creatomate is not available
+    if (!containerId || !window.Creatomate?.Preview) {
+      console.log('Preview initialization skipped: missing containerId or SDK');
+      return;
+    }
+
+    // Skip if already initialized
+    if (previewRef.current) {
+      console.log('Preview already initialized');
+      return;
+    }
+
+    // Get the container element
+    const container = document.getElementById(containerId);
+    if (!container) {
+      console.error(`Container element with ID ${containerId} not found`);
+      setError(new Error(`Container element with ID ${containerId} not found`));
+      return;
+    }
+
+    console.log('Initializing Creatomate Preview with container:', containerId);
+    setIsLoading(true);
+
+    try {
+      // Create a new preview instance
+      const preview = new window.Creatomate.Preview(
+        container, 
+        'player', 
+        import.meta.env.VITE_CREATOMATE_TOKEN || 'public-jb5rna2gay9buhajvtiyp1hb'
+      );
+
+      // Setup preview event handlers
+      preview.onReady = async () => {
+        console.log('Preview ready, loading template:', templateId);
+        setIsLoading(true);
+        
+        try {
+          if (templateId) {
+            await preview.loadTemplate(templateId);
+            console.log('Template loaded successfully');
+          } else {
+            console.warn('No template ID provided, preview will be empty');
+          }
+          
+          // Set initial time to show something interesting
+          await preview.setTime(0.5);
+          
+          // Auto play if requested
+          if (autoPlay) {
+            preview.play();
+            setIsPlaying(true);
+          }
+          
+          setIsReady(true);
+          setIsLoading(false);
+          onReady?.();
+        } catch (err) {
+          console.error('Error loading template:', err);
+          setError(err instanceof Error ? err : new Error('Failed to load template'));
+          setIsLoading(false);
+          onError?.(err instanceof Error ? err : new Error('Failed to load template'));
+          toast.error('Failed to load video template', {
+            description: err instanceof Error ? err.message : 'Unknown error'
+          });
+        }
+      };
+
+      preview.onError = (err: Error) => {
+        console.error('Preview error:', err);
+        setError(err);
+        setIsLoading(false);
+        onError?.(err);
+        toast.error('Video preview error', {
+          description: err.message
+        });
+      };
+      
+      preview.onTimeUpdate = (time: number) => {
+        setCurrentTime(time);
+      };
+      
+      preview.onPlay = () => {
+        setIsPlaying(true);
+      };
+      
+      preview.onPause = () => {
+        setIsPlaying(false);
+      };
+
+      // Store the preview instance
+      previewRef.current = preview;
+    } catch (err) {
+      console.error('Error initializing preview:', err);
+      setError(err instanceof Error ? err : new Error('Failed to initialize preview'));
+      setIsLoading(false);
+      onError?.(err instanceof Error ? err : new Error('Failed to initialize preview'));
+      toast.error('Failed to initialize video preview', {
+        description: err instanceof Error ? err.message : 'Unknown error'
+      });
+    }
+
+    // Clean up on unmount
+    return () => {
+      if (previewRef.current) {
+        console.log('Disposing preview instance');
+        try {
+          previewRef.current.dispose();
+        } catch (err) {
+          console.error('Error disposing preview:', err);
+        }
+        previewRef.current = null;
+      }
+    };
+  }, [containerId]);
+  
+  // Update variables when they change
+  useEffect(() => {
+    if (!previewRef.current || !isReady || Object.keys(formattedVariables).length === 0) {
       return;
     }
     
-    // Clear any previous errors
-    setError(null);
-    isInitializingRef.current = true;
-
+    console.log('Updating preview variables:', formattedVariables);
+    
     try {
-      // Check requirements
-      if (!containerRef.current) {
-        throw new Error('Container element is not available');
-      }
-      
-      if (!creatomateToken) {
-        throw new Error('Creatomate API token is missing. Set CREATOMATE_API_KEY in Supabase secrets table');
-      }
-      
-      if (!window.Creatomate?.Preview) {
-        throw new Error('Creatomate SDK is not loaded. Check the script tag in index.html');
-      }
-
-      // Clean up previous instance if it exists
-      if (previewRef.current) {
-        try {
-          previewRef.current.dispose();
-        } catch (e) {
-          console.warn('Error disposing previous preview:', e);
-        }
-      }
-
-      console.log(`Initializing Creatomate preview in ${previewMode} mode with token: ${creatomateToken.substring(0, 5)}...`);
-      
-      // Create the preview in interactive mode
-      previewRef.current = new window.Creatomate.Preview(
-        containerRef.current,
-        previewMode,
-        creatomateToken
-      );
-      
-      // Set up event handlers
-      previewRef.current.onError = (previewError: PreviewError) => {
-        const errorMessage = previewError?.message || 'Unknown error';
-        console.error('Creatomate preview error:', previewError);
-        setError(`Preview error: ${errorMessage}`);
-        setIsLoaded(false);
-        isInitializingRef.current = false;
-      };
-      
-      previewRef.current.onReady = async () => {
-        console.log('Creatomate preview ready, loading template or composition...');
-        
-        try {
-          if (creatomateTemplateId) {
-            // Load template if ID is provided
-            console.log(`Loading template with ID: ${creatomateTemplateId}`);
-            await previewRef.current.loadTemplate(creatomateTemplateId);
-          } else {
-            // Fall back to basic composition if no template ID
-            console.log('No template ID provided, loading basic composition');
-            await previewRef.current.setSource(BASIC_COMPOSITION);
-          }
-          
-          // Format variables for the preview
-          if (variables && Object.keys(variables).length > 0) {
-            const formattedVariables = formatVariablesForPlayer(variables);
-            previewRef.current.setModifications(formattedVariables);
-            console.log('Applied modifications:', formattedVariables);
-          }
-          
-          console.log('Template/composition loaded successfully');
-          setIsLoaded(true);
-          setError(null);
-          
-          if (autoPlay) {
-            previewRef.current.play();
-            setIsPlaying(true);
-          }
-        } catch (templateError: any) {
-          console.error('Error loading template/composition:', templateError);
-          setError(`Failed to load content: ${
-            templateError?.message || 'Unknown error'
-          }`);
-        } finally {
-          isInitializingRef.current = false;
-        }
-      };
-      
-      previewRef.current.onStateChange = (state: any) => {
-        setIsPlaying(state.isPlaying || false);
-      };
-      
-    } catch (error: any) {
-      console.error('Error initializing Creatomate preview:', error);
-      setError(`Initialization error: ${error?.message || 'Unknown error'}`);
-      setIsLoaded(false);
-      isInitializingRef.current = false;
+      previewRef.current.setModifications(formattedVariables);
+    } catch (err) {
+      console.error('Error updating preview variables:', err);
+      toast.error('Failed to update preview', {
+        description: err instanceof Error ? err.message : 'Unknown error'
+      });
     }
-  }, [creatomateTemplateId, variables, autoPlay, containerRef, previewMode, creatomateToken]);
+  }, [formattedVariables, isReady]);
 
-  // Initialize preview when dependencies change
-  useEffect(() => {
-    // Reset state
-    setIsLoaded(false);
-    if (error) setError(null);
-    
-    // Add a small delay to ensure DOM is fully rendered
-    const timeoutId = setTimeout(initializePreview, 100);
-    
-    // Cleanup function
-    return () => {
-      clearTimeout(timeoutId);
-      
-      // Dispose preview if it exists
-      if (previewRef.current) {
-        try {
-          console.log('Disposing Creatomate preview');
-          previewRef.current.dispose();
-          previewRef.current = null;
-        } catch (e) {
-          console.error('Error disposing preview:', e);
-        }
-      }
-    };
-  }, [creatomateTemplateId, initializePreview, creatomateToken]);
-
-  // Update variables when they change
-  useEffect(() => {
-    if (isLoaded && previewRef.current && variables) {
-      try {
-        console.log('Updating preview variables:', variables);
-        const formattedVariables = formatVariablesForPlayer(variables);
-        previewRef.current.setModifications(formattedVariables);
-      } catch (e) {
-        console.error('Error updating variables:', e);
-      }
-    }
-  }, [variables, isLoaded]);
-  
-  // Control functions
-  const play = useCallback(() => {
-    if (previewRef.current && isLoaded) {
+  // Media control functions
+  const play = () => {
+    if (previewRef.current && isReady) {
       previewRef.current.play();
-      setIsPlaying(true);
     }
-  }, [isLoaded]);
+  };
   
-  const pause = useCallback(() => {
-    if (previewRef.current && isLoaded) {
+  const pause = () => {
+    if (previewRef.current && isReady) {
       previewRef.current.pause();
-      setIsPlaying(false);
     }
-  }, [isLoaded]);
+  };
   
-  const toggle = useCallback(() => {
-    if (isPlaying) {
-      pause();
-    } else {
-      play();
-    }
-  }, [isPlaying, play, pause]);
-  
-  // Update preview with new variables
-  const updateVariables = useCallback((newVariables: Record<string, any>) => {
-    if (previewRef.current && isLoaded) {
-      try {
-        const formattedVariables = formatVariablesForPlayer(newVariables);
-        previewRef.current.setModifications(formattedVariables);
-      } catch (e) {
-        console.error('Error updating variables:', e);
+  const togglePlay = () => {
+    if (previewRef.current && isReady) {
+      if (isPlaying) {
+        previewRef.current.pause();
+      } else {
+        previewRef.current.play();
       }
     }
-  }, [isLoaded]);
-
-  // Get current preview mode
-  const getPreviewMode = useCallback(() => {
-    return previewMode;
-  }, [previewMode]);
-
-  // Manual retry function
-  const retryInitialization = useCallback(() => {
-    console.log('Manually retrying preview initialization');
-    isInitializingRef.current = false;
-    setError(null);
-    initializePreview();
-  }, [initializePreview]);
+  };
+  
+  const seekTo = (time: number) => {
+    if (previewRef.current && isReady) {
+      previewRef.current.setTime(time);
+    }
+  };
+  
+  const restart = () => {
+    if (previewRef.current && isReady) {
+      previewRef.current.setTime(0);
+      previewRef.current.play();
+    }
+  };
 
   return {
-    isLoaded,
-    isPlaying,
+    isReady,
+    isLoading,
     error,
+    isPlaying,
+    currentTime,
     play,
     pause,
-    toggle,
-    updateVariables,
-    getPreviewMode,
-    retryInitialization,
-    previewMode
+    togglePlay,
+    seekTo,
+    restart,
+    preview: previewRef.current
   };
 }
