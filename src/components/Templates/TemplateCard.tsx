@@ -3,6 +3,7 @@ import { memo } from "react";
 import { Template, Platform } from "@/types";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { getTemplatePreviewImage } from "@/hooks/templates";
 
 interface TemplateCardProps {
   template: Template;
@@ -11,6 +12,9 @@ interface TemplateCardProps {
 
 // Using memo to prevent unnecessary re-renders when other templates change
 const TemplateCard = memo(({ template, onSelect }: TemplateCardProps) => {
+  // Get the best preview image for this template
+  const previewImageUrl = getTemplatePreviewImage(template);
+  
   return (
     <Card key={template.id} className="overflow-hidden cursor-pointer hover-scale">
       <div 
@@ -19,7 +23,7 @@ const TemplateCard = memo(({ template, onSelect }: TemplateCardProps) => {
       >
         <div className="aspect-video w-full overflow-hidden">
           <img
-            src={template.preview_image_url || "/placeholder.svg"}
+            src={previewImageUrl}
             alt={template.name}
             className="w-full h-full object-cover"
             loading="lazy" // Add lazy loading for performance

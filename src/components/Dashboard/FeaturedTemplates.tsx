@@ -10,10 +10,17 @@ import {
 import { mockTemplates } from "@/data/mockData";
 import { ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { getTemplatePreviewImage } from "@/hooks/templates";
+import { useTemplates } from "@/hooks/api";
 
 export function FeaturedTemplates() {
   const navigate = useNavigate();
-  const featuredTemplates = mockTemplates.slice(0, 3);
+  
+  // Use real templates from the API instead of mock data
+  const { data: templates, isLoading } = useTemplates();
+  
+  // Get featured templates (first 3) - fall back to mockTemplates if API data not loaded
+  const featuredTemplates = templates?.slice(0, 3) || mockTemplates.slice(0, 3);
 
   return (
     <Card>
@@ -30,27 +37,31 @@ export function FeaturedTemplates() {
       </CardHeader>
       <CardContent className="pt-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {featuredTemplates.map((template) => (
-            <div key={template.id} className="overflow-hidden rounded-md hover-scale">
-              <div
-                className="group cursor-pointer"
-                onClick={() => navigate(`/create?template=${template.id}`)}
-              >
-                <div className="relative aspect-video overflow-hidden rounded-md">
-                  <img
-                    src={template.preview_image_url}
-                    alt={template.name}
-                    className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
-                    <div className="p-2 text-white">
-                      <p className="font-medium text-sm">{template.name}</p>
+          {featuredTemplates.map((template) => {
+            const previewImageUrl = getTemplatePreviewImage(template);
+            
+            return (
+              <div key={template.id} className="overflow-hidden rounded-md hover-scale">
+                <div
+                  className="group cursor-pointer"
+                  onClick={() => navigate(`/create?template=${template.id}`)}
+                >
+                  <div className="relative aspect-video overflow-hidden rounded-md">
+                    <img
+                      src={previewImageUrl}
+                      alt={template.name}
+                      className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end">
+                      <div className="p-2 text-white">
+                        <p className="font-medium text-sm">{template.name}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </CardContent>
     </Card>
