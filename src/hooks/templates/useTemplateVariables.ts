@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Template } from '@/types';
 
 interface TemplateVariableSection {
@@ -13,6 +13,10 @@ interface VariablesByType {
   mediaVariables: Array<TemplateVariableSection>;
   colorVariables: Array<TemplateVariableSection>;
   hasVariables: boolean;
+  variables: Record<string, any>;
+  setVariables: (newVars: Record<string, any>) => void;
+  resetVariables: () => void;
+  isReady: boolean;
 }
 
 /**
@@ -21,7 +25,30 @@ interface VariablesByType {
  * @returns Organized variables by type (text, media, color)
  */
 export function useTemplateVariables(template: Template | null): VariablesByType {
-  return useMemo(() => {
+  const [variables, setVariablesState] = useState<Record<string, any>>({});
+  const [isReady, setIsReady] = useState(false);
+  
+  // Initialize variables from the template
+  useEffect(() => {
+    if (template?.variables) {
+      setVariablesState(template.variables);
+      setIsReady(true);
+    }
+  }, [template?.variables]);
+  
+  // Reset variables to original template values
+  const resetVariables = () => {
+    if (template?.variables) {
+      setVariablesState(template.variables);
+    }
+  };
+  
+  // Set variables with a new object
+  const setVariables = (newVars: Record<string, any>) => {
+    setVariablesState(newVars);
+  };
+
+  const categorizedVariables = useMemo(() => {
     const result = {
       textVariables: [] as Array<TemplateVariableSection>,
       mediaVariables: [] as Array<TemplateVariableSection>,
@@ -111,6 +138,14 @@ export function useTemplateVariables(template: Template | null): VariablesByType
     
     return result;
   }, [template?.variables]);
+
+  return {
+    ...categorizedVariables,
+    variables,
+    setVariables,
+    resetVariables,
+    isReady
+  };
 }
 
 /**

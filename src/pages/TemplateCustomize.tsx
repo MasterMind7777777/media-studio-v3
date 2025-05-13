@@ -6,13 +6,47 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useTemplate } from "@/hooks/api";
 import { useRenderJob } from "@/hooks/api/useRenderJobs";
-import { useTemplatePreview, useTemplateVariables, useCreatomatePreview } from "@/hooks/templates";
+import { useTemplateVariables, useCreatomatePreview } from "@/hooks/templates";
+import { useTemplatePreview } from "@/hooks/templates/useTemplatePreview";
 import { TemplatePreview } from "@/components/Templates/TemplatePreview";
 import { TemplateVariablesEditor } from "@/components/Templates/TemplateVariablesEditor";
 import { TemplateHeader } from "@/components/Templates/TemplateHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
-import { renderVideo } from "@/services/creatomate";
+import { Json } from "@/integrations/supabase/types";
+
+/**
+ * Renders a video using the Creatomate API
+ */
+const renderVideo = async ({ 
+  templateId, 
+  variables, 
+  platforms, 
+  metadata 
+}: { 
+  templateId: string, 
+  variables: Record<string, any>, 
+  platforms: any[], 
+  metadata?: Record<string, any>
+}) => {
+  try {
+    // Call the edge function to render the video
+    const { data, error } = await supabase.functions.invoke('creatomate', {
+      body: {
+        templateId,
+        modifications: variables,
+        outputFormats: platforms.map((p: any) => p.id || p.name),
+        metadata
+      }
+    });
+
+    if (error) throw new Error(error.message);
+    return { renderId: data?.renderId, error: null };
+  } catch (err) {
+    console.error("Error in renderVideo:", err);
+    return { renderId: null, error: err instanceof Error ? err.message : String(err) };
+  }
+};
 
 export default function TemplateCustomize() {
   const { id: templateIdOrProjectId } = useParams<{ id: string }>();
@@ -36,7 +70,7 @@ export default function TemplateCustomize() {
   // Fetch template data
   const { data: template, isLoading: templateLoading } = useTemplate(templateId);
   
-  // Initialize template variables hook
+  // Initialize template variables hook with enhanced type
   const {
     variables,
     setVariables,
@@ -46,6 +80,7 @@ export default function TemplateCustomize() {
   
   // Initialize Creatomate preview
   const { isLoading: previewLoading } = useCreatomatePreview({
+    containerId: "preview-container",
     templateId: template?.creatomate_template_id
   });
   
@@ -96,10 +131,10 @@ export default function TemplateCustomize() {
       const submitData = {
         user_id: user.id,
         template_id: template.id,
-        variables: variables,
+        variables: variables as Json,
         name: `${template.name} - ${new Date().toLocaleString()}`,
         status: "pending" as const,
-        platforms: template.platforms,
+        platforms: template.platforms as Json,
       };
       
       // Create a new render job in the database
@@ -128,7 +163,7 @@ export default function TemplateCustomize() {
       await supabase
         .from("render_jobs")
         .update({
-          creatomate_render_ids: [renderId],
+          creatomate_render_ids: [renderId] as Json,
         })
         .eq("id", renderJob.id);
       
@@ -171,7 +206,9 @@ export default function TemplateCustomize() {
         <div className="flex flex-col gap-4">
           <h2 className="text-xl font-semibold">Preview</h2>
           <Card className="overflow-hidden">
-            <TemplatePreview />
+            <div id="preview-container" className="aspect-video">
+              <TemplatePreview />
+            </div>
           </Card>
         </div>
         
@@ -208,11 +245,12 @@ export default function TemplateCustomize() {
                     </label>
                     <input
                       type="text"
-                      value={value}
+                      value={String(value)}
                       onChange={(e) => {
                         const newValue = e.target.value;
-                        setVariables({ ...variables, [key]: newValue });
-                        updatePreview({ ...variables, [key]: newValue });
+                        const updatedVars = { ...variables, [key]: newValue };
+                        setVariables(updatedVars);
+                        updatePreview(updatedVars);
                       }}
                       className="w-full rounded-md border px-3 py-2"
                     />
