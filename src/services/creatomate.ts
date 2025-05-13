@@ -34,12 +34,18 @@ export async function importCreatomateTemplate(templateId: string, curlCommand?:
       body: { 
         action: 'import-template',
         templateId,
-        curlCommand 
+        curlCommand,
+        include_preview: true // Signal to include preview_url in the response
       },
     });
     
     if (error) {
       throw new Error(`Error importing template: ${error.message}`);
+    }
+    
+    // If the response includes a preview_url but no preview_image_url, set it
+    if (data && data.preview_url && !data.preview_image_url) {
+      data.preview_image_url = data.preview_url;
     }
     
     return data as Template;
@@ -116,7 +122,8 @@ export async function startRenderJob(
         variables: cleanVariables,
         platforms,
         user_id: user.id, // Pass user ID to the edge function
-        database_job_id // Pass database job ID if provided
+        database_job_id, // Pass database job ID if provided
+        include_snapshots: true // Request snapshots from Creatomate for previews
       },
     });
     
@@ -176,4 +183,30 @@ function cleanupVariables(variables: Record<string, any>): Record<string, any> {
   });
   
   return cleanVars;
+}
+
+/**
+ * Updates preview images for templates by scanning variables or output URLs
+ */
+export async function updateTemplatePreviews(): Promise<{
+  total: number;
+  success: number;
+  failed: number;
+}> {
+  try {
+    const { data, error } = await supabase.functions.invoke('creatomate', {
+      body: {
+        action: 'update-template-previews'
+      }
+    });
+    
+    if (error) {
+      throw new Error(`Error updating template previews: ${error.message}`);
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Error updating template previews:', error);
+    throw error;
+  }
 }

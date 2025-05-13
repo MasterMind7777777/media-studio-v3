@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Clock, Filter, Loader2 } from "lucide-react";
 import { useTemplates } from "@/hooks/api";
+import { getTemplatePreviewImage } from "@/hooks/templates";
 
 export default function Templates() {
   const navigate = useNavigate();
@@ -87,7 +88,7 @@ export default function Templates() {
             <Card key={template.id} className="overflow-hidden">
               <div className="aspect-video w-full overflow-hidden">
                 <img
-                  src={template.preview_image_url || "/placeholder.svg"}
+                  src={getTemplatePreviewImage(template)}
                   alt={template.name}
                   className="w-full h-full object-cover transform hover:scale-105 transition-transform duration-300"
                 />
@@ -108,7 +109,7 @@ export default function Templates() {
               <CardFooter className="flex justify-between">
                 <Button
                   variant="ghost"
-                  onClick={() => window.open(template.preview_image_url, '_blank')}
+                  onClick={() => window.open(getTemplatePreviewImage(template), '_blank')}
                 >
                   Preview
                 </Button>

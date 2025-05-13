@@ -143,6 +143,30 @@ serve(async (req: Request) => {
       );
     }
 
+    // NEW: Update template preview image if render succeeded and has snapshot_url
+    if (render.status === 'succeeded' && (render.snapshot_url || render.preview_url || render.url) && existingJob.template_id) {
+      console.log('Updating template preview image with render preview');
+      
+      // Prioritize snapshot_url, then preview_url, then regular url
+      const previewUrl = render.snapshot_url || render.preview_url || render.url;
+      
+      if (previewUrl) {
+        const { error: templateUpdateError } = await supabase
+          .from('templates')
+          .update({ 
+            preview_image_url: previewUrl,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingJob.template_id);
+        
+        if (templateUpdateError) {
+          console.error('Error updating template preview image:', templateUpdateError);
+        } else {
+          console.log(`Successfully updated template ${existingJob.template_id} preview image to ${previewUrl}`);
+        }
+      }
+    }
+
     // Return success response (must be fast as required by Creatomate)
     return new Response(
       JSON.stringify({ success: true }),
