@@ -52,6 +52,7 @@ function App() {
         {/* Protected routes with layout */}
         <Route element={<ProtectedRoute />}>
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/projects/:id/customize" element={<TemplateCustomize />} />
           <Route path="/create" element={<Create />} />
           <Route path="/create/:id/customize" element={<TemplateCustomize />} />
           <Route path="/templates" element={<Templates />} />

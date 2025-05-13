@@ -1,282 +1,170 @@
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { RenderJob, Platform } from "@/types";
-import { startRenderJob } from "@/services/creatomate";
-import { Json } from "@/integrations/supabase/types";
+import { RenderJob } from "@/types";
 import { useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 
-// Define status mapping from Creatomate to our database status values
-const mapCreatomateStatus = (status: string): 'pending' | 'processing' | 'completed' | 'failed' => {
-  const statusMap: Record<string, 'pending' | 'processing' | 'completed' | 'failed'> = {
-    'planned': 'pending',
-    'waiting': 'pending',
-    'transcribing': 'processing',
-    'rendering': 'processing',
-    'succeeded': 'completed',
-    'failed': 'failed'
-  };
-  
-  return statusMap[status] || 'pending'; // Default to 'pending' for unknown statuses
-};
-
-// Helper function to transform render job data from Supabase
-const transformRenderJobData = (item: any): RenderJob => ({
-  id: item.id,
-  user_id: item.user_id,
-  template_id: item.template_id,
-  variables: item.variables || {},
-  platforms: Array.isArray(item.platforms) ? item.platforms.map((platform: any) => ({
-    id: platform.id || '',
-    name: platform.name || '',
-    width: platform.width || 0,
-    height: platform.height || 0,
-    aspect_ratio: platform.aspect_ratio || '1:1'
-  })) : [],
-  status: item.status || 'pending',
-  creatomate_render_ids: item.creatomate_render_ids || [],
-  output_urls: item.output_urls || {},
-  created_at: item.created_at,
-  updated_at: item.updated_at
-});
+// Page size for infinite queries
+const PAGE_SIZE = 12;
 
 /**
- * Hook to fetch all render jobs
+ * Hook to get a single render job by ID
+ * @param id - The render job ID to fetch
  */
-export const useRenderJobs = () => {
+export const useRenderJob = (id: string | undefined) => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
   return useQuery({
+    queryKey: ["renderJobs", id],
+    queryFn: async () => {
+      if (!id) throw new Error("No render job ID provided");
+
+      // Try to get it from the cache first
+      const cached = queryClient.getQueryData<RenderJob>(["renderJobs", id]);
+      if (cached) return cached;
+
+      console.log(`Fetching render job with ID: ${id}`);
+      const { data, error } = await supabase
+        .from("render_jobs")
+        .select("*, templates(*)")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching render job:", error);
+        throw new Error(`Error fetching render job: ${error.message}`);
+      }
+
+      if (!data) {
+        throw new Error(`Render job not found: ${id}`);
+      }
+
+      return data as RenderJob;
+    },
+    enabled: !!id && !!user,
+  });
+};
+
+/**
+ * Hook to fetch all render jobs for the current user with optional real-time updates
+ */
+export const useRenderJobs = ({ realtime = true } = {}) => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const result = useQuery({
     queryKey: ["renderJobs"],
     queryFn: async () => {
+      console.log("Fetching render jobs");
       const { data, error } = await supabase
         .from("render_jobs")
         .select("*")
         .order("created_at", { ascending: false });
-        
+
       if (error) {
+        console.error("Error fetching render jobs:", error);
         throw new Error(`Error fetching render jobs: ${error.message}`);
       }
-      
-      return (data || []).map(item => transformRenderJobData(item));
-    }
-  });
-};
 
-/**
- * Hook to fetch a single render job by ID
- */
-export const useRenderJob = (id: string | undefined) => {
-  const queryClient = useQueryClient();
-  
-  // Set up a realtime subscription for this render job
+      return data as RenderJob[];
+    },
+    enabled: !!user,
+  });
+
+  // Setup real-time subscription if enabled
   useEffect(() => {
-    if (!id) return;
-    
-    // Subscribe to changes for this particular render job
+    if (!user || !realtime) return;
+
+    console.log("Setting up render_jobs real-time channel");
     const channel = supabase
-      .channel(`render_job_${id}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'render_jobs',
-        filter: `id=eq.${id}`
-      }, (payload) => {
-        // When the job is updated (by the webhook), refresh the data
-        queryClient.invalidateQueries({ queryKey: ["renderJobs", id] });
-      })
+      .channel("render_jobs_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "render_jobs" },
+        (payload) => {
+          console.log("Real-time update for render_jobs:", payload);
+          queryClient.invalidateQueries({ queryKey: ["renderJobs"] });
+        }
+      )
       .subscribe();
-    
-    // Clean up subscription on unmount
+
     return () => {
+      console.log("Unsubscribing from render_jobs real-time channel");
       supabase.removeChannel(channel);
     };
-  }, [id, queryClient]);
-  
-  return useQuery({
-    queryKey: ["renderJobs", id],
-    queryFn: async () => {
-      if (!id) throw new Error("Render Job ID is required");
+  }, [user, realtime, queryClient]);
+
+  return result;
+};
+
+/**
+ * Hook to fetch render jobs with infinite pagination 
+ */
+export const useInfiniteRenderJobs = () => {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+
+  const result = useInfiniteQuery({
+    queryKey: ["renderJobsInfinite"],
+    queryFn: async ({ pageParam }) => {
+      console.log(`Fetching render jobs page, cursor: ${pageParam || "initial"}`);
       
-      const { data, error } = await supabase
+      let query = supabase
         .from("render_jobs")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-        
+        .select("*, templates(name)")
+        .order("created_at", { ascending: false })
+        .limit(PAGE_SIZE);
+      
+      if (pageParam) {
+        // Use cursor-based pagination with created_at
+        query = query.lt("created_at", pageParam);
+      }
+
+      const { data, error } = await query;
+
       if (error) {
-        throw new Error(`Error fetching render job: ${error.message}`);
+        console.error("Error fetching render jobs:", error);
+        throw new Error(`Error fetching render jobs: ${error.message}`);
       }
-      
-      if (!data) {
-        throw new Error(`Render job not found with ID: ${id}`);
-      }
-      
-      return transformRenderJobData(data);
+
+      return {
+        data,
+        cursor: data.length > 0 ? data[data.length - 1].created_at : null,
+      };
     },
-    enabled: !!id
+    getNextPageParam: (lastPage) => lastPage.cursor,
+    initialPageParam: undefined as string | undefined,
+    enabled: !!user,
   });
-};
 
-/**
- * Hook to create a new render job
- */
-export const useCreateRenderJob = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ 
-      templateId, 
-      variables, 
-      platforms 
-    }: { 
-      templateId: string, 
-      variables: Record<string, any>, 
-      platforms: Platform[] 
-    }) => {
-      // First, fetch the template to get the Creatomate template ID
-      const { data: templateData, error: templateError } = await supabase
-        .from("templates")
-        .select("id, creatomate_template_id, name")
-        .eq("id", templateId)
-        .maybeSingle();
-        
-      if (templateError) {
-        throw new Error(`Error fetching template: ${templateError.message}`);
-      }
-      
-      if (!templateData) {
-        throw new Error(`Template not found with ID: ${templateId}`);
-      }
-      
-      const creatomateTemplateId = templateData.creatomate_template_id;
-      
-      if (!creatomateTemplateId) {
-        throw new Error(`Template "${templateData.name}" doesn't have a valid Creatomate template ID`);
-      }
+  // Setup real-time subscription
+  useEffect(() => {
+    if (!user) return;
 
-      console.log(`Starting render for template ${templateId} with Creatomate ID: ${creatomateTemplateId}`);
-      
-      try {
-        // Need to get the current user ID
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("User not authenticated");
-        
-        // Create a record in the render_jobs table FIRST
-        const { data: renderJob, error: createError } = await supabase
-          .from("render_jobs")
-          .insert([{
-            user_id: user.id,
-            template_id: templateId,
-            variables: variables as Json,
-            platforms: platforms as unknown as Json,
-            status: 'pending',  // Start with pending status
-            creatomate_render_ids: [], // Will be populated after Creatomate response
-            output_urls: {} as Json
-          }])
-          .select()
-          .single();
+    console.log("Setting up render_jobs real-time channel for infinite query");
+    const channel = supabase
+      .channel("render_jobs_infinite_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "render_jobs" },
+        (payload) => {
+          console.log("Real-time update for infinite render_jobs:", payload);
           
-        if (createError) {
-          throw new Error(`Error creating render job: ${createError.message}`);
+          // If it's an INSERT or UPDATE event, we need to invalidate the query
+          if (payload.eventType === "INSERT" || payload.eventType === "UPDATE") {
+            queryClient.invalidateQueries({ queryKey: ["renderJobsInfinite"] });
+          }
         }
+      )
+      .subscribe();
 
-        if (!renderJob) {
-          throw new Error('Failed to create render job in database');
-        }
-        
-        // Start the render job with Creatomate using the creatomate_template_id (not the database ID)
-        // Pass the database job ID to link Creatomate renders to our database record
-        const renderIds = await startRenderJob(
-          creatomateTemplateId, 
-          variables, 
-          platforms,
-          renderJob.id // Pass our database ID to Creatomate
-        );
-        
-        // Update the render job with the Creatomate render IDs
-        const { error: updateError } = await supabase
-          .from("render_jobs")
-          .update({
-            creatomate_render_ids: renderIds,
-          })
-          .eq("id", renderJob.id);
-          
-        if (updateError) {
-          console.error("Error updating render job with Creatomate IDs:", updateError);
-          // Continue anyway as this isn't critical
-        }
-        
-        return transformRenderJobData(renderJob);
-      } catch (error) {
-        console.error("Failed to start render job:", error);
-        throw error;
-      }
-    },
-    onSuccess: () => {
-      // Invalidate render jobs query to refetch data
-      queryClient.invalidateQueries({ queryKey: ["renderJobs"] });
-    }
-  });
-};
+    return () => {
+      console.log("Unsubscribing from render_jobs real-time channel for infinite query");
+      supabase.removeChannel(channel);
+    };
+  }, [user, queryClient]);
 
-/**
- * Hook to update a render job
- */
-export const useUpdateRenderJob = () => {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async ({ id, ...renderJob }: Partial<RenderJob> & { id: string }) => {
-      // Convert Platform[] to Json for Supabase
-      const updateData: any = { ...renderJob };
-      if (renderJob.platforms) {
-        updateData.platforms = renderJob.platforms as unknown as Json;
-      }
-      if (renderJob.variables) {
-        updateData.variables = renderJob.variables as unknown as Json;
-      }
-      if (renderJob.output_urls) {
-        updateData.output_urls = renderJob.output_urls as unknown as Json;
-      }
-
-      const { data, error } = await supabase
-        .from("render_jobs")
-        .update(updateData)
-        .eq("id", id)
-        .select()
-        .single();
-        
-      if (error) {
-        throw new Error(`Error updating render job: ${error.message}`);
-      }
-      
-      return transformRenderJobData(data);
-    },
-    onSuccess: (_, variables) => {
-      // Invalidate specific render job query and list
-      queryClient.invalidateQueries({ queryKey: ["renderJobs", variables.id] });
-      queryClient.invalidateQueries({ queryKey: ["renderJobs"] });
-    }
-  });
-};
-
-// Note: The checkRenderStatus hook is now deprecated as we're using webhooks instead
-// We'll keep it for backward compatibility but mark it as deprecated
-/**
- * @deprecated Use webhook approach instead
- * Hook to check render status and update job
- */
-export const useCheckRenderStatus = () => {
-  console.warn("useCheckRenderStatus is deprecated. The application now uses webhooks for status updates.");
-  
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (renderJob: RenderJob) => {
-      // Simply return the render job as is, since webhooks will handle status updates
-      return renderJob;
-    },
-    onSuccess: (data) => {
-      // No action needed - webhooks will update the status
-    }
-  });
+  return result;
 };
