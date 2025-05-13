@@ -24,6 +24,8 @@ const AuthContext = createContext<AuthContextProps | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [internalLoading, setInternalLoading] = useState(true);
+  // Add a separate debounced loading state
   const [loading, setLoading] = useState(true);
   const [isEmailSignupDisabled, setIsEmailSignupDisabled] = useState(false);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
@@ -51,6 +53,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Error in fetchUserProfile:', error);
     }
   };
+
+  // Update the debounced loading state with a small delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoading(internalLoading);
+    }, 300); // 300ms debounce for loading state changes
+    
+    return () => clearTimeout(timer);
+  }, [internalLoading]);
 
   useEffect(() => {
     // Set up the auth state listener first - IMPORTANT to use this order
@@ -117,7 +128,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('Error initializing auth:', error);
       } finally {
-        setLoading(false);
+        // Update the internal loading state
+        setInternalLoading(false);
       }
     };
     

@@ -41,9 +41,9 @@ export const useTemplates = () => {
         throw error;
       }
     },
-    staleTime: 60 * 1000, // Cache for 1 minute only (reduced from 5 minutes)
-    refetchOnWindowFocus: true, // Refetch when window gets focus
-    refetchOnMount: true, // Refetch when component mounts
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes (increased from 1 minute)
+    refetchOnWindowFocus: false, // Avoid refetching on window focus to prevent flashing
+    refetchOnMount: "if-stale", // Only refetch if the data is stale
   });
 };
 
@@ -109,7 +109,8 @@ export const useTemplate = (id: string | undefined) => {
     },
     enabled: !!id && !!user,
     retry: 1, // Only retry once to avoid excessive retries for non-existent templates
-    staleTime: 60 * 1000, // Cache for 1 minute only (reduced from 5 minutes)
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes (increased from 1 minute)
+    refetchOnWindowFocus: false, // Avoid refetching on window focus
+    refetchOnMount: "if-stale", // Only refetch if the data is stale
   });
 };
