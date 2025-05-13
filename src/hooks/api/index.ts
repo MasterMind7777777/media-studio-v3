@@ -4,3 +4,4 @@ export * from './templates';
 export * from './useContentPacks';
 export * from './useMediaAssets';
 export * from './useRenderJobs';
+export * from './useCreateRenderJob';

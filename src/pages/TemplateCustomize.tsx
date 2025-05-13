@@ -3,9 +3,11 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TemplateVariablesEditor } from '@/components/Templates/TemplateVariablesEditor';
 import { TemplateHeader } from '@/components/Templates/TemplateHeader';
-import { useCreatomatePreview } from '@/hooks/templates';
-import { useTemplate, useCreateRenderJob } from '@/hooks/api';
-import { toast } from '@/hooks/use-toast';
+import { useCreatomatePreview, useTemplateVariables } from '@/hooks/templates';
+import { useTemplate } from '@/hooks/api/templates/useTemplate';
+import { useCreateRenderJob } from '@/hooks/api/useCreateRenderJob';
+import { useToast } from '@/hooks/use-toast';
+import { MediaAsset } from '@/types';
 
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
@@ -13,6 +15,7 @@ export default function TemplateCustomize() {
 
   const [variables, setVariables] = useState<Record<string, any>>({});
   const [isRendering, setIsRendering] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
 
   // Fetch template data
   const { 
@@ -21,8 +24,16 @@ export default function TemplateCustomize() {
     error: templateError 
   } = useTemplate(id);
 
+  // Extract template variables
+  const {
+    textVariables,
+    mediaVariables,
+    colorVariables,
+    hasVariables
+  } = useTemplateVariables(template);
+
   // Set up Creatomate preview
-  const { isLoading: previewLoading } = useCreatomatePreview({
+  const { isLoading: previewLoading, isUpdating } = useCreatomatePreview({
     containerId: 'creatomate-preview',
     templateId: template?.creatomate_template_id,
     variables: variables,
@@ -30,6 +41,7 @@ export default function TemplateCustomize() {
 
   // Set up render job creation
   const { mutateAsync: createRenderJob, isPending: isSubmitting } = useCreateRenderJob();
+  const { toast } = useToast();
 
   // Handle initial variables
   useEffect(() => {
@@ -46,7 +58,36 @@ export default function TemplateCustomize() {
         description: templateError.message
       });
     }
-  }, [templateError]);
+  }, [templateError, toast]);
+
+  // Handle text variable changes
+  const handleTextChange = (key: string, value: string) => {
+    setVariables(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  // Handle color variable changes
+  const handleColorChange = (key: string, value: string) => {
+    setVariables(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  };
+
+  // Handle media variable changes
+  const handleMediaSelect = (key: string, asset: MediaAsset) => {
+    setSelectedMedia(prev => ({
+      ...prev,
+      [key]: asset
+    }));
+
+    setVariables(prev => ({
+      ...prev,
+      [key]: asset.url
+    }));
+  };
 
   // Handle render button click
   const handleRender = async () => {
@@ -86,7 +127,6 @@ export default function TemplateCustomize() {
       {template && (
         <TemplateHeader 
           templateName={template.name}
-          // Remove the Render Video button from here
         />
       )}
 
@@ -110,16 +150,16 @@ export default function TemplateCustomize() {
         <div className="relative">
           {template && (
             <TemplateVariablesEditor
-              textVariables={[]}
-              mediaVariables={[]}
-              colorVariables={[]}
+              textVariables={textVariables}
+              mediaVariables={mediaVariables}
+              colorVariables={colorVariables}
               platforms={template.platforms || []}
-              selectedMedia={{}}
-              onTextChange={() => {}}
-              onColorChange={() => {}}
-              onMediaSelect={() => {}}
+              selectedMedia={selectedMedia}
+              onTextChange={handleTextChange}
+              onColorChange={handleColorChange}
+              onMediaSelect={(key) => console.log('Media select for', key)}
               isRendering={isRendering}
-              isUpdating={false}
+              isUpdating={isUpdating}
               onRender={handleRender}
             />
           )}
@@ -127,4 +167,4 @@ export default function TemplateCustomize() {
       </div>
     </div>
   );
-}
+};

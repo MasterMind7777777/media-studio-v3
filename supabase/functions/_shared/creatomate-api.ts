@@ -1,4 +1,6 @@
-import axios, { AxiosInstance, AxiosRequestConfig } from "https://esm.sh/axios@1.6.7";
+
+// Remove axios dependency and use native fetch
+// import axios, { AxiosInstance, AxiosRequestConfig } from "https://esm.sh/axios@1.6.7";
 import { z } from "https://esm.sh/zod@3.23.8";
 
 /**
@@ -69,7 +71,8 @@ export interface RenderParams {
  * This class wraps all API operations and ensures type safety
  */
 export class CreatomateApi {
-  private client: AxiosInstance;
+  private baseUrl: string;
+  private headers: HeadersInit;
   
   /**
    * Create a new Creatomate API client
@@ -80,29 +83,56 @@ export class CreatomateApi {
       throw new Error('Creatomate API key is required');
     }
     
-    this.client = axios.create({
-      baseURL: 'https://api.creatomate.com/v1',
-      timeout: 20000, // 20 seconds
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      validateStatus: (s) => s < 300 // Only 2xx status codes are success
-    });
+    this.baseUrl = 'https://api.creatomate.com/v1';
+    this.headers = {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    };
+  }
+  
+  /**
+   * Make a request to the Creatomate API
+   * @param endpoint - API endpoint
+   * @param method - HTTP method
+   * @param body - Request body for POST/PUT requests
+   * @returns Response data
+   */
+  private async request<T>(endpoint: string, method: string, body?: any): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`;
+    
+    const options: RequestInit = {
+      method,
+      headers: this.headers,
+    };
+    
+    if (body) {
+      options.body = JSON.stringify(body);
+    }
+    
+    try {
+      const response = await fetch(url, options);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`API error (${response.status}): ${errorText}`);
+      }
+      
+      const data = await response.json();
+      return data as T;
+    } catch (error) {
+      console.error(`Error in ${method} request to ${endpoint}:`, error);
+      throw this.handleError(error);
+    }
   }
   
   /**
    * Create a new render job
    * @param params - Render parameters
-   * @param config - Optional axios request config
    * @returns Creatomate Render object
    */
-  async createRender(
-    params: RenderParams,
-    config: AxiosRequestConfig = {}
-  ): Promise<CreatomateRender> {
+  async createRender(params: RenderParams): Promise<CreatomateRender> {
     try {
-      const { data } = await this.client.post('/renders', params, config);
+      const data = await this.request<any>('/renders', 'POST', params);
       
       // Parse and validate the response
       return RenderSchema.parse(data);
@@ -115,15 +145,11 @@ export class CreatomateApi {
   /**
    * Get a specific render by ID
    * @param id - Render ID
-   * @param config - Optional axios request config
    * @returns Creatomate Render object
    */
-  async getRender(
-    id: string,
-    config: AxiosRequestConfig = {}
-  ): Promise<CreatomateRender> {
+  async getRender(id: string): Promise<CreatomateRender> {
     try {
-      const { data } = await this.client.get(`/renders/${id}`, config);
+      const data = await this.request<any>(`/renders/${id}`, 'GET');
       
       // Parse and validate the response
       return RenderSchema.parse(data);
@@ -136,18 +162,22 @@ export class CreatomateApi {
   /**
    * Get multiple renders (optionally filtered)
    * @param params - Query parameters
-   * @param config - Optional axios request config
    * @returns Array of Creatomate Render objects
    */
-  async getRenders(
-    params: Record<string, any> = {},
-    config: AxiosRequestConfig = {}
-  ): Promise<CreatomateRender[]> {
+  async getRenders(params: Record<string, any> = {}): Promise<CreatomateRender[]> {
     try {
-      const { data } = await this.client.get('/renders', {
-        ...config,
-        params
+      // Convert params to query string
+      const queryParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, String(value));
+        }
       });
+      
+      const queryString = queryParams.toString();
+      const endpoint = `/renders${queryString ? `?${queryString}` : ''}`;
+      
+      const data = await this.request<any>(endpoint, 'GET');
       
       // Parse and validate the response
       const result = RendersSchema.safeParse(data);
@@ -169,15 +199,11 @@ export class CreatomateApi {
   /**
    * Get a template by ID
    * @param id - Template ID
-   * @param config - Optional axios request config
    * @returns Creatomate Template object
    */
-  async getTemplate(
-    id: string,
-    config: AxiosRequestConfig = {}
-  ): Promise<CreatomateTemplate> {
+  async getTemplate(id: string): Promise<CreatomateTemplate> {
     try {
-      const { data } = await this.client.get(`/templates/${id}`, config);
+      const data = await this.request<any>(`/templates/${id}`, 'GET');
       
       // Parse and validate the response
       return TemplateSchema.parse(data);
@@ -218,7 +244,7 @@ export class CreatomateApi {
    * Helper to transform API errors into more useful formats
    */
   private handleError(error: any): Error {
-    // If it's an Axios error with a response, extract the details
+    // If it's a fetch error with a response, extract the details
     if (error.response) {
       const { status, data } = error.response;
       

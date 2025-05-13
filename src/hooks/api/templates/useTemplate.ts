@@ -1,0 +1,73 @@
+
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { Template } from "@/types";
+import { transformTemplateData } from "./transformers";
+import { useAuth } from "@/context/AuthContext";
+
+/**
+ * Hook to fetch a single template by ID with improved error handling and logging
+ */
+export const useTemplate = (id: string | undefined) => {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
+  return useQuery({
+    queryKey: ["templates", id, user?.id],
+    queryFn: async () => {
+      if (!id) {
+        console.error("Template ID is missing");
+        throw new Error("Template ID is required");
+      }
+      
+      console.log(`Looking for template with ID: ${id}`);
+      
+      try {
+        // First try to get it from the cache
+        const templates = queryClient.getQueryData<Template[]>(["templates", user?.id]);
+        console.log(`Checking cache for templates. Found: ${templates ? templates.length : 0} templates`);
+        
+        if (templates && templates.length > 0) {
+          const cachedTemplate = templates.find(t => t.id === id);
+          if (cachedTemplate) {
+            console.log(`Found template "${cachedTemplate.name}" in cache`);
+            return cachedTemplate;
+          } else {
+            console.log(`Template with ID ${id} not found in cache of ${templates.length} templates`);
+          }
+        }
+        
+        // If not in cache, fetch from API
+        console.log(`Fetching template ${id} from API`);
+        const { data, error } = await supabase
+          .from("templates")
+          .select("*")
+          .eq("id", id)
+          .maybeSingle();
+          
+        if (error) {
+          console.error(`API error fetching template: ${error.message}`);
+          throw new Error(`Error fetching template: ${error.message}`);
+        }
+        
+        if (!data) {
+          console.error(`Template with ID ${id} not found in database`);
+          throw new Error(`Template not found with ID: ${id}`);
+        }
+        
+        // Transform the data to match the expected Template type
+        const transformedTemplate = transformTemplateData(data);
+        console.log(`Successfully fetched template "${transformedTemplate.name}" from API`);
+        
+        return transformedTemplate;
+      } catch (error) {
+        console.error("Error in useTemplate:", error);
+        throw error;
+      }
+    },
+    enabled: !!id && !!user,
+    retry: 1, // Only retry once to avoid excessive retries for non-existent templates
+    staleTime: 60 * 1000, // Cache for 1 minute only
+    refetchOnWindowFocus: true,
+  });
+};
