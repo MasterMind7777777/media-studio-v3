@@ -43,7 +43,7 @@ export const useTemplates = () => {
     },
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes (increased from 1 minute)
     refetchOnWindowFocus: false, // Avoid refetching on window focus to prevent flashing
-    refetchOnMount: "if-stale", // Only refetch if the data is stale
+    refetchOnMount: true, // Changed from "if-stale" to true
   });
 };
 
@@ -111,6 +111,6 @@ export const useTemplate = (id: string | undefined) => {
     retry: 1, // Only retry once to avoid excessive retries for non-existent templates
     staleTime: 5 * 60 * 1000, // Cache for 5 minutes (increased from 1 minute)
     refetchOnWindowFocus: false, // Avoid refetching on window focus
-    refetchOnMount: "if-stale", // Only refetch if the data is stale
+    refetchOnMount: true, // Changed from "if-stale" to true
   });
 };
