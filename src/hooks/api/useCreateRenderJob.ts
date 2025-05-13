@@ -38,6 +38,12 @@ export const useCreateRenderJob = () => {
           throw new Error("Template has no Creatomate template ID");
         }
         
+        // Get the current user ID
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          throw new Error("User not authenticated");
+        }
+        
         // Create a new render job in our database
         const { data: job, error: jobError } = await supabase
           .from("render_jobs")
@@ -46,6 +52,7 @@ export const useCreateRenderJob = () => {
             variables: variables,
             platforms: platforms,
             status: "pending",
+            user_id: user.id // Add the user_id field which was missing
           })
           .select()
           .single();
@@ -66,7 +73,7 @@ export const useCreateRenderJob = () => {
         await supabase
           .from("render_jobs")
           .update({
-            render_ids: renderIds,
+            creatomate_render_ids: renderIds,
             status: "processing"
           })
           .eq("id", job.id);

@@ -4,4 +4,4 @@ export * from './templates';
 export * from './useContentPacks';
 export * from './useMediaAssets';
 export * from './useRenderJobs';
-export * from './useCreateRenderJob';
+// Don't re-export useCreateRenderJob since it's already exported in useRenderJobs

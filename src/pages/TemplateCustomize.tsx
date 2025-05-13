@@ -6,7 +6,7 @@ import { TemplateHeader } from '@/components/Templates/TemplateHeader';
 import { useCreatomatePreview, useTemplateVariables } from '@/hooks/templates';
 import { useTemplate } from '@/hooks/api/templates/useTemplate';
 import { useCreateRenderJob } from '@/hooks/api/useCreateRenderJob';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/components/ui/use-toast';
 import { MediaAsset } from '@/types';
 
 export default function TemplateCustomize() {
@@ -33,15 +33,17 @@ export default function TemplateCustomize() {
   } = useTemplateVariables(template);
 
   // Set up Creatomate preview
-  const { isLoading: previewLoading, isUpdating } = useCreatomatePreview({
+  const { isLoading: previewLoading } = useCreatomatePreview({
     containerId: 'creatomate-preview',
     templateId: template?.creatomate_template_id,
     variables: variables,
   });
 
+  // For updating UI state
+  const [isUpdating, setIsUpdating] = useState(false);
+
   // Set up render job creation
   const { mutateAsync: createRenderJob, isPending: isSubmitting } = useCreateRenderJob();
-  const { toast } = useToast();
 
   // Handle initial variables
   useEffect(() => {
@@ -58,22 +60,26 @@ export default function TemplateCustomize() {
         description: templateError.message
       });
     }
-  }, [templateError, toast]);
+  }, [templateError]);
 
   // Handle text variable changes
   const handleTextChange = (key: string, value: string) => {
+    setIsUpdating(true);
     setVariables(prev => ({
       ...prev,
       [key]: value
     }));
+    setIsUpdating(false);
   };
 
   // Handle color variable changes
   const handleColorChange = (key: string, value: string) => {
+    setIsUpdating(true);
     setVariables(prev => ({
       ...prev,
       [key]: value
     }));
+    setIsUpdating(false);
   };
 
   // Handle media variable changes
@@ -85,7 +91,7 @@ export default function TemplateCustomize() {
 
     setVariables(prev => ({
       ...prev,
-      [key]: asset.url
+      [key]: asset.file_url // Using file_url instead of url which doesn't exist
     }));
   };
 
@@ -157,7 +163,7 @@ export default function TemplateCustomize() {
               selectedMedia={selectedMedia}
               onTextChange={handleTextChange}
               onColorChange={handleColorChange}
-              onMediaSelect={(key) => console.log('Media select for', key)}
+              onMediaSelect={handleMediaSelect}
               isRendering={isRendering}
               isUpdating={isUpdating}
               onRender={handleRender}

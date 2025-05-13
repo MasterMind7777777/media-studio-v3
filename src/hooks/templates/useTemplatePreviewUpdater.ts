@@ -1,7 +1,7 @@
 
 import { useState } from "react";
 import { useUpdateTemplatePreviewBulk } from "@/hooks/api/templates";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/use-toast";
 
 /**
  * Hook to update template preview images in bulk
@@ -20,7 +20,8 @@ export function useTemplatePreviewUpdater() {
   
   const updatePreviews = async () => {
     setIsRunning(true);
-    toast.info("Updating template previews", {
+    toast({
+      title: "Updating template previews",
       description: "Scanning all templates for better preview images..."
     });
     
@@ -28,12 +29,14 @@ export function useTemplatePreviewUpdater() {
       const result = await updateTemplatePreviews();
       setResults(result);
       
-      toast.success("Template previews updated", {
+      toast({
+        title: "Template previews updated",
         description: `Updated ${result.success} of ${result.total} templates.${result.failed > 0 ? ` Failed: ${result.failed}.` : ''}${result.skipped > 0 ? ` Skipped: ${result.skipped}.` : ''}`
       });
     } catch (error) {
       console.error("Error updating template previews:", error);
-      toast.error("Failed to update template previews", {
+      toast({
+        title: "Failed to update template previews",
         description: error instanceof Error ? error.message : "Unknown error"
       });
     } finally {
