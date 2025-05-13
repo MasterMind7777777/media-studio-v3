@@ -15,7 +15,7 @@ interface TemplateVariablesEditorProps {
   selectedMedia: Record<string, MediaAsset>;
   onTextChange: (key: string, value: string) => void;
   onColorChange: (key: string, value: string) => void;
-  onMediaSelect: (key: string, asset: MediaAsset) => void; // Updated to accept asset parameter
+  onMediaSelect: (key: string) => void; // Changed back to accept only key
   isRendering: boolean;
   isUpdating: boolean;
   onRender: () => void;

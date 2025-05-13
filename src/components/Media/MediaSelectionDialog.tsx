@@ -9,14 +9,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 interface MediaSelectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onMediaSelect: (media: MediaAsset) => void;
+  onSelect: (media: MediaAsset) => void; // Changed from onMediaSelect to onSelect
   title?: string;
 }
 
 export function MediaSelectionDialog({
   open,
   onOpenChange,
-  onMediaSelect,
+  onSelect, // Changed from onMediaSelect to onSelect
   title = "Select Media"
 }: MediaSelectionDialogProps) {
   const [mediaTab, setMediaTab] = useState<string>("all-uploads");
@@ -39,7 +39,7 @@ export function MediaSelectionDialog({
             {mediaTab === "all-uploads" && (
               <MediaGallery 
                 onMediaSelect={(media) => {
-                  onMediaSelect(media);
+                  onSelect(media);
                   onOpenChange(false); // Close dialog after selection
                 }}
               />
@@ -50,7 +50,7 @@ export function MediaSelectionDialog({
                 <h3 className="font-medium mb-4">Recent Uploads</h3>
                 <MediaGallery 
                   onMediaSelect={(media) => {
-                    onMediaSelect(media);
+                    onSelect(media);
                     onOpenChange(false); // Close dialog after selection
                   }}
                 />
@@ -69,7 +69,7 @@ export function MediaSelectionDialog({
                     <MediaGallery 
                       contentPackId="nature"
                       onMediaSelect={(media) => {
-                        onMediaSelect(media);
+                        onSelect(media);
                         onOpenChange(false);
                       }}
                     />
@@ -78,7 +78,7 @@ export function MediaSelectionDialog({
                     <MediaGallery 
                       contentPackId="business"
                       onMediaSelect={(media) => {
-                        onMediaSelect(media);
+                        onSelect(media);
                         onOpenChange(false);
                       }}
                     />
@@ -87,7 +87,7 @@ export function MediaSelectionDialog({
                     <MediaGallery 
                       contentPackId="urban"
                       onMediaSelect={(media) => {
-                        onMediaSelect(media);
+                        onSelect(media);
                         onOpenChange(false);
                       }}
                     />
