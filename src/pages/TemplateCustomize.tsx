@@ -5,8 +5,7 @@ import { TemplateVariablesEditor } from '@/components/Templates/TemplateVariable
 import { TemplateHeader } from '@/components/Templates/TemplateHeader';
 import { useCreatomatePreview } from '@/hooks/templates';
 import { useTemplate, useCreateRenderJob } from '@/hooks/api';
-import { Button } from "@/components/ui/button";
-import { toast } from '@/components/ui/sonner';
+import { toast } from '@/hooks/use-toast';
 
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
@@ -42,7 +41,8 @@ export default function TemplateCustomize() {
   // Handle errors
   useEffect(() => {
     if (templateError) {
-      toast.error('Error loading template', {
+      toast({
+        title: 'Error loading template',
         description: templateError.message
       });
     }
@@ -61,7 +61,8 @@ export default function TemplateCustomize() {
         platforms: template.platforms || []
       });
 
-      toast.success('Render started successfully!', {
+      toast({
+        title: 'Render started successfully!',
         description: 'Your video is now being rendered. You will be redirected to the Projects page.'
       });
 
@@ -69,7 +70,8 @@ export default function TemplateCustomize() {
       navigate(`/projects?job=${result.id}`);
     } catch (error: any) {
       console.error('Render error:', error);
-      toast.error('Failed to start render', {
+      toast({
+        title: 'Failed to start render',
         description: error.message
       });
     } finally {
@@ -84,14 +86,7 @@ export default function TemplateCustomize() {
       {template && (
         <TemplateHeader 
           templateName={template.name}
-          actions={
-            <Button 
-              onClick={handleRender} 
-              disabled={isSubmitting || isRendering}
-            >
-              {isSubmitting || isRendering ? 'Starting Render...' : 'Render Video'}
-            </Button>
-          }
+          // Remove the Render Video button from here
         />
       )}
 
