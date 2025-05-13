@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useMediaAssets } from "@/hooks/api";
@@ -31,24 +31,7 @@ export function MediaGallery({
   
   // Use either provided media assets or fetched ones
   const mediaAssets = propMediaAssets || fetchedMediaAssets;
-  
-  // Track loading state with minimum display time
-  const [showLoading, setShowLoading] = useState(propIsLoading !== undefined ? propIsLoading : isFetching);
-  
-  useEffect(() => {
-    // If loading starts, show immediately
-    if (propIsLoading !== undefined ? propIsLoading : isFetching) {
-      setShowLoading(true);
-      return;
-    }
-    
-    // If loading ends, ensure it shows for at least 500ms to prevent flashing
-    const timer = setTimeout(() => {
-      setShowLoading(false);
-    }, 500);
-    
-    return () => clearTimeout(timer);
-  }, [propIsLoading, isFetching]);
+  const isLoading = propIsLoading !== undefined ? propIsLoading : isFetching;
   
   const handleSelectMedia = (media: MediaAsset) => {
     if (onMediaSelect) {
@@ -56,7 +39,7 @@ export function MediaGallery({
     }
   };
   
-  if (showLoading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center py-12">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />

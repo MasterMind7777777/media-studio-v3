@@ -1,7 +1,6 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4';
-import { createHmac } from 'https://deno.land/std@0.168.0/crypto/mod.ts';
 
 // Define cors headers for cross-origin requests
 const corsHeaders = {
@@ -69,42 +68,6 @@ const getBestPreviewImage = (render: any): string | null => {
   return null;
 };
 
-// Verify the webhook signature
-const verifySignature = (request: Request, body: string): boolean => {
-  try {
-    const signature = request.headers.get('X-Creatomate-Signature');
-    if (!signature) {
-      console.log('No signature header found');
-      return false;
-    }
-
-    const secretKey = Deno.env.get('CREATOMATE_API_KEY');
-    if (!secretKey) {
-      console.log('No CREATOMATE_API_KEY secret found');
-      return false;
-    }
-
-    // Create HMAC using the secret key and the request body
-    const hmac = createHmac('sha256', secretKey);
-    hmac.update(body);
-    const expectedSignature = hmac.digest('hex');
-
-    // Compare in constant time to prevent timing attacks
-    const signatureMatches = expectedSignature.length === signature.length &&
-      expectedSignature.split('').every((char, i) => char === signature[i]);
-
-    if (!signatureMatches) {
-      console.log('Signature verification failed');
-      return false;
-    }
-
-    return true;
-  } catch (err) {
-    console.error('Error verifying signature:', err);
-    return false;
-  }
-};
-
 // Handle CORS preflight requests
 serve(async (req: Request) => {
   // Handle CORS OPTIONS preflight request
@@ -116,23 +79,10 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Get raw body for signature verification
-    const rawBody = await req.text();
-    
-    // Parse the JSON
-    const render = JSON.parse(rawBody);
-    console.log('Received webhook from Creatomate:', render);
+    // Get the render data from the request body
+    const render = await req.json();
 
-    // Verify webhook signature for production environments
-    if (Deno.env.get('ENVIRONMENT') !== 'development') {
-      const isValid = verifySignature(req, rawBody);
-      if (!isValid) {
-        return new Response(
-          JSON.stringify({ error: 'Invalid signature' }),
-          { status: 401, headers: corsHeaders }
-        );
-      }
-    }
+    console.log('Received webhook from Creatomate:', render);
 
     if (!render.id) {
       return new Response(
@@ -221,28 +171,13 @@ serve(async (req: Request) => {
       outputUrls[render.id] = render.url;
     }
 
-    // Get snapshot URL for this render
-    let snapshotUrl = null;
-    if (render.status === 'succeeded') {
-      snapshotUrl = getBestPreviewImage(render);
-    }
-
-    // Update data to save to the database
-    const updateData: Record<string, any> = {
-      status: mappedStatus,
-      output_urls: outputUrls,
-      updated_at: new Date().toISOString()
-    };
-
-    // Only update snapshot_url if we have a valid image URL and it's not already set
-    if (snapshotUrl && (!existingJob.snapshot_url || render.event_type === 'render.finished')) {
-      updateData.snapshot_url = snapshotUrl;
-      console.log(`Updating snapshot_url to ${snapshotUrl}`);
-    }
-
     const { error: updateError } = await supabase
       .from('render_jobs')
-      .update(updateData)
+      .update({
+        status: mappedStatus, // Use mapped status
+        output_urls: outputUrls,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', existingJob.id);
 
     if (updateError) {

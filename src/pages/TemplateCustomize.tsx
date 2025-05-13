@@ -1,276 +1,285 @@
 
+import { useParams, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { toast } from "sonner";
-import { useTemplate } from "@/hooks/api";
-import { useRenderJob } from "@/hooks/api/useRenderJobs";
-import { useTemplateVariables, useCreatomatePreview, useTemplatePreview } from "@/hooks/templates";
+import { useTemplate, useCreateRenderJob, useUpdateTemplate } from "@/hooks/api";
+import { toast } from "@/components/ui/sonner";
+import { MediaAsset, Template } from "@/types";
+import { MediaSelectionDialog } from "@/components/Media/MediaSelectionDialog";
+import { TemplateHeader } from "@/components/Templates/TemplateHeader";
 import { TemplatePreview } from "@/components/Templates/TemplatePreview";
 import { TemplateVariablesEditor } from "@/components/Templates/TemplateVariablesEditor";
-import { TemplateHeader } from "@/components/Templates/TemplateHeader";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/context/AuthContext";
-import { Json } from "@/integrations/supabase/types";
-import { getTemplatePreviewImage } from "@/hooks/templates";
-import { Platform } from "@/types";
-
-/**
- * Renders a video using the Creatomate API
- */
-const renderVideo = async ({ 
-  templateId, 
-  variables, 
-  platforms, 
-  metadata 
-}: { 
-  templateId: string, 
-  variables: Record<string, any>, 
-  platforms: any[], 
-  metadata?: Record<string, any>
-}) => {
-  try {
-    // Call the edge function to render the video
-    const { data, error } = await supabase.functions.invoke('creatomate', {
-      body: {
-        templateId,
-        modifications: variables,
-        outputFormats: platforms.map((p: any) => p.id || p.name),
-        metadata
-      }
-    });
-
-    if (error) throw new Error(error.message);
-    return { renderId: data?.renderId, error: null };
-  } catch (err) {
-    console.error("Error in renderVideo:", err);
-    return { renderId: null, error: err instanceof Error ? err.message : String(err) };
-  }
-};
+import { useTemplateVariables } from "@/hooks/templates";
 
 export default function TemplateCustomize() {
-  const { id: templateIdOrProjectId } = useParams<{ id: string }>();
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
   
-  // Differentiate between template and project mode
-  const isProjectMode = window.location.pathname.includes("/projects/");
+  // State management
+  const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
+  const [updatedTemplate, setUpdatedTemplate] = useState<Template | null>(null);
+  const [mediaDialogOpen, setMediaDialogOpen] = useState(false);
+  const [currentMediaKey, setCurrentMediaKey] = useState<string>("");
   
-  // Fetch project data if in project mode
-  const { data: project, isLoading: projectLoading } = useRenderJob(
-    isProjectMode ? templateIdOrProjectId : undefined
-  );
-  
-  // Get the template ID based on mode
-  const templateId = isProjectMode 
-    ? project?.template_id 
-    : templateIdOrProjectId;
-  
-  // Fetch template data
-  const { data: template, isLoading: templateLoading } = useTemplate(templateId);
-  
-  // Initialize template variables hook
-  const {
-    textVariables,
-    mediaVariables,
-    colorVariables,
-    variables,
-    setVariables,
-    resetVariables,
-    isReady: variablesReady
-  } = useTemplateVariables(template);
-  
-  // Initialize Creatomate preview
-  const { isLoading: previewLoading } = useCreatomatePreview({
-    containerId: "preview-container",
-    templateId: template?.creatomate_template_id || ""
-  });
-  
-  // Initialize template preview
-  const { updatePreview } = useTemplatePreview();
-  
-  // Load project variables when in project mode
+  // Validate template ID
   useEffect(() => {
-    if (isProjectMode && project?.variables && variablesReady) {
-      console.log("Loading variables from project", project.variables);
+    if (!id) {
+      console.error("Template ID is missing from route parameters");
+      toast.error("Missing template information", {
+        description: "No template ID was provided."
+      });
+      navigate("/create");
+    } else {
+      console.log(`TemplateCustomize page loaded with template ID: ${id}`);
+    }
+  }, [id, navigate]);
+  
+  // Fetch template data 
+  const { 
+    data: template, 
+    isLoading, 
+    error,
+    isError
+  } = useTemplate(id);
+
+  // API mutations
+  const { 
+    mutate: updateTemplate,
+    isPending: isUpdating
+  } = useUpdateTemplate();
+
+  const { 
+    mutate: createRenderJob, 
+    isPending: isRendering 
+  } = useCreateRenderJob();
+  
+  // Update local state when template data is loaded
+  useEffect(() => {
+    if (template && !updatedTemplate) {
+      console.log(`Template data loaded successfully: ${template.name}`);
+      console.log(`Creatomate template ID: ${template.creatomate_template_id}`);
+      setUpdatedTemplate(template);
+    }
+  }, [template, updatedTemplate]);
+  
+  // Extract variables by type
+  const { textVariables, mediaVariables, colorVariables, hasVariables } = useTemplateVariables(updatedTemplate);
+  
+  // Handle template loading errors
+  useEffect(() => {
+    if (isError && error) {
+      console.error("Template loading error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
       
-      // Compare project variables with template variables
-      // to warn about missing keys
-      if (template?.variables) {
-        const templateVarKeys = new Set(Object.keys(template.variables));
-        const projectVarKeys = new Set(Object.keys(project.variables));
-        
-        // Find keys in template but not in project
-        const missingKeys = [...templateVarKeys].filter(key => !projectVarKeys.has(key));
-        
-        // Find keys in project but not in template
-        const extraKeys = [...projectVarKeys].filter(key => !templateVarKeys.has(key));
-        
-        if (missingKeys.length > 0) {
-          toast.warning("Template has been updated", {
-            description: `Some variables are missing from your project: ${missingKeys.join(", ")}. Default values will be used.`,
-            duration: 6000,
-          });
-        }
-        
-        if (extraKeys.length > 0) {
-          console.log(`Project has extra variables not in template: ${extraKeys.join(", ")}`);
-        }
+      if (errorMessage.includes("not found")) {
+        toast.error("Template not found", {
+          description: `The template with ID ${id} could not be found. It may have been deleted or is unavailable.`,
+        });
+      } else {
+        toast.error("Failed to load template", {
+          description: errorMessage
+        });
       }
       
-      // Set variables from project
-      setVariables(project.variables);
+      setTimeout(() => {
+        navigate("/create");
+      }, 1500);
     }
-  }, [isProjectMode, project, variablesReady, setVariables, template?.variables]);
+  }, [isError, error, id, navigate]);
+
+  // Navigation handler
+  const handleBack = () => {
+    navigate("/create");
+  };
   
-  // Function to handle render submission
-  const handleSubmit = async () => {
-    if (!template || !user) return;
+  // Variable update handlers - FIXED to properly handle keys
+  const handleTextChange = (variableKey: string, value: string) => {
+    if (!updatedTemplate) return;
     
-    try {
-      setIsSubmitting(true);
-      
-      const submitData = {
-        user_id: user.id,
-        template_id: template.id,
-        variables: variables as Json,
-        name: `${template.name} - ${new Date().toLocaleString()}`,
-        status: "pending" as const,
-        // Convert platforms to Json before submitting
-        platforms: template.platforms as unknown as Json,
-      };
-      
-      // Create a new render job in the database
-      const { data: renderJob, error: dbError } = await supabase
-        .from("render_jobs")
-        .insert(submitData)
-        .select()
-        .single();
-      
-      if (dbError) throw dbError;
-      
-      // Call the Creatomate API to render the video
-      const { renderId, error } = await renderVideo({
-        templateId: template.creatomate_template_id,
-        variables: variables,
-        platforms: template.platforms,
-        metadata: {
-          database_job_id: renderJob.id,
-          template_id: template.id,
+    console.log(`Updating text variable: ${variableKey} = ${value}`);
+    
+    // Use the provided key directly without modification - the key already includes the .text suffix
+    const updatedVariables = {
+      ...updatedTemplate.variables,
+      [variableKey]: value
+    };
+    
+    setUpdatedTemplate({
+      ...updatedTemplate,
+      variables: updatedVariables
+    });
+  };
+  
+  const handleColorChange = (variableKey: string, value: string) => {
+    if (!updatedTemplate) return;
+    
+    console.log(`Updating color variable: ${variableKey} = ${value}`);
+    
+    // Use the provided key directly without modification - the key already includes the .fill suffix
+    const updatedVariables = {
+      ...updatedTemplate.variables,
+      [variableKey]: value
+    };
+    
+    setUpdatedTemplate({
+      ...updatedTemplate,
+      variables: updatedVariables
+    });
+  };
+  
+  // Media selection handlers
+  const handleMediaSelect = (variableKey: string) => {
+    setCurrentMediaKey(variableKey);
+    setMediaDialogOpen(true);
+  };
+  
+  const handleMediaDialogSelect = (mediaAsset: MediaAsset) => {
+    if (!currentMediaKey || !updatedTemplate) return;
+    
+    console.log(`Selected media for ${currentMediaKey}: ${mediaAsset.name}`);
+    
+    // Update the selected media
+    setSelectedMedia({
+      ...selectedMedia,
+      [currentMediaKey]: mediaAsset
+    });
+    
+    // Update the template variable with the media URL
+    setUpdatedTemplate({
+      ...updatedTemplate,
+      variables: {
+        ...updatedTemplate.variables,
+        [currentMediaKey]: mediaAsset.file_url
+      }
+    });
+    
+    toast.success("Media selected", {
+      description: `${mediaAsset.name} added to ${currentMediaKey.replace(/_/g, ' ')}`
+    });
+  };
+
+  // Render handler
+  const handleRender = () => {
+    if (updatedTemplate && JSON.stringify(template?.variables) !== JSON.stringify(updatedTemplate.variables)) {
+      updateTemplate({
+        id: updatedTemplate.id,
+        variables: updatedTemplate.variables
+      }, {
+        onSuccess: () => {
+          toast.success("Template updated", {
+            description: "Your changes have been saved."
+          });
+          
+          // Start the render job after saving the template
+          startRender();
         },
+        onError: (error) => {
+          toast.error("Failed to save changes", {
+            description: error.message
+          });
+        }
       });
-      
-      if (error) throw new Error(error);
-      
-      // Update the render job with the Creatomate render ID
-      await supabase
-        .from("render_jobs")
-        .update({
-          creatomate_render_ids: [renderId] as unknown as Json,
-        })
-        .eq("id", renderJob.id);
-      
-      // Show success toast and navigate to projects page
-      toast.success("Render job created", {
-        description: "Your video is being processed and will be available soon.",
-      });
-      
-      navigate(`/projects?job=${renderJob.id}`);
-    } catch (error) {
-      console.error("Error submitting render job:", error);
-      toast.error("Error creating render", {
-        description: (error as Error).message,
-      });
-    } finally {
-      setIsSubmitting(false);
+    } else {
+      // If no changes, just start the render
+      startRender();
     }
   };
   
-  const isLoading = templateLoading || previewLoading || projectLoading;
-  const shouldDisableSubmit = isLoading || isSubmitting || !template;
-  const previewImageUrl = template ? getTemplatePreviewImage(template) : '';
-  
-  return (
-    <div className="flex flex-col gap-8 p-8">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">
-          {isProjectMode ? "Edit Project" : "Customize Template"}
-        </h1>
-        <Button
-          variant="outline"
-          onClick={() => navigate(isProjectMode ? "/projects" : "/templates")}
-        >
-          {isProjectMode ? "Back to Projects" : "Back to Templates"}
-        </Button>
-      </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Preview Area */}
-        <div className="flex flex-col gap-4">
-          <h2 className="text-xl font-semibold">Preview</h2>
-          <Card className="overflow-hidden">
-            <div id="preview-container" className="aspect-video">
-              <TemplatePreview 
-                previewImageUrl={previewImageUrl}
-                width={template?.platforms[0]?.width || 1920}
-                height={template?.platforms[0]?.height || 1080}
-              />
-            </div>
-          </Card>
+  const startRender = () => {
+    if (!updatedTemplate) return;
+    
+    createRenderJob({
+      templateId: updatedTemplate.id,
+      variables: updatedTemplate.variables,
+      platforms: updatedTemplate.platforms
+    }, {
+      onSuccess: (renderJob) => {
+        toast.success("Render started", {
+          description: "Your render job has been created and is processing."
+        });
+        navigate(`/projects?job=${renderJob.id}`);
+      },
+      onError: (error) => {
+        toast.error("Failed to start render", {
+          description: error.message
+        });
+      }
+    });
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-[70vh]">
+        <div className="text-center">
+          <div className="mb-4">Loading template...</div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-studio-600 mx-auto"></div>
         </div>
-        
-        {/* Variables Editor */}
-        <div className="flex flex-col gap-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold">Customize</h2>
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                onClick={resetVariables}
-                disabled={isLoading}
-              >
-                Reset
-              </Button>
-              <Button 
-                onClick={handleSubmit} 
-                disabled={shouldDisableSubmit}
-              >
-                {isSubmitting ? "Creating..." : "Create Video"}
-              </Button>
+      </div>
+    );
+  }
+  
+  if (!template || !updatedTemplate) {
+    return null; // Return null while redirect happens via the useEffect
+  }
+
+  return (
+    <div className="flex flex-col gap-6 p-4 md:p-8">
+      <TemplateHeader 
+        templateName={template.name}
+        onBack={handleBack}
+      />
+      
+      {/* Main content area with preview and editing panel */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* Preview Section */}
+        <div className="md:col-span-8">
+          <TemplatePreview 
+            previewImageUrl={updatedTemplate.preview_image_url}
+            width={updatedTemplate.platforms[0]?.width}
+            height={updatedTemplate.platforms[0]?.height}
+            templateId={updatedTemplate.id}
+            creatomateTemplateId={updatedTemplate.creatomate_template_id}
+            variables={updatedTemplate.variables}
+          />
+          
+          {/* Debug information - this will help troubleshoot preview issues */}
+          <div className="mt-2 p-4 bg-muted/20 rounded border text-sm">
+            <div className="font-medium mb-1">Preview Information:</div>
+            <div>Database Template ID: {updatedTemplate.id}</div>
+            <div className={updatedTemplate.creatomate_template_id ? 'text-green-600' : 'text-red-500 font-medium'}>
+              Creatomate Template ID: {updatedTemplate.creatomate_template_id || 'Missing!'}
+            </div>
+            <div className={hasVariables ? 'text-green-600' : 'text-yellow-500'}>
+              Variables: {hasVariables ? 'Available' : 'None defined'}
             </div>
           </div>
-          
-          <Card className="p-4">
-            {isLoading ? (
-              <div className="p-4 text-center">Loading variables...</div>
-            ) : (
-              <div className="space-y-4">
-                {Object.entries(variables || {}).map(([key, value]) => (
-                  <div key={key} className="space-y-2">
-                    <label className="block text-sm font-medium">
-                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                    </label>
-                    <input
-                      type="text"
-                      value={String(value)}
-                      onChange={(e) => {
-                        const newValue = e.target.value;
-                        const updatedVars = { ...variables, [key]: newValue };
-                        setVariables(updatedVars);
-                        updatePreview(updatedVars);
-                      }}
-                      className="w-full rounded-md border px-3 py-2"
-                    />
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
+        </div>
+        
+        {/* Editing Panel */}
+        <div className="md:col-span-4">
+          <TemplateVariablesEditor
+            textVariables={textVariables}
+            mediaVariables={mediaVariables}
+            colorVariables={colorVariables}
+            platforms={updatedTemplate.platforms}
+            selectedMedia={selectedMedia}
+            onTextChange={handleTextChange}
+            onColorChange={handleColorChange}
+            onMediaSelect={handleMediaSelect}
+            isRendering={isRendering}
+            isUpdating={isUpdating}
+            onRender={handleRender}
+          />
         </div>
       </div>
+      
+      {/* Media Selection Dialog */}
+      <MediaSelectionDialog 
+        open={mediaDialogOpen}
+        onOpenChange={setMediaDialogOpen}
+        onMediaSelect={handleMediaDialogSelect}
+        title={`Select Media for ${currentMediaKey?.replace(/_/g, ' ') || ''}`}
+      />
     </div>
   );
 }

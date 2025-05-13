@@ -3,23 +3,17 @@ import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { AdminLayout } from './Layout/AdminLayout';
-import { memo } from 'react';
-
-// Using memo to prevent unnecessary re-renders of the loading state
-const LoadingIndicator = memo(() => (
-  <div className="flex h-screen items-center justify-center">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-  </div>
-));
-
-LoadingIndicator.displayName = 'LoadingIndicator';
 
 export const AdminProtectedRoute = () => {
   const { user, loading, isAdmin } = useAuth();
   
   // Show loading state while checking authentication
   if (loading) {
-    return <LoadingIndicator />;
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
   }
   
   // Redirect to login if not authenticated

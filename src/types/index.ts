@@ -1,3 +1,4 @@
+
 export type UserRole = 'user' | 'admin';
 
 export interface User {
@@ -56,16 +57,13 @@ export interface RenderJob {
   id: string;
   user_id: string;
   template_id: string;
-  name?: string; // Added name as optional
   variables: Record<string, any>;
   platforms: Platform[];
-  status: 'pending' | 'processing' | 'rendering' | 'planned' | 'completed' | 'succeeded' | 'failed';
+  status: 'pending' | 'processing' | 'completed' | 'failed';
   creatomate_render_ids: string[];
   output_urls: Record<string, string>;
-  snapshot_url?: string; // Added snapshot_url as optional
   created_at: string;
   updated_at: string;
-  templates?: Template; // For join queries
 }
 
 export interface Statistics {
