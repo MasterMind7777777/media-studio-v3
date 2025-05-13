@@ -8,6 +8,7 @@ import { useTemplate } from '@/hooks/api/templates/useTemplate';
 import { useCreateRenderJob } from '@/hooks/api/useCreateRenderJob';
 import { toast } from '@/components/ui/use-toast';
 import { MediaAsset } from '@/types';
+import { MediaSelectionDialog } from '@/components/Media/MediaSelectionDialog';
 
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
@@ -16,6 +17,8 @@ export default function TemplateCustomize() {
   const [variables, setVariables] = useState<Record<string, any>>({});
   const [isRendering, setIsRendering] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
+  const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false);
+  const [currentMediaKey, setCurrentMediaKey] = useState<string>('');
 
   // Fetch template data
   const { 
@@ -82,17 +85,27 @@ export default function TemplateCustomize() {
     setIsUpdating(false);
   };
 
-  // Handle media variable changes
-  const handleMediaSelect = (key: string, asset: MediaAsset) => {
-    setSelectedMedia(prev => ({
-      ...prev,
-      [key]: asset
-    }));
+  // Open media selection dialog
+  const handleMediaSelect = (key: string) => {
+    setCurrentMediaKey(key);
+    setIsMediaDialogOpen(true);
+  };
 
-    setVariables(prev => ({
-      ...prev,
-      [key]: asset.file_url // Using file_url instead of url which doesn't exist
-    }));
+  // Handle media selection
+  const handleMediaSelected = (asset: MediaAsset) => {
+    if (currentMediaKey) {
+      setSelectedMedia(prev => ({
+        ...prev,
+        [currentMediaKey]: asset
+      }));
+
+      setVariables(prev => ({
+        ...prev,
+        [currentMediaKey]: asset.file_url
+      }));
+
+      setIsMediaDialogOpen(false);
+    }
   };
 
   // Handle render button click
@@ -171,6 +184,13 @@ export default function TemplateCustomize() {
           )}
         </div>
       </div>
+
+      {/* Media Selection Dialog */}
+      <MediaSelectionDialog
+        open={isMediaDialogOpen}
+        onOpenChange={setIsMediaDialogOpen}
+        onSelect={handleMediaSelected}
+      />
     </div>
   );
 };
