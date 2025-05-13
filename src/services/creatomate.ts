@@ -1,6 +1,7 @@
 
 import { Template, RenderJob } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
+import { isImageUrl, isAudioUrl } from "@/lib/utils";
 
 /**
  * Fetches templates from Creatomate via our secure Edge Function
@@ -44,8 +45,23 @@ export async function importCreatomateTemplate(templateId: string, curlCommand?:
     }
     
     // If the response includes a preview_url but no preview_image_url, set it
-    if (data && data.preview_url && !data.preview_image_url) {
-      data.preview_image_url = data.preview_url;
+    // First validate that it's an image URL, not an audio file
+    if (data) {
+      let previewUrl = null;
+      
+      // Check for preview_url first
+      if (data.preview_url && isImageUrl(data.preview_url) && !isAudioUrl(data.preview_url)) {
+        previewUrl = data.preview_url;
+      } 
+      // Then try snapshot_url
+      else if (data.snapshot_url && isImageUrl(data.snapshot_url) && !isAudioUrl(data.snapshot_url)) {
+        previewUrl = data.snapshot_url;
+      }
+      
+      if (previewUrl && !data.preview_image_url) {
+        data.preview_image_url = previewUrl;
+        console.log(`Using ${previewUrl} as preview image for imported template`);
+      }
     }
     
     return data as Template;
@@ -192,11 +208,13 @@ export async function updateTemplatePreviews(): Promise<{
   total: number;
   success: number;
   failed: number;
+  skipped: number;
 }> {
   try {
     const { data, error } = await supabase.functions.invoke('creatomate', {
       body: {
-        action: 'update-template-previews'
+        action: 'update-template-previews',
+        validate_images: true // New flag to ensure only valid images are used
       }
     });
     

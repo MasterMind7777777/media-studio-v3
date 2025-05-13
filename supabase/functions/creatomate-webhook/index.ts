@@ -23,6 +23,51 @@ const mapCreatomateStatus = (status: string): string => {
   return statusMap[status] || 'pending'; // Default to 'pending' for unknown statuses
 };
 
+// Function to check if a URL is likely an image URL
+const isImageUrl = (url: string): boolean => {
+  if (!url) return false;
+  
+  // Check for common image file extensions
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.tiff'];
+  const lowercaseUrl = url.toLowerCase();
+  
+  // Check if URL ends with an image extension or contains image/ in the path
+  return imageExtensions.some(ext => lowercaseUrl.endsWith(ext)) || lowercaseUrl.includes('image/');
+};
+
+// Function to check if a URL is likely an audio URL (to filter these out)
+const isAudioUrl = (url: string): boolean => {
+  if (!url) return false;
+  
+  // Check for common audio file extensions
+  const audioExtensions = ['.mp3', '.wav', '.ogg', '.aac', '.m4a', '.flac'];
+  const lowercaseUrl = url.toLowerCase();
+  
+  // Check if URL ends with an audio extension or contains audio/ in the path
+  return audioExtensions.some(ext => lowercaseUrl.endsWith(ext)) || lowercaseUrl.includes('audio/');
+};
+
+// Function to get the best preview image URL from a render
+const getBestPreviewImage = (render: any): string | null => {
+  // Check the various possible URLs in order of preference
+  const possibleUrls = [
+    render.snapshot_url,
+    render.preview_url,
+    render.url
+  ];
+  
+  for (const url of possibleUrls) {
+    if (url && isImageUrl(url) && !isAudioUrl(url)) {
+      console.log(`Using ${url} as preview image`);
+      return url;
+    } else if (url && isAudioUrl(url)) {
+      console.log(`Skipping audio URL: ${url}`);
+    }
+  }
+  
+  return null;
+};
+
 // Handle CORS preflight requests
 serve(async (req: Request) => {
   // Handle CORS OPTIONS preflight request
@@ -143,14 +188,16 @@ serve(async (req: Request) => {
       );
     }
 
-    // NEW: Update template preview image if render succeeded and has snapshot_url
-    if (render.status === 'succeeded' && (render.snapshot_url || render.preview_url || render.url) && existingJob.template_id) {
-      console.log('Updating template preview image with render preview');
+    // Update template preview image if render succeeded and has valid image URL
+    if (render.status === 'succeeded' && existingJob.template_id) {
+      console.log('Checking for valid preview image in render response');
       
-      // Prioritize snapshot_url, then preview_url, then regular url
-      const previewUrl = render.snapshot_url || render.preview_url || render.url;
+      // Get the best preview image URL using our helper function
+      const previewUrl = getBestPreviewImage(render);
       
       if (previewUrl) {
+        console.log(`Found valid preview image URL: ${previewUrl}`);
+        
         const { error: templateUpdateError } = await supabase
           .from('templates')
           .update({ 
@@ -164,6 +211,8 @@ serve(async (req: Request) => {
         } else {
           console.log(`Successfully updated template ${existingJob.template_id} preview image to ${previewUrl}`);
         }
+      } else {
+        console.log('No valid preview image URL found in render response');
       }
     }
 

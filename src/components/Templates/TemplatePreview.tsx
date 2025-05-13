@@ -2,12 +2,13 @@
 import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Play, Maximize, Pause, AlertCircle, RotateCcw } from "lucide-react";
+import { Play, Maximize, Pause, AlertCircle, RotateCcw, ImageIcon } from "lucide-react";
 import { useCreatomatePreview } from "@/hooks/templates";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { DEFAULT_TEMPLATE_ID } from "@/config/creatomate";
 import { getCreatomateToken } from "@/integrations/creatomate/config";
 import { CREATOMATE_PUBLIC_TOKEN } from "@/config/creatomate";
+import { isImageUrl } from "@/lib/utils";
 
 interface TemplatePreviewProps {
   previewImageUrl: string;
@@ -31,6 +32,7 @@ export function TemplatePreview({
   const [apiToken, setApiToken] = useState<string>(CREATOMATE_PUBLIC_TOKEN);
   const [templateId, setTemplateId] = useState<string>(creatomateTemplateId);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [imgError, setImgError] = useState(false);
   const previewContainerId = "creatomate-preview-container";
   
   // Get the token from config
@@ -56,6 +58,11 @@ export function TemplatePreview({
     
     fetchCredentials();
   }, [apiToken, creatomateTemplateId]);
+  
+  // Reset image error state when previewImageUrl changes
+  useEffect(() => {
+    setImgError(false);
+  }, [previewImageUrl]);
   
   // Check browser compatibility
   useEffect(() => {
@@ -87,6 +94,12 @@ export function TemplatePreview({
     
     checkBrowser();
   }, []);
+  
+  // Check if preview URL is valid
+  const hasValidPreviewImage = previewImageUrl && 
+                              previewImageUrl !== '/placeholder.svg' && 
+                              isImageUrl(previewImageUrl) &&
+                              !imgError;
   
   // Only proceed with preview initialization after we've attempted to load credentials
   const {
@@ -130,11 +143,19 @@ export function TemplatePreview({
           <div className="text-white text-center p-8 absolute inset-0 flex flex-col items-center justify-center">
             <div className="text-xl font-medium mb-4">Loading Preview</div>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-            <img 
-              src={previewImageUrl} 
-              alt="Preview" 
-              className="max-w-full max-h-60 mx-auto rounded-md shadow-lg opacity-40 mt-4"
-            />
+            {hasValidPreviewImage ? (
+              <img 
+                src={previewImageUrl} 
+                alt="Preview" 
+                className="max-w-full max-h-60 mx-auto rounded-md shadow-lg opacity-40 mt-4"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center mt-4 opacity-40">
+                <ImageIcon size={48} />
+                <p className="mt-2">No preview available</p>
+              </div>
+            )}
           </div>
         )}
         
@@ -169,11 +190,19 @@ export function TemplatePreview({
               Retry
             </Button>
             
-            <img 
-              src={previewImageUrl} 
-              alt="Preview" 
-              className="max-w-full max-h-60 mx-auto rounded-md shadow-lg"
-            />
+            {hasValidPreviewImage ? (
+              <img 
+                src={previewImageUrl} 
+                alt="Preview" 
+                className="max-w-full max-h-60 mx-auto rounded-md shadow-lg"
+                onError={() => setImgError(true)}
+              />
+            ) : (
+              <div className="flex flex-col items-center justify-center mt-4">
+                <ImageIcon size={48} />
+                <p className="mt-2">No preview available</p>
+              </div>
+            )}
           </div>
         )}
       </div>

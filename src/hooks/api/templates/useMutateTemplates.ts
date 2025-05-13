@@ -5,6 +5,7 @@ import { Template } from "@/types";
 import { Json } from "@/integrations/supabase/types";
 import { transformTemplateData } from "./transformers";
 import { getTemplatePreviewImage } from "@/hooks/templates";
+import { isAudioUrl, isImageUrl } from "@/lib/utils";
 
 /**
  * Hook to create a new template
@@ -87,8 +88,11 @@ export const useUpdateTemplate = () => {
         const fullTemplate = { ...updateData, id: updateData.id } as Template;
         const extractedPreview = getTemplatePreviewImage(fullTemplate);
         if (extractedPreview && extractedPreview !== '/placeholder.svg') {
-          supabaseUpdateData.preview_image_url = extractedPreview;
-          console.log(`Auto-extracted preview image for template ${updateData.id}: ${extractedPreview}`);
+          // Verify it's not an audio URL before using it
+          if (!isAudioUrl(extractedPreview) && (isImageUrl(extractedPreview) || extractedPreview.startsWith('http'))) {
+            supabaseUpdateData.preview_image_url = extractedPreview;
+            console.log(`Auto-extracted preview image for template ${updateData.id}: ${extractedPreview}`);
+          }
         }
       }
 
@@ -148,23 +152,32 @@ export const useUpdateTemplatePreviewBulk = () => {
   
   return useMutation({
     mutationFn: async () => {
-      // 1. Get all templates without preview images
+      // 1. Get all templates with either missing or audio-file preview images
       const { data: templates, error } = await supabase
         .from("templates")
         .select("id, variables, preview_image_url")
-        .is("preview_image_url", null)
         .order("created_at", { ascending: false });
         
       if (error) {
         throw new Error(`Error fetching templates: ${error.message}`);
       }
 
-      // 2. For each template, extract preview from variables and update
-      const updatedCount = { total: 0, success: 0, failed: 0 };
+      // 2. For each template, extract preview from variables and update if needed
+      const updatedCount = { total: templates?.length || 0, success: 0, failed: 0, skipped: 0 };
       
       for (const template of templates || []) {
-        updatedCount.total++;
         try {
+          // Check if current preview needs to be updated (missing or is audio file)
+          const needsUpdate = !template.preview_image_url || 
+                             template.preview_image_url === '/placeholder.svg' ||
+                             isAudioUrl(template.preview_image_url);
+          
+          if (!needsUpdate) {
+            updatedCount.skipped++;
+            console.log(`Template ${template.id} already has a valid preview image, skipping`);
+            continue;
+          }
+          
           // Extract a preview URL from template variables
           const fullTemplate = await queryClient.fetchQuery({ 
             queryKey: ["templates", template.id],
@@ -183,7 +196,7 @@ export const useUpdateTemplatePreviewBulk = () => {
           // Try to get the best preview image
           const previewUrl = getTemplatePreviewImage(fullTemplate);
           
-          if (previewUrl && previewUrl !== '/placeholder.svg') {
+          if (previewUrl && previewUrl !== '/placeholder.svg' && !isAudioUrl(previewUrl)) {
             // Update the template with the extracted preview URL
             const { error: updateError } = await supabase
               .from("templates")
