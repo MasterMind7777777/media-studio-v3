@@ -1,6 +1,5 @@
-
 import { useState, useEffect, useRef } from 'react';
-import { isCreatomateSDKAvailable } from '@/integrations/creatomate/config';
+import { isCreatomateSDKAvailable, ensureCreatomateSDK } from '@/integrations/creatomate/config';
 import { toast } from 'sonner';
 
 interface UseCreatomatePreviewProps {
@@ -30,11 +29,14 @@ export function useCreatomatePreview({
   // Ref to store the preview instance
   const previewRef = useRef<any>(null);
   
-  // Format the variables for the preview
-  const formattedVariables = variables || {};
+  // Keep track of latest variables to avoid stale closures
+  const variablesRef = useRef<Record<string, any>>(variables || {});
+  useEffect(() => {
+    variablesRef.current = variables || {};
+  }, [variables]);
   
   // Function to retry initialization
-  const retryInitialization = () => {
+  const retryInitialization = async () => {
     console.log('Retrying preview initialization');
     setIsLoading(true);
     setError(null);
@@ -49,8 +51,32 @@ export function useCreatomatePreview({
       previewRef.current = null;
     }
     
-    // The initialization will be retried in the next useEffect run
-    initializePreview();
+    // Try to ensure SDK is loaded before initializing
+    try {
+      await ensureCreatomateSDK();
+      initializePreview();
+    } catch (err) {
+      console.error('Failed to load SDK during retry:', err);
+      setError(err instanceof Error ? err : new Error('Failed to load SDK'));
+      setIsLoading(false);
+    }
+  };
+  
+  // Function to update preview variables 
+  const updatePreviewVariables = (newVars: Record<string, any>) => {
+    if (!previewRef.current || !isReady) {
+      console.warn('Cannot update variables - preview not ready');
+      return false;
+    }
+    
+    try {
+      console.log('Updating preview variables:', newVars);
+      previewRef.current.setModifications(newVars);
+      return true;
+    } catch (err) {
+      console.error('Error updating preview variables:', err);
+      return false;
+    }
   };
   
   // Initialize the preview
@@ -61,7 +87,7 @@ export function useCreatomatePreview({
       return;
     }
 
-    // Check if the SDK is available - we no longer try to load it manually here
+    // Check if the SDK is available
     if (!isCreatomateSDKAvailable()) {
       console.log('Preview initialization skipped: SDK not available');
       setError(new Error('Creatomate SDK not loaded. Please refresh the page and try again.'));
@@ -86,7 +112,7 @@ export function useCreatomatePreview({
     setIsLoading(true);
 
     try {
-      // Create a new preview instance using the already loaded SDK
+      // Create a new preview instance using the SDK
       const preview = new window.Creatomate.Preview(
         container, 
         'player', 
@@ -111,6 +137,12 @@ export function useCreatomatePreview({
           
           // Set initial time to show something interesting
           await preview.setTime(0.5);
+          
+          // Apply initial variables if available
+          if (Object.keys(variablesRef.current).length > 0) {
+            console.log('Setting initial variables:', variablesRef.current);
+            preview.setModifications(variablesRef.current);
+          }
           
           // Auto play if requested
           if (autoPlay) {
@@ -167,9 +199,21 @@ export function useCreatomatePreview({
     }
   };
 
-  // Initialize on mount
+  // Initialize on mount with SDK loading check
   useEffect(() => {
-    initializePreview();
+    const loadSDKAndInitialize = async () => {
+      setIsLoading(true);
+      try {
+        await ensureCreatomateSDK();
+        initializePreview();
+      } catch (err) {
+        console.error('Failed to load SDK:', err);
+        setError(err instanceof Error ? err : new Error('Failed to load SDK'));
+        setIsLoading(false);
+      }
+    };
+    
+    loadSDKAndInitialize();
 
     // Clean up on unmount
     return () => {
@@ -187,21 +231,16 @@ export function useCreatomatePreview({
   
   // Update variables when they change
   useEffect(() => {
-    if (!previewRef.current || !isReady || Object.keys(formattedVariables).length === 0) {
+    if (!previewRef.current || !isReady) {
       return;
     }
     
-    console.log('Updating preview variables:', formattedVariables);
-    
-    try {
-      previewRef.current.setModifications(formattedVariables);
-    } catch (err) {
-      console.error('Error updating preview variables:', err);
-      toast.error('Failed to update preview', {
-        description: err instanceof Error ? err.message : 'Unknown error'
-      });
+    // Only update if we have variables
+    if (variables && Object.keys(variables).length > 0) {
+      console.log('Variables changed, updating preview:', variables);
+      updatePreviewVariables(variables);
     }
-  }, [formattedVariables, isReady]);
+  }, [variables, isReady]);
 
   // Media control functions
   const play = () => {
@@ -238,6 +277,11 @@ export function useCreatomatePreview({
       previewRef.current.play();
     }
   };
+  
+  // Force update variables programmatically (used by parent components)
+  const forceUpdateVariables = (newVars: Record<string, any>) => {
+    return updatePreviewVariables(newVars);
+  };
 
   return {
     isReady,
@@ -253,6 +297,7 @@ export function useCreatomatePreview({
     preview: previewRef.current,
     previewMode,
     retryInitialization,
-    isLoaded: isReady && !isLoading
+    isLoaded: isReady && !isLoading,
+    forceUpdateVariables
   };
 }

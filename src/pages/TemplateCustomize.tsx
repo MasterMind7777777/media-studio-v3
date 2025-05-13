@@ -3,22 +3,22 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TemplateVariablesEditor } from '@/components/Templates/TemplateVariablesEditor';
 import { TemplateHeader } from '@/components/Templates/TemplateHeader';
-import { useCreatomatePreview, useTemplateVariables } from '@/hooks/templates';
+import { useCreatomatePreview, useTemplatePreviewUpdater, useTemplateVariables } from '@/hooks/templates';
 import { useTemplate } from '@/hooks/api/templates/useTemplate';
 import { useCreateRenderJob } from '@/hooks/api/useCreateRenderJob';
 import { toast } from '@/components/ui/use-toast';
 import { MediaAsset } from '@/types';
 import { MediaSelectionDialog } from '@/components/Media/MediaSelectionDialog';
+import { CreatomateLoader } from '@/components/CreatomateLoader';
 
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [variables, setVariables] = useState<Record<string, any>>({});
   const [isRendering, setIsRendering] = useState(false);
-  const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
   const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false);
   const [currentMediaKey, setCurrentMediaKey] = useState<string>('');
+  const [sdkStatus, setSDKStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   // Fetch template data
   const { 
@@ -34,26 +34,52 @@ export default function TemplateCustomize() {
     colorVariables,
     hasVariables
   } = useTemplateVariables(template);
+  
+  // Setup template variables updater
+  const {
+    variables,
+    selectedMedia,
+    isUpdating,
+    handleTextChange,
+    handleColorChange,
+    handleMediaSelected,
+    setVariables
+  } = useTemplatePreviewUpdater({
+    initialVariables: template?.variables || {},
+    onPreviewUpdate: (newVars) => {
+      // This will be called whenever variables change
+      if (creatomatePreview.isReady && creatomatePreview.preview) {
+        console.log('Forcing preview update with new variables');
+        creatomatePreview.forceUpdateVariables(newVars);
+      }
+    }
+  });
 
-  // Set up Creatomate preview
-  const { isLoading: previewLoading } = useCreatomatePreview({
+  // Set up Creatomate preview with improved error handling
+  const creatomatePreview = useCreatomatePreview({
     containerId: 'creatomate-preview',
     templateId: template?.creatomate_template_id,
     variables: variables,
+    onReady: () => {
+      console.log('Preview is ready');
+      setSDKStatus('ready');
+    },
+    onError: (error) => {
+      console.error('Preview error:', error);
+      setSDKStatus('error');
+    }
   });
-
-  // For updating UI state
-  const [isUpdating, setIsUpdating] = useState(false);
 
   // Set up render job creation
   const { mutateAsync: createRenderJob, isPending: isSubmitting } = useCreateRenderJob();
 
   // Handle initial variables
   useEffect(() => {
-    if (template?.variables && Object.keys(variables).length === 0) {
+    if (template?.variables && Object.keys(template.variables).length > 0) {
+      console.log('Setting initial template variables:', template.variables);
       setVariables(template.variables);
     }
-  }, [template, variables]);
+  }, [template?.variables]);
 
   // Handle errors
   useEffect(() => {
@@ -65,56 +91,39 @@ export default function TemplateCustomize() {
     }
   }, [templateError]);
 
-  // Handle text variable changes
-  const handleTextChange = (key: string, value: string) => {
-    setIsUpdating(true);
-    setVariables(prev => ({
-      ...prev,
-      [key]: value
-    }));
-    setIsUpdating(false);
-  };
-
-  // Handle color variable changes
-  const handleColorChange = (key: string, value: string) => {
-    setIsUpdating(true);
-    setVariables(prev => ({
-      ...prev,
-      [key]: value
-    }));
-    setIsUpdating(false);
-  };
-
-  // Open media selection dialog
+  // Handle media select button click
   const handleMediaSelect = (key: string) => {
+    console.log('Opening media selection dialog for:', key);
     setCurrentMediaKey(key);
     setIsMediaDialogOpen(true);
   };
 
-  // Handle media selection
-  const handleMediaSelected = (asset: MediaAsset) => {
-    if (currentMediaKey) {
-      setSelectedMedia(prev => ({
-        ...prev,
-        [currentMediaKey]: asset
-      }));
-
-      setVariables(prev => ({
-        ...prev,
-        [currentMediaKey]: asset.file_url
-      }));
-
-      setIsMediaDialogOpen(false);
+  // Handle media selection from dialog
+  const handleMediaDialogSelect = (asset: MediaAsset) => {
+    if (!currentMediaKey) {
+      console.error('No media key selected');
+      return;
     }
+    
+    console.log(`Media selected from dialog: ${asset.name} for key ${currentMediaKey}`);
+    handleMediaSelected(currentMediaKey, asset);
+    setIsMediaDialogOpen(false);
   };
 
   // Handle render button click
   const handleRender = async () => {
-    if (!template || !id) return;
+    if (!template || !id) {
+      toast({
+        title: 'Cannot start render',
+        description: 'Template information is missing'
+      });
+      return;
+    }
 
     setIsRendering(true);
     
     try {
+      console.log('Starting render with variables:', variables);
       const result = await createRenderJob({
         templateId: id, 
         variables, 
@@ -139,10 +148,13 @@ export default function TemplateCustomize() {
     }
   };
 
-  const isLoading = templateLoading || previewLoading;
+  const isLoading = templateLoading || creatomatePreview.isLoading;
 
   return (
     <div className="container py-8 max-w-7xl">
+      {/* Load the Creatomate SDK */}
+      <CreatomateLoader />
+      
       {template && (
         <TemplateHeader 
           templateName={template.name}
@@ -150,11 +162,26 @@ export default function TemplateCustomize() {
       )}
 
       <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Preview - The CreatomateLoader handles rendering */}
+        {/* Preview */}
         <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80">
+            <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
               <div className="animate-pulse text-muted-foreground">Loading preview...</div>
+            </div>
+          )}
+
+          {sdkStatus === 'error' && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10">
+              <div className="text-destructive mb-2">Failed to load preview</div>
+              <button 
+                className="px-3 py-1 text-sm bg-muted rounded-md hover:bg-muted/80"
+                onClick={() => {
+                  setSDKStatus('loading');
+                  creatomatePreview.retryInitialization();
+                }}
+              >
+                Retry
+              </button>
             </div>
           )}
 
@@ -189,7 +216,7 @@ export default function TemplateCustomize() {
       <MediaSelectionDialog
         open={isMediaDialogOpen}
         onOpenChange={setIsMediaDialogOpen}
-        onSelect={handleMediaSelected}
+        onSelect={handleMediaDialogSelect}
       />
     </div>
   );

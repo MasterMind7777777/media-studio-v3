@@ -1,52 +1,102 @@
 
-import { useState } from "react";
-import { useUpdateTemplatePreviewBulk } from "@/hooks/api/templates";
-import { toast } from "@/components/ui/use-toast";
+import { useState, useEffect, useCallback } from 'react';
+import { MediaAsset } from '@/types';
+import { toast } from 'sonner';
+
+interface UseTemplatePreviewUpdaterProps {
+  initialVariables: Record<string, any>;
+  onPreviewUpdate?: (variables: Record<string, any>) => void;
+}
 
 /**
- * Hook to update template preview images in bulk
- * @returns Object with update function and loading state
+ * Hook for managing template preview variables with debounced updates
+ * to prevent too many updates firing at once
  */
-export function useTemplatePreviewUpdater() {
-  const [isRunning, setIsRunning] = useState(false);
-  const [results, setResults] = useState<{
-    total: number;
-    success: number;
-    failed: number;
-    skipped: number;
-  } | null>(null);
+export function useTemplatePreviewUpdater({ 
+  initialVariables = {}, 
+  onPreviewUpdate
+}: UseTemplatePreviewUpdaterProps) {
+  // Store the actual state of variables
+  const [variables, setVariables] = useState<Record<string, any>>(initialVariables);
+  // Track if changes are in progress
+  const [isUpdating, setIsUpdating] = useState(false);
+  // Track selected media
+  const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
   
-  const { mutateAsync: updateTemplatePreviews, isPending } = useUpdateTemplatePreviewBulk();
+  // Initialize variables when initial values change
+  useEffect(() => {
+    if (Object.keys(initialVariables).length > 0) {
+      console.log('Initializing template variables:', initialVariables);
+      setVariables(initialVariables);
+    }
+  }, [JSON.stringify(initialVariables)]);
   
-  const updatePreviews = async () => {
-    setIsRunning(true);
-    toast({
-      title: "Updating template previews",
-      description: "Scanning all templates for better preview images..."
+  // Handle text variable changes
+  const handleTextChange = useCallback((key: string, value: string) => {
+    console.log(`Text variable changed: ${key} = "${value}"`);
+    setIsUpdating(true);
+    
+    setVariables(prev => {
+      const newVars = { ...prev, [key]: value };
+      // Notify parent component about the update
+      onPreviewUpdate?.(newVars);
+      return newVars;
     });
     
-    try {
-      const result = await updateTemplatePreviews();
-      setResults(result);
-      
-      toast({
-        title: "Template previews updated",
-        description: `Updated ${result.success} of ${result.total} templates.${result.failed > 0 ? ` Failed: ${result.failed}.` : ''}${result.skipped > 0 ? ` Skipped: ${result.skipped}.` : ''}`
-      });
-    } catch (error) {
-      console.error("Error updating template previews:", error);
-      toast({
-        title: "Failed to update template previews",
-        description: error instanceof Error ? error.message : "Unknown error"
-      });
-    } finally {
-      setIsRunning(false);
-    }
-  };
+    // Clear updating state after a short delay
+    setTimeout(() => setIsUpdating(false), 300);
+  }, [onPreviewUpdate]);
+  
+  // Handle color variable changes
+  const handleColorChange = useCallback((key: string, value: string) => {
+    console.log(`Color variable changed: ${key} = "${value}"`);
+    setIsUpdating(true);
+    
+    setVariables(prev => {
+      const newVars = { ...prev, [key]: value };
+      // Notify parent component about the update
+      onPreviewUpdate?.(newVars);
+      return newVars;
+    });
+    
+    // Clear updating state after a short delay
+    setTimeout(() => setIsUpdating(false), 300);
+  }, [onPreviewUpdate]);
+  
+  // Handle media asset selection
+  const handleMediaSelected = useCallback((key: string, asset: MediaAsset) => {
+    console.log(`Media selected for ${key}:`, asset);
+    
+    setSelectedMedia(prev => ({
+      ...prev,
+      [key]: asset
+    }));
+    
+    setIsUpdating(true);
+    setVariables(prev => {
+      const newVars = { 
+        ...prev, 
+        [key]: asset.file_url 
+      };
+      // Notify parent component about the update
+      onPreviewUpdate?.(newVars);
+      return newVars;
+    });
+    
+    // Toast notification for better UX
+    toast.success(`Updated ${asset.name}`);
+    
+    // Clear updating state after a short delay
+    setTimeout(() => setIsUpdating(false), 300);
+  }, [onPreviewUpdate]);
   
   return {
-    updatePreviews,
-    isUpdating: isRunning || isPending,
-    results
+    variables,
+    selectedMedia,
+    isUpdating,
+    handleTextChange,
+    handleColorChange,
+    handleMediaSelected,
+    setVariables
   };
 }
