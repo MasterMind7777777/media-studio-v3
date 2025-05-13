@@ -52,31 +52,50 @@ export const useUpdateTemplate = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ id, ...template }: Partial<Template> & { id: string }) => {
-      // Prepare the template data for Supabase
-      const updateData: any = { ...template };
-      
-      if (template.platforms) {
-        updateData.platforms = template.platforms as unknown as Json;
+    mutationFn: async (updateData: Partial<Template> & { id: string }) => {
+      // Ensure we have the required name field if this is a full template update
+      if (updateData.name === undefined) {
+        // Fetch the current template to get its name
+        const { data: currentTemplate, error: fetchError } = await supabase
+          .from("templates")
+          .select("name")
+          .eq("id", updateData.id)
+          .single();
+          
+        if (fetchError) {
+          throw new Error(`Error fetching template: ${fetchError.message}`);
+        }
+        
+        // Add the current name to our update data
+        updateData.name = currentTemplate.name;
       }
-      if (template.variables) {
-        updateData.variables = template.variables as unknown as Json;
+      
+      // Prepare the template data for Supabase
+      const supabaseUpdateData: any = { ...updateData };
+      
+      // Convert complex objects to Json for Supabase
+      if (updateData.platforms) {
+        supabaseUpdateData.platforms = updateData.platforms as unknown as Json;
+      }
+      if (updateData.variables) {
+        supabaseUpdateData.variables = updateData.variables as unknown as Json;
       }
 
       // If preview_image_url is not provided and we have a template with variables,
       // try to extract a preview image from the variables
-      if (!updateData.preview_image_url && template.variables) {
-        const extractedPreview = getTemplatePreviewImage({...template, id});
+      if (!supabaseUpdateData.preview_image_url && updateData.variables) {
+        const fullTemplate = { ...updateData, id: updateData.id } as Template;
+        const extractedPreview = getTemplatePreviewImage(fullTemplate);
         if (extractedPreview && extractedPreview !== '/placeholder.svg') {
-          updateData.preview_image_url = extractedPreview;
-          console.log(`Auto-extracted preview image for template ${id}: ${extractedPreview}`);
+          supabaseUpdateData.preview_image_url = extractedPreview;
+          console.log(`Auto-extracted preview image for template ${updateData.id}: ${extractedPreview}`);
         }
       }
 
       const { data, error } = await supabase
         .from("templates")
-        .update(updateData)
-        .eq("id", id)
+        .update(supabaseUpdateData)
+        .eq("id", updateData.id)
         .select()
         .single();
         
