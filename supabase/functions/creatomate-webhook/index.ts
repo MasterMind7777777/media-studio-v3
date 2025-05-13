@@ -171,15 +171,11 @@ serve(async (req: Request) => {
       outputUrls[render.id] = render.url;
     }
 
-    // Get the snapshot URL if available
-    const snapshotUrl = render.snapshot_url || render.preview_url || null;
-
     const { error: updateError } = await supabase
       .from('render_jobs')
       .update({
         status: mappedStatus, // Use mapped status
         output_urls: outputUrls,
-        snapshot_url: snapshotUrl, // Save the snapshot URL
         updated_at: new Date().toISOString()
       })
       .eq('id', existingJob.id);

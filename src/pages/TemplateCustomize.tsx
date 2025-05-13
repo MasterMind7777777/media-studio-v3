@@ -1,305 +1,285 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { RenderJob, Platform } from "@/types";
-import { startRenderJob } from "@/services/creatomate";
-import { Json } from "@/integrations/supabase/types";
-import { useEffect } from "react";
 
-// Define status mapping from Creatomate to our database status values
-const mapCreatomateStatus = (status: string): 'pending' | 'processing' | 'completed' | 'failed' => {
-  const statusMap: Record<string, 'pending' | 'processing' | 'completed' | 'failed'> = {
-    'planned': 'pending',
-    'waiting': 'pending',
-    'transcribing': 'processing',
-    'rendering': 'processing',
-    'succeeded': 'completed',
-    'failed': 'failed'
+import { useParams, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useTemplate, useCreateRenderJob, useUpdateTemplate } from "@/hooks/api";
+import { toast } from "@/components/ui/sonner";
+import { MediaAsset, Template } from "@/types";
+import { MediaSelectionDialog } from "@/components/Media/MediaSelectionDialog";
+import { TemplateHeader } from "@/components/Templates/TemplateHeader";
+import { TemplatePreview } from "@/components/Templates/TemplatePreview";
+import { TemplateVariablesEditor } from "@/components/Templates/TemplateVariablesEditor";
+import { useTemplateVariables } from "@/hooks/templates";
+
+export default function TemplateCustomize() {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  
+  // State management
+  const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
+  const [updatedTemplate, setUpdatedTemplate] = useState<Template | null>(null);
+  const [mediaDialogOpen, setMediaDialogOpen] = useState(false);
+  const [currentMediaKey, setCurrentMediaKey] = useState<string>("");
+  
+  // Validate template ID
+  useEffect(() => {
+    if (!id) {
+      console.error("Template ID is missing from route parameters");
+      toast.error("Missing template information", {
+        description: "No template ID was provided."
+      });
+      navigate("/create");
+    } else {
+      console.log(`TemplateCustomize page loaded with template ID: ${id}`);
+    }
+  }, [id, navigate]);
+  
+  // Fetch template data 
+  const { 
+    data: template, 
+    isLoading, 
+    error,
+    isError
+  } = useTemplate(id);
+
+  // API mutations
+  const { 
+    mutate: updateTemplate,
+    isPending: isUpdating
+  } = useUpdateTemplate();
+
+  const { 
+    mutate: createRenderJob, 
+    isPending: isRendering 
+  } = useCreateRenderJob();
+  
+  // Update local state when template data is loaded
+  useEffect(() => {
+    if (template && !updatedTemplate) {
+      console.log(`Template data loaded successfully: ${template.name}`);
+      console.log(`Creatomate template ID: ${template.creatomate_template_id}`);
+      setUpdatedTemplate(template);
+    }
+  }, [template, updatedTemplate]);
+  
+  // Extract variables by type
+  const { textVariables, mediaVariables, colorVariables, hasVariables } = useTemplateVariables(updatedTemplate);
+  
+  // Handle template loading errors
+  useEffect(() => {
+    if (isError && error) {
+      console.error("Template loading error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      if (errorMessage.includes("not found")) {
+        toast.error("Template not found", {
+          description: `The template with ID ${id} could not be found. It may have been deleted or is unavailable.`,
+        });
+      } else {
+        toast.error("Failed to load template", {
+          description: errorMessage
+        });
+      }
+      
+      setTimeout(() => {
+        navigate("/create");
+      }, 1500);
+    }
+  }, [isError, error, id, navigate]);
+
+  // Navigation handler
+  const handleBack = () => {
+    navigate("/create");
   };
   
-  return statusMap[status] || 'pending'; // Default to 'pending' for unknown statuses
-};
-
-// Helper function to transform render job data from Supabase
-const transformRenderJobData = (item: any): RenderJob => ({
-  id: item.id,
-  user_id: item.user_id,
-  template_id: item.template_id,
-  variables: item.variables || {},
-  platforms: Array.isArray(item.platforms) ? item.platforms.map((platform: any) => ({
-    id: platform.id || '',
-    name: platform.name || '',
-    width: platform.width || 0,
-    height: platform.height || 0,
-    aspect_ratio: platform.aspect_ratio || '1:1'
-  })) : [],
-  status: item.status || 'pending',
-  creatomate_render_ids: Array.isArray(item.creatomate_render_ids) ? item.creatomate_render_ids : [],
-  output_urls: item.output_urls || {},
-  snapshot_url: item.snapshot_url || null,
-  name: item.name || null,
-  created_at: item.created_at,
-  updated_at: item.updated_at
-});
-
-/**
- * Hook to fetch all render jobs
- */
-export const useRenderJobs = () => {
-  const queryClient = useQueryClient();
-  
-  // Set up a realtime subscription for render_jobs table
-  useEffect(() => {
-    const channel = supabase
-      .channel('render_jobs_updates')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'render_jobs'
-      }, () => {
-        // When any job is updated (by the webhook), refresh the data
-        queryClient.invalidateQueries({ queryKey: ["renderJobs"] });
-      })
-      .subscribe();
+  // Variable update handlers - FIXED to properly handle keys
+  const handleTextChange = (variableKey: string, value: string) => {
+    if (!updatedTemplate) return;
     
-    // Clean up subscription on unmount
-    return () => {
-      supabase.removeChannel(channel);
+    console.log(`Updating text variable: ${variableKey} = ${value}`);
+    
+    // Use the provided key directly without modification - the key already includes the .text suffix
+    const updatedVariables = {
+      ...updatedTemplate.variables,
+      [variableKey]: value
     };
-  }, [queryClient]);
-
-  return useQuery({
-    queryKey: ["renderJobs"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("render_jobs")
-        .select("id, name, template_id, status, snapshot_url, variables, created_at, output_urls, creatomate_render_ids, platforms")
-        .order("created_at", { ascending: false });
-        
-      if (error) {
-        throw new Error(`Error fetching render jobs: ${error.message}`);
-      }
-      
-      return (data || []).map(item => transformRenderJobData(item));
-    }
-  });
-};
-
-/**
- * Hook to fetch a single render job by ID
- */
-export const useRenderJob = (id: string | undefined) => {
-  const queryClient = useQueryClient();
+    
+    setUpdatedTemplate({
+      ...updatedTemplate,
+      variables: updatedVariables
+    });
+  };
   
-  // Set up a realtime subscription for this render job
-  useEffect(() => {
-    if (!id) return;
+  const handleColorChange = (variableKey: string, value: string) => {
+    if (!updatedTemplate) return;
     
-    // Subscribe to changes for this particular render job
-    const channel = supabase
-      .channel(`render_job_${id}`)
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'render_jobs',
-        filter: `id=eq.${id}`
-      }, (payload) => {
-        // When the job is updated (by the webhook), refresh the data
-        queryClient.invalidateQueries({ queryKey: ["renderJobs", id] });
-      })
-      .subscribe();
+    console.log(`Updating color variable: ${variableKey} = ${value}`);
     
-    // Clean up subscription on unmount
-    return () => {
-      supabase.removeChannel(channel);
+    // Use the provided key directly without modification - the key already includes the .fill suffix
+    const updatedVariables = {
+      ...updatedTemplate.variables,
+      [variableKey]: value
     };
-  }, [id, queryClient]);
+    
+    setUpdatedTemplate({
+      ...updatedTemplate,
+      variables: updatedVariables
+    });
+  };
   
-  return useQuery({
-    queryKey: ["renderJobs", id],
-    queryFn: async () => {
-      if (!id) throw new Error("Render Job ID is required");
-      
-      const { data, error } = await supabase
-        .from("render_jobs")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-        
-      if (error) {
-        throw new Error(`Error fetching render job: ${error.message}`);
-      }
-      
-      if (!data) {
-        throw new Error(`Render job not found with ID: ${id}`);
-      }
-      
-      return transformRenderJobData(data);
-    },
-    enabled: !!id
-  });
-};
-
-/**
- * Hook to create a new render job
- */
-export const useCreateRenderJob = () => {
-  const queryClient = useQueryClient();
+  // Media selection handlers
+  const handleMediaSelect = (variableKey: string) => {
+    setCurrentMediaKey(variableKey);
+    setMediaDialogOpen(true);
+  };
   
-  return useMutation({
-    mutationFn: async ({ 
-      templateId, 
-      variables, 
-      platforms 
-    }: { 
-      templateId: string, 
-      variables: Record<string, any>, 
-      platforms: Platform[] 
-    }) => {
-      // First, fetch the template to get the Creatomate template ID
-      const { data: templateData, error: templateError } = await supabase
-        .from("templates")
-        .select("id, creatomate_template_id, name")
-        .eq("id", templateId)
-        .maybeSingle();
-        
-      if (templateError) {
-        throw new Error(`Error fetching template: ${templateError.message}`);
+  const handleMediaDialogSelect = (mediaAsset: MediaAsset) => {
+    if (!currentMediaKey || !updatedTemplate) return;
+    
+    console.log(`Selected media for ${currentMediaKey}: ${mediaAsset.name}`);
+    
+    // Update the selected media
+    setSelectedMedia({
+      ...selectedMedia,
+      [currentMediaKey]: mediaAsset
+    });
+    
+    // Update the template variable with the media URL
+    setUpdatedTemplate({
+      ...updatedTemplate,
+      variables: {
+        ...updatedTemplate.variables,
+        [currentMediaKey]: mediaAsset.file_url
       }
-      
-      if (!templateData) {
-        throw new Error(`Template not found with ID: ${templateId}`);
-      }
-      
-      const creatomateTemplateId = templateData.creatomate_template_id;
-      
-      if (!creatomateTemplateId) {
-        throw new Error(`Template "${templateData.name}" doesn't have a valid Creatomate template ID`);
-      }
+    });
+    
+    toast.success("Media selected", {
+      description: `${mediaAsset.name} added to ${currentMediaKey.replace(/_/g, ' ')}`
+    });
+  };
 
-      console.log(`Starting render for template ${templateId} with Creatomate ID: ${creatomateTemplateId}`);
-      
-      try {
-        // Need to get the current user ID
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error("User not authenticated");
-        
-        // Create a record in the render_jobs table FIRST
-        const { data: renderJob, error: createError } = await supabase
-          .from("render_jobs")
-          .insert([{
-            user_id: user.id,
-            template_id: templateId,
-            variables: variables as Json,
-            platforms: platforms as unknown as Json,
-            status: 'pending',  // Start with pending status
-            creatomate_render_ids: [], // Will be populated after Creatomate response
-            output_urls: {} as Json
-          }])
-          .select()
-          .single();
+  // Render handler
+  const handleRender = () => {
+    if (updatedTemplate && JSON.stringify(template?.variables) !== JSON.stringify(updatedTemplate.variables)) {
+      updateTemplate({
+        id: updatedTemplate.id,
+        variables: updatedTemplate.variables
+      }, {
+        onSuccess: () => {
+          toast.success("Template updated", {
+            description: "Your changes have been saved."
+          });
           
-        if (createError) {
-          throw new Error(`Error creating render job: ${createError.message}`);
+          // Start the render job after saving the template
+          startRender();
+        },
+        onError: (error) => {
+          toast.error("Failed to save changes", {
+            description: error.message
+          });
         }
-
-        if (!renderJob) {
-          throw new Error('Failed to create render job in database');
-        }
-        
-        // Start the render job with Creatomate using the creatomate_template_id (not the database ID)
-        // Pass the database job ID to link Creatomate renders to our database record
-        const renderIds = await startRenderJob(
-          creatomateTemplateId, 
-          variables, 
-          platforms,
-          renderJob.id // Pass our database ID to Creatomate
-        );
-        
-        // Update the render job with the Creatomate render IDs
-        const { error: updateError } = await supabase
-          .from("render_jobs")
-          .update({
-            creatomate_render_ids: renderIds,
-          })
-          .eq("id", renderJob.id);
-          
-        if (updateError) {
-          console.error("Error updating render job with Creatomate IDs:", updateError);
-          // Continue anyway as this isn't critical
-        }
-        
-        return transformRenderJobData(renderJob);
-      } catch (error) {
-        console.error("Failed to start render job:", error);
-        throw error;
-      }
-    },
-    onSuccess: () => {
-      // Invalidate render jobs query to refetch data
-      queryClient.invalidateQueries({ queryKey: ["renderJobs"] });
+      });
+    } else {
+      // If no changes, just start the render
+      startRender();
     }
-  });
-};
-
-/**
- * Hook to update a render job
- */
-export const useUpdateRenderJob = () => {
-  const queryClient = useQueryClient();
+  };
   
-  return useMutation({
-    mutationFn: async ({ id, ...renderJob }: Partial<RenderJob> & { id: string }) => {
-      // Convert Platform[] to Json for Supabase
-      const updateData: any = { ...renderJob };
-      if (renderJob.platforms) {
-        updateData.platforms = renderJob.platforms as unknown as Json;
+  const startRender = () => {
+    if (!updatedTemplate) return;
+    
+    createRenderJob({
+      templateId: updatedTemplate.id,
+      variables: updatedTemplate.variables,
+      platforms: updatedTemplate.platforms
+    }, {
+      onSuccess: (renderJob) => {
+        toast.success("Render started", {
+          description: "Your render job has been created and is processing."
+        });
+        navigate(`/projects?job=${renderJob.id}`);
+      },
+      onError: (error) => {
+        toast.error("Failed to start render", {
+          description: error.message
+        });
       }
-      if (renderJob.variables) {
-        updateData.variables = renderJob.variables as unknown as Json;
-      }
-      if (renderJob.output_urls) {
-        updateData.output_urls = renderJob.output_urls as unknown as Json;
-      }
+    });
+  };
 
-      const { data, error } = await supabase
-        .from("render_jobs")
-        .update(updateData)
-        .eq("id", id)
-        .select()
-        .single();
-        
-      if (error) {
-        throw new Error(`Error updating render job: ${error.message}`);
-      }
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-[70vh]">
+        <div className="text-center">
+          <div className="mb-4">Loading template...</div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-studio-600 mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+  
+  if (!template || !updatedTemplate) {
+    return null; // Return null while redirect happens via the useEffect
+  }
+
+  return (
+    <div className="flex flex-col gap-6 p-4 md:p-8">
+      <TemplateHeader 
+        templateName={template.name}
+        onBack={handleBack}
+      />
       
-      return transformRenderJobData(data);
-    },
-    onSuccess: (_, variables) => {
-      // Invalidate specific render job query and list
-      queryClient.invalidateQueries({ queryKey: ["renderJobs", variables.id] });
-      queryClient.invalidateQueries({ queryKey: ["renderJobs"] });
-    }
-  });
-};
-
-// Note: The checkRenderStatus hook is now deprecated as we're using webhooks instead
-// We'll keep it for backward compatibility but mark it as deprecated
-/**
- * @deprecated Use webhook approach instead
- * Hook to check render status and update job
- */
-export const useCheckRenderStatus = () => {
-  console.warn("useCheckRenderStatus is deprecated. The application now uses webhooks for status updates.");
-  
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: async (renderJob: RenderJob) => {
-      // Simply return the render job as is, since webhooks will handle status updates
-      return renderJob;
-    },
-    onSuccess: (data) => {
-      // No action needed - webhooks will update the status
-    }
-  });
-};
+      {/* Main content area with preview and editing panel */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* Preview Section */}
+        <div className="md:col-span-8">
+          <TemplatePreview 
+            previewImageUrl={updatedTemplate.preview_image_url}
+            width={updatedTemplate.platforms[0]?.width}
+            height={updatedTemplate.platforms[0]?.height}
+            templateId={updatedTemplate.id}
+            creatomateTemplateId={updatedTemplate.creatomate_template_id}
+            variables={updatedTemplate.variables}
+          />
+          
+          {/* Debug information - this will help troubleshoot preview issues */}
+          <div className="mt-2 p-4 bg-muted/20 rounded border text-sm">
+            <div className="font-medium mb-1">Preview Information:</div>
+            <div>Database Template ID: {updatedTemplate.id}</div>
+            <div className={updatedTemplate.creatomate_template_id ? 'text-green-600' : 'text-red-500 font-medium'}>
+              Creatomate Template ID: {updatedTemplate.creatomate_template_id || 'Missing!'}
+            </div>
+            <div className={hasVariables ? 'text-green-600' : 'text-yellow-500'}>
+              Variables: {hasVariables ? 'Available' : 'None defined'}
+            </div>
+          </div>
+        </div>
+        
+        {/* Editing Panel */}
+        <div className="md:col-span-4">
+          <TemplateVariablesEditor
+            textVariables={textVariables}
+            mediaVariables={mediaVariables}
+            colorVariables={colorVariables}
+            platforms={updatedTemplate.platforms}
+            selectedMedia={selectedMedia}
+            onTextChange={handleTextChange}
+            onColorChange={handleColorChange}
+            onMediaSelect={handleMediaSelect}
+            isRendering={isRendering}
+            isUpdating={isUpdating}
+            onRender={handleRender}
+          />
+        </div>
+      </div>
+      
+      {/* Media Selection Dialog */}
+      <MediaSelectionDialog 
+        open={mediaDialogOpen}
+        onOpenChange={setMediaDialogOpen}
+        onMediaSelect={handleMediaDialogSelect}
+        title={`Select Media for ${currentMediaKey?.replace(/_/g, ' ') || ''}`}
+      />
+    </div>
+  );
+}

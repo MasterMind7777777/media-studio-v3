@@ -112,10 +112,8 @@ export type Database = {
           created_at: string | null
           creatomate_render_ids: string[] | null
           id: string
-          name: string | null
           output_urls: Json | null
           platforms: Json | null
-          snapshot_url: string | null
           status: string | null
           template_id: string
           updated_at: string | null
@@ -126,10 +124,8 @@ export type Database = {
           created_at?: string | null
           creatomate_render_ids?: string[] | null
           id?: string
-          name?: string | null
           output_urls?: Json | null
           platforms?: Json | null
-          snapshot_url?: string | null
           status?: string | null
           template_id: string
           updated_at?: string | null
@@ -140,10 +136,8 @@ export type Database = {
           created_at?: string | null
           creatomate_render_ids?: string[] | null
           id?: string
-          name?: string | null
           output_urls?: Json | null
           platforms?: Json | null
-          snapshot_url?: string | null
           status?: string | null
           template_id?: string
           updated_at?: string | null
