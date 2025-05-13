@@ -3,10 +3,9 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TemplateVariablesEditor } from '@/components/Templates/TemplateVariablesEditor';
 import { TemplateHeader } from '@/components/Templates/TemplateHeader';
-import { useCreatomatePreview, useTemplateVariables } from '@/hooks/templates';
+import { useCreatomatePreview } from '@/hooks/templates';
 import { useTemplate, useCreateRenderJob } from '@/hooks/api';
 import { toast } from '@/hooks/use-toast';
-import { MediaAsset } from '@/types';
 
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
@@ -14,7 +13,6 @@ export default function TemplateCustomize() {
 
   const [variables, setVariables] = useState<Record<string, any>>({});
   const [isRendering, setIsRendering] = useState(false);
-  const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
 
   // Fetch template data
   const { 
@@ -22,13 +20,6 @@ export default function TemplateCustomize() {
     isLoading: templateLoading, 
     error: templateError 
   } = useTemplate(id);
-
-  // Extract template variables
-  const { 
-    textVariables, 
-    mediaVariables, 
-    colorVariables 
-  } = useTemplateVariables(template);
 
   // Set up Creatomate preview
   const { isLoading: previewLoading } = useCreatomatePreview({
@@ -56,29 +47,6 @@ export default function TemplateCustomize() {
       });
     }
   }, [templateError]);
-
-  // Handle text variable changes
-  const handleTextChange = (key: string, value: string) => {
-    setVariables(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  // Handle color variable changes
-  const handleColorChange = (key: string, value: string) => {
-    setVariables(prev => ({
-      ...prev,
-      [key]: value
-    }));
-  };
-
-  // Handle media variable changes
-  const handleMediaSelect = (key: string) => {
-    // Here we would typically open a media selection dialog
-    // For now, we'll just log that the user wants to change media
-    console.log(`Media selection requested for ${key}`);
-  };
 
   // Handle render button click
   const handleRender = async () => {
@@ -118,6 +86,7 @@ export default function TemplateCustomize() {
       {template && (
         <TemplateHeader 
           templateName={template.name}
+          // Remove the Render Video button from here
         />
       )}
 
@@ -141,16 +110,16 @@ export default function TemplateCustomize() {
         <div className="relative">
           {template && (
             <TemplateVariablesEditor
-              textVariables={textVariables}
-              mediaVariables={mediaVariables}
-              colorVariables={colorVariables}
+              textVariables={[]}
+              mediaVariables={[]}
+              colorVariables={[]}
               platforms={template.platforms || []}
-              selectedMedia={selectedMedia}
-              onTextChange={handleTextChange}
-              onColorChange={handleColorChange}
-              onMediaSelect={handleMediaSelect}
+              selectedMedia={{}}
+              onTextChange={() => {}}
+              onColorChange={() => {}}
+              onMediaSelect={() => {}}
               isRendering={isRendering}
-              isUpdating={isSubmitting}
+              isUpdating={false}
               onRender={handleRender}
             />
           )}
