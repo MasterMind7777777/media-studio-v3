@@ -2,6 +2,97 @@
 import { Template, RenderJob } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { isImageUrl, isAudioUrl } from "@/lib/utils";
+import { z } from "zod";
+import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
+
+/**
+ * Zod schema definitions for Creatomate API responses
+ */
+
+// Schema for Creatomate Render object
+export const RenderSchema = z.object({
+  id: z.string(),
+  status: z.enum(['queued', 'waiting', 'planned', 'transcribing', 'rendering', 'succeeded', 'failed']),
+  url: z.string().url().optional(),
+  snapshot_url: z.string().url().optional(),
+  preview_url: z.string().url().optional(),
+  progress: z.number().optional(),
+  error_message: z.string().optional(),
+  output_format: z.enum(['jpg', 'png', 'gif', 'mp4']).optional(),
+  width: z.number().optional(),
+  height: z.number().optional(),
+  metadata: z.string().optional(),
+  template_id: z.string().optional(),
+  template_name: z.string().optional(),
+  created_at: z.string().datetime().optional()
+});
+
+// Schema for Creatomate Template object
+export const TemplateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  preview_url: z.string().url().optional(),
+  snapshot_url: z.string().url().optional(),
+  source: z.record(z.any()).optional(),
+  elements: z.array(z.record(z.any())).optional(),
+  outputs: z.array(z.record(z.any())).optional(),
+  width: z.number().optional(),
+  height: z.number().optional()
+});
+
+// Type definitions derived from schemas
+export type CreatomateRender = z.infer<typeof RenderSchema>;
+export type CreatomateTemplate = z.infer<typeof TemplateSchema>;
+
+// Parameters for render creation
+export interface RenderParams {
+  template_id?: string;
+  source?: Record<string, any>;
+  modifications?: Record<string, any>;
+  output_format?: 'jpg' | 'png' | 'gif' | 'mp4';
+  width?: number;
+  height?: number;
+  render_scale?: number;
+  max_width?: number;
+  max_height?: number;
+  webhook_url?: string;
+  metadata?: string;
+  // Allow for future parameters
+  [key: string]: unknown;
+}
+
+/**
+ * Helper function to clean up variables before sending to Creatomate API
+ */
+function cleanupVariables(variables: Record<string, any>): Record<string, any> {
+  const cleanVars: Record<string, any> = {};
+  
+  // Process each variable to ensure we don't have duplicated keys
+  Object.entries(variables).forEach(([key, value]) => {
+    // Skip null/undefined values
+    if (value === null || value === undefined) {
+      return;
+    }
+    
+    // Fix duplicated suffixes (like .text.text becoming just .text)
+    const suffixes = ['.text', '.fill', '.source'];
+    
+    let cleanKey = key;
+    suffixes.forEach(suffix => {
+      // Check if key has duplicate suffixes (e.g., "Heading.text.text")
+      const regex = new RegExp(`(${suffix.replace('.', '\\.')})+$`);
+      if (regex.test(key)) {
+        cleanKey = key.replace(regex, suffix);
+      }
+    });
+    
+    // Store with clean key
+    cleanVars[cleanKey] = value;
+  });
+  
+  return cleanVars;
+}
 
 /**
  * Fetches templates from Creatomate via our secure Edge Function
@@ -170,38 +261,6 @@ export async function startRenderJob(
 }
 
 /**
- * Helper function to clean up variables before sending to Creatomate API
- */
-function cleanupVariables(variables: Record<string, any>): Record<string, any> {
-  const cleanVars: Record<string, any> = {};
-  
-  // Process each variable to ensure we don't have duplicated keys
-  Object.entries(variables).forEach(([key, value]) => {
-    // Skip null/undefined values
-    if (value === null || value === undefined) {
-      return;
-    }
-    
-    // Fix duplicated suffixes (like .text.text becoming just .text)
-    const suffixes = ['.text', '.fill', '.source'];
-    
-    let cleanKey = key;
-    suffixes.forEach(suffix => {
-      // Check if key has duplicate suffixes (e.g., "Heading.text.text")
-      const regex = new RegExp(`(${suffix.replace('.', '\\.')})+$`);
-      if (regex.test(key)) {
-        cleanKey = key.replace(regex, suffix);
-      }
-    });
-    
-    // Store with clean key
-    cleanVars[cleanKey] = value;
-  });
-  
-  return cleanVars;
-}
-
-/**
  * Updates preview images for templates by scanning variables or output URLs
  */
 export async function updateTemplatePreviews(): Promise<{
@@ -228,3 +287,4 @@ export async function updateTemplatePreviews(): Promise<{
     throw error;
   }
 }
+

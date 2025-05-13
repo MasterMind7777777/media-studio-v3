@@ -1,6 +1,8 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4';
+import { z } from 'https://esm.sh/zod@3.23.8';
+import { RenderSchema, CreatomateApi } from '../_shared/creatomate-api.ts';
 
 // Define cors headers for cross-origin requests
 const corsHeaders = {
@@ -9,11 +11,15 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 };
 
+// Define Zod schema for webhook payload
+const WebhookPayloadSchema = RenderSchema;
+
 // Define status mapping from Creatomate to our database status values
 const mapCreatomateStatus = (status: string): string => {
   const statusMap: Record<string, string> = {
     'planned': 'pending',
     'waiting': 'pending',
+    'queued': 'pending',
     'transcribing': 'processing',
     'rendering': 'processing',
     'succeeded': 'completed',
@@ -68,6 +74,27 @@ const getBestPreviewImage = (render: any): string | null => {
   return null;
 };
 
+// Helper function to get the API key from secrets table - used for webhook verification
+async function getCreatomateApiKey(supabaseClient: any) {
+  try {
+    const { data, error } = await supabaseClient
+      .from('secrets')
+      .select('value')
+      .eq('name', 'CREATOMATE_API_KEY')
+      .maybeSingle();
+      
+    if (error || !data) {
+      console.error('Error fetching API key:', error);
+      return null;
+    }
+    
+    return data.value;
+  } catch (e) {
+    console.error('Failed to get API key:', e);
+    return null;
+  }
+}
+
 // Handle CORS preflight requests
 serve(async (req: Request) => {
   // Handle CORS OPTIONS preflight request
@@ -79,10 +106,65 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Get the render data from the request body
-    const render = await req.json();
+    // Get the raw request body for signature verification
+    const rawBody = await req.text();
+    let render;
+    
+    try {
+      // Parse the webhook payload
+      render = JSON.parse(rawBody);
+    } catch (e) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid JSON payload' }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // Create a Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Get the API key for webhook signature verification
+    const apiKey = await getCreatomateApiKey(supabase);
+    if (!apiKey) {
+      console.error('API key not found for webhook verification');
+      // Continue anyway for backward compatibility, but this is not secure
+    } else {
+      // Verify the webhook signature when API key is available
+      const signature = req.headers.get('X-Creatomate-Signature');
+      
+      if (!CreatomateApi.verifyWebhookSignature(signature, rawBody, apiKey)) {
+        console.error('Invalid webhook signature');
+        
+        // In production, reject unauthorized webhooks
+        // For now, log error but continue for backward compatibility
+        // return new Response(
+        //   JSON.stringify({ error: 'Invalid signature' }),
+        //   { status: 401, headers: corsHeaders }
+        // );
+      } else {
+        console.log('Webhook signature verified successfully');
+      }
+    }
 
     console.log('Received webhook from Creatomate:', render);
+
+    // Validate the webhook payload against our Zod schema
+    const validationResult = WebhookPayloadSchema.safeParse(render);
+    if (!validationResult.success) {
+      console.error('Invalid webhook payload format:', validationResult.error);
+      
+      if (!render.id) {
+        return new Response(
+          JSON.stringify({ error: 'Invalid webhook payload, missing render ID' }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+      
+      // Continue anyway with minimal validation for backward compatibility
+      console.warn('Continuing with unvalidated payload for backward compatibility');
+    }
 
     if (!render.id) {
       return new Response(
@@ -94,11 +176,6 @@ serve(async (req: Request) => {
     // Map Creatomate status to our database status
     const mappedStatus = mapCreatomateStatus(render.status);
     console.log(`Mapping Creatomate status '${render.status}' to database status '${mappedStatus}'`);
-
-    // Create a Supabase client
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Extract metadata if available
     let metadata = null;

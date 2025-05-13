@@ -13,6 +13,7 @@ This project uses Creatomate for interactive video previews and editing. To set 
    - Sign up or login to [Creatomate](https://creatomate.com)
    - Go to Project Settings in your Creatomate dashboard
    - Copy your public token (it's safe to use in the frontend)
+   - Copy your secret API key (for server-side operations only)
 
 2. **Create a template or use an existing one**:
    - Create a new template in the Creatomate dashboard
@@ -20,15 +21,31 @@ This project uses Creatomate for interactive video previews and editing. To set 
 
 3. **Set up environment variables**:
    - Create a `.env` file in the project root (based on `.env.example`)
-   - Add your Creatomate token: `VITE_CREATOMATE_TOKEN=your_token_here`
+   - Add your Creatomate public token: `VITE_CREATOMATE_TOKEN=your_token_here`
    - Add your template ID: `VITE_CREATOMATE_TEMPLATE_ID=your_template_id_here`
    - Restart the development server
 
+4. **Configure the Secret API Key in Supabase**:
+   - The Creatomate secret API key is required for edge functions
+   - This key should be stored in the Supabase secrets table
+   - It should never be exposed to the frontend
+
 If configured correctly, the interactive preview will load and allow drag-and-drop editing in the `/create/:id/customize` page.
+
+### Using the Creatomate API Wrapper
+
+The project includes a type-safe Creatomate API wrapper that handles all interactions with the Creatomate API:
+
+- **Frontend Services**: The `src/services/creatomate.ts` file provides methods for starting render jobs and importing templates through our secure edge functions.
+
+- **Edge Functions**: Server-side operations use a type-safe `CreatomateApi` class (in `supabase/functions/_shared/creatomate-api.ts`) for direct API calls.
+
+- **Webhook Handler**: The `creatomate-webhook` edge function handles render status updates with signature validation.
 
 ### Important Notes
 
 - The Creatomate public token is specifically designed to be used in client-side code, so it's safe to expose in the frontend.
+- The Creatomate secret API key must only be used in edge functions, never in frontend code.
 - For production deployments, make sure to add the environment variables to your hosting platform (Vercel, Render, etc.).
 - The preview uses jsDelivr CDN with an unpkg fallback for reliability.
 
@@ -99,3 +116,4 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+

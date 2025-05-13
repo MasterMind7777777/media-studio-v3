@@ -1,4 +1,6 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.4'
+import { CreatomateApi, RenderParams } from '../_shared/creatomate-api.ts';
 
 // Define necessary types directly in the edge function
 interface Platform {
@@ -102,25 +104,27 @@ function extractVariablesFromCurl(text: string): Record<string, any> | null {
 }
 
 // Helper function to get test render info for a template to extract variable modifications
-async function getTemplateRenderInfo(templateId: string, apiKey: string) {
+async function getTemplateRenderInfo(templateId: string, creatomateApi: CreatomateApi) {
   try {
     console.log(`Fetching render examples for template ${templateId}`);
-    const response = await fetch(`https://api.creatomate.com/v1/renders?template_id=${templateId}&limit=1`, {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      }
+    
+    // Use our API wrapper instead of direct fetch
+    const renders = await creatomateApi.getRenders({ 
+      template_id: templateId,
+      limit: 1
     });
     
-    if (!response.ok) {
-      console.log(`Could not fetch render examples for template ${response.status}`);
-      return null;
-    }
-    
-    const data = await response.json();
-    if (data.renders && data.renders.length > 0 && data.renders[0].modifications) {
-      console.log('Found render example with modifications:', data.renders[0].modifications);
-      return data.renders[0].modifications;
+    if (renders && renders.length > 0 && renders[0].metadata) {
+      try {
+        // Try to parse metadata as JSON containing modifications
+        const metadata = JSON.parse(renders[0].metadata);
+        if (metadata.modifications) {
+          console.log('Found render example with modifications:', metadata.modifications);
+          return metadata.modifications;
+        }
+      } catch (e) {
+        console.log('Metadata is not valid JSON or does not contain modifications');
+      }
     }
     
     return null;
@@ -207,6 +211,7 @@ const mapCreatomateStatus = (status: string): string => {
   const statusMap: Record<string, string> = {
     'planned': 'pending',
     'waiting': 'pending',
+    'queued': 'pending',
     'transcribing': 'processing',
     'rendering': 'processing',
     'succeeded': 'completed',
@@ -257,6 +262,9 @@ Deno.serve(async (req) => {
       );
     }
     
+    // Initialize the Creatomate API client
+    const creatomateApi = new CreatomateApi(apiKey);
+    
     // Get the site URL for webhook
     const siteUrl = Deno.env.get('SITE_URL');
     if (!siteUrl) {
@@ -297,163 +305,155 @@ Deno.serve(async (req) => {
         }
       }
       
-      // Fetch template from Creatomate API
-      const response = await fetch(`https://api.creatomate.com/v1/templates/${templateId}`, {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (!response.ok) {
-        console.error('Creatomate API error:', response.status, response.statusText);
-        const errorText = await response.text();
-        console.error('Error response body:', errorText);
-        return new Response(
-          JSON.stringify({ error: `Creatomate API error: ${response.statusText}` }),
-          { status: response.status, headers: corsHeaders }
-        );
-      }
-      
-      const templateData = await response.json();
-      console.log('Template data structure:', JSON.stringify(templateData, null, 2));
-      
-      // Extract platforms (resolutions) from the template
-      let platforms: Platform[] = [];
-      
-      // Check if templateData.outputs exists before mapping
-      if (templateData.outputs && Array.isArray(templateData.outputs)) {
-        platforms = templateData.outputs.map((output: any) => ({
-          id: output.id || crypto.randomUUID(),
-          name: output.name || `${output.width}x${output.height}`,
-          width: output.width,
-          height: output.height,
-          aspect_ratio: `${output.width}:${output.height}`
-        }));
-      } else {
-        // Create a default platform if no outputs are provided
-        // Check if we can get dimensions from the template itself
-        let width = 1920;
-        let height = 1080;
+      // Fetch template from Creatomate API using our wrapper
+      try {
+        const templateData = await creatomateApi.getTemplate(templateId);
+        console.log('Template data structure:', JSON.stringify(templateData, null, 2));
         
-        if (templateData.source && templateData.source.width && templateData.source.height) {
-          width = templateData.source.width;
-          height = templateData.source.height;
-        } else if (templateData.width && templateData.height) {
-          width = templateData.width;
-          height = templateData.height;
-        }
+        // Extract platforms (resolutions) from the template
+        let platforms: Platform[] = [];
         
-        platforms = [{
-          id: crypto.randomUUID(),
-          name: `${width}x${height}`,
-          width,
-          height,
-          aspect_ratio: `${width}:${height}`
-        }];
-        
-        console.log('Created default platform:', platforms[0]);
-      }
-      
-      // Initialize variables object
-      const variables: Record<string, any> = {};
-      
-      // 1. First use the variables provided in the curl command if available
-      if (curlModifications) {
-        Object.entries(curlModifications).forEach(([key, value]) => {
-          variables[key] = value;
-        });
-        console.log('Added variables from curl command:', variables);
-      }
-      
-      // 2. Extract variables from template elements
-      let elementsToProcess: any[] = [];
-      
-      // Get elements from the right place in the structure
-      if (templateData.source && templateData.source.elements) {
-        elementsToProcess = templateData.source.elements;
-        console.log('Using templateData.source.elements for variable extraction');
-      } else if (templateData.elements) {
-        elementsToProcess = templateData.elements;
-        console.log('Using templateData.elements for variable extraction');
-      }
-      
-      // Process elements to extract variables
-      if (elementsToProcess.length > 0) {
-        const elementVariables = extractVariablesFromElements(elementsToProcess);
-        
-        // Add element variables that don't already exist from curl command
-        Object.entries(elementVariables).forEach(([key, value]) => {
-          if (!variables[key]) {
-            variables[key] = value;
+        // Check if templateData.outputs exists before mapping
+        if (templateData.outputs && Array.isArray(templateData.outputs)) {
+          platforms = templateData.outputs.map((output: any) => ({
+            id: output.id || crypto.randomUUID(),
+            name: output.name || `${output.width}x${output.height}`,
+            width: output.width,
+            height: output.height,
+            aspect_ratio: `${output.width}:${output.height}`
+          }));
+        } else {
+          // Create a default platform if no outputs are provided
+          // Check if we can get dimensions from the template itself
+          let width = 1920;
+          let height = 1080;
+          
+          if (templateData.source && templateData.source.width && templateData.source.height) {
+            width = templateData.source.width;
+            height = templateData.source.height;
+          } else if (templateData.width && templateData.height) {
+            width = templateData.width;
+            height = templateData.height;
           }
-        });
+          
+          platforms = [{
+            id: crypto.randomUUID(),
+            name: `${width}x${height}`,
+            width,
+            height,
+            aspect_ratio: `${width}:${height}`
+          }];
+          
+          console.log('Created default platform:', platforms[0]);
+        }
         
-        console.log('Extracted variables from elements:', elementVariables);
-      } else {
-        console.log('No elements found for variable extraction');
-      }
-      
-      // 3. Additionally, try to fetch a sample render for this template to extract modification variables
-      const renderModifications = await getTemplateRenderInfo(templateId, apiKey);
-      
-      if (renderModifications) {
-        // Add all modifications as variables if they don't exist yet
-        Object.entries(renderModifications).forEach(([key, value]) => {
-          if (typeof value === 'string' || typeof value === 'number') {
+        // Initialize variables object
+        const variables: Record<string, any> = {};
+        
+        // 1. First use the variables provided in the curl command if available
+        if (curlModifications) {
+          Object.entries(curlModifications).forEach(([key, value]) => {
+            variables[key] = value;
+          });
+          console.log('Added variables from curl command:', variables);
+        }
+        
+        // 2. Extract variables from template elements
+        let elementsToProcess: any[] = [];
+        
+        // Get elements from the right place in the structure
+        if (templateData.source && templateData.source.elements) {
+          elementsToProcess = templateData.source.elements;
+          console.log('Using templateData.source.elements for variable extraction');
+        } else if (templateData.elements) {
+          elementsToProcess = templateData.elements;
+          console.log('Using templateData.elements for variable extraction');
+        }
+        
+        // Process elements to extract variables
+        if (elementsToProcess.length > 0) {
+          const elementVariables = extractVariablesFromElements(elementsToProcess);
+          
+          // Add element variables that don't already exist from curl command
+          Object.entries(elementVariables).forEach(([key, value]) => {
             if (!variables[key]) {
               variables[key] = value;
             }
-          }
-        });
-        console.log('Added variables from render example:', renderModifications);
-      }
-      
-      // 4. If we still don't have variables, try to parse from curl examples in the description
-      if (Object.keys(variables).length === 0 && templateData.description) {
-        const descriptionVariables = extractVariablesFromCurl(templateData.description);
+          });
+          
+          console.log('Extracted variables from elements:', elementVariables);
+        } else {
+          console.log('No elements found for variable extraction');
+        }
         
-        if (descriptionVariables) {
-          Object.entries(descriptionVariables).forEach(([key, value]) => {
-            if (!variables[key] && (typeof value === 'string' || typeof value === 'number')) {
-              variables[key] = value;
+        // 3. Additionally, try to fetch a sample render for this template to extract modification variables
+        const renderModifications = await getTemplateRenderInfo(templateId, creatomateApi);
+        
+        if (renderModifications) {
+          // Add all modifications as variables if they don't exist yet
+          Object.entries(renderModifications).forEach(([key, value]) => {
+            if (typeof value === 'string' || typeof value === 'number') {
+              if (!variables[key]) {
+                variables[key] = value;
+              }
             }
           });
-          console.log('Parsed variables from template description:', descriptionVariables);
-        } else {
-          console.log('No variables found in template description');
+          console.log('Added variables from render example:', renderModifications);
         }
-      }
-      
-      console.log('Final extracted variables:', variables);
-      
-      // Create a new template in the database
-      const template = {
-        name: templateData.name || `Template ${templateId}`,
-        description: templateData.description || `Template for various sizes`,
-        preview_image_url: templateData.preview_url || '',
-        creatomate_template_id: templateData.id || templateId,
-        variables,
-        platforms,
-        category: 'Imported',
-        is_active: true
-      };
-      
-      const { data, error } = await supabase
-        .from('templates')
-        .insert([template])
-        .select()
-        .single();
         
-      if (error) {
-        console.error('Database error:', error);
+        // 4. If we still don't have variables, try to parse from curl examples in the description
+        if (Object.keys(variables).length === 0 && templateData.description) {
+          const descriptionVariables = extractVariablesFromCurl(templateData.description);
+          
+          if (descriptionVariables) {
+            Object.entries(descriptionVariables).forEach(([key, value]) => {
+              if (!variables[key] && (typeof value === 'string' || typeof value === 'number')) {
+                variables[key] = value;
+              }
+            });
+            console.log('Parsed variables from template description:', descriptionVariables);
+          } else {
+            console.log('No variables found in template description');
+          }
+        }
+        
+        console.log('Final extracted variables:', variables);
+        
+        // Create a new template in the database
+        const template = {
+          name: templateData.name || `Template ${templateId}`,
+          description: templateData.description || `Template for various sizes`,
+          preview_image_url: templateData.preview_url || '',
+          creatomate_template_id: templateData.id || templateId,
+          variables,
+          platforms,
+          category: 'Imported',
+          is_active: true
+        };
+        
+        const { data, error } = await supabase
+          .from('templates')
+          .insert([template])
+          .select()
+          .single();
+          
+        if (error) {
+          console.error('Database error:', error);
+          return new Response(
+            JSON.stringify({ error: `Database error: ${error.message}` }),
+            { status: 500, headers: corsHeaders }
+          );
+        }
+        
+        return new Response(JSON.stringify(data), { headers: corsHeaders });
+        
+      } catch (error) {
+        console.error('Error fetching template from Creatomate:', error);
         return new Response(
-          JSON.stringify({ error: `Database error: ${error.message}` }),
+          JSON.stringify({ error: `Failed to fetch template: ${error.message}` }),
           { status: 500, headers: corsHeaders }
         );
       }
-      
-      return new Response(JSON.stringify(data), { headers: corsHeaders });
       
     } else if (action === 'start-render') {
       // Start render action
@@ -471,8 +471,8 @@ Deno.serve(async (req) => {
         template_id, 
         variables, 
         platforms,
-        user_id, // Add user_id parameter
-        database_job_id // Add database_job_id parameter for tracking
+        user_id,
+        database_job_id
       } = requestBody;
       
       // Combine both parameters, with creatomateTemplateId taking precedence if both are provided
@@ -515,8 +515,7 @@ Deno.serve(async (req) => {
       
       console.log('Sending modifications to Creatomate:', modifications);
       
-      // Process each platform as a separate render for now
-      // In future we could batch these as an array if Creatomate supports it
+      // Process each platform as a separate render using the API wrapper
       try {
         const allRenders = [];
         
@@ -524,52 +523,28 @@ Deno.serve(async (req) => {
           console.log(`Processing platform ${platform.name || `${platform.width}x${platform.height}`}`);
           
           // Create a request payload for this platform
-          const payload = {
+          const renderParams: RenderParams = {
             template_id: templateIdentifier,
             output_format: 'mp4',
             width: platform.width,
             height: platform.height,
             modifications,
-            webhook_url: webhookUrl,  // Add the webhook URL
+            webhook_url: webhookUrl,
             metadata: JSON.stringify({
               platform_id: platform.id,
-              user_id: user_id, // Pass user ID from request
-              template_id: requestBody.template_id, // Pass database template ID
-              database_job_id: database_job_id // Pass database job ID for correlation
+              user_id: user_id,
+              template_id: requestBody.template_id,
+              database_job_id: database_job_id
             })
           };
           
-          // Send request to Creatomate
-          const response = await fetch('https://api.creatomate.com/v1/renders', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${apiKey}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-          });
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`Creatomate API error for platform ${platform.name || `${platform.width}x${platform.height}`}:`, response.status);
-            console.error('Error response body:', errorText);
-            throw new Error(`Creatomate API error: ${response.statusText} - ${errorText}`);
-          }
-          
-          // Process the response - always expect an array from Creatomate
-          const data = await response.json();
-          console.log('Creatomate response:', JSON.stringify(data));
-          
-          // Extract render data from response array
-          if (Array.isArray(data)) {
-            // Direct array response
-            allRenders.push(...data);
-          } else if (data.renders && Array.isArray(data.renders)) {
-            // Nested renders array
-            allRenders.push(...data.renders);
-          } else {
-            console.error('Unexpected response format from Creatomate:', data);
-            throw new Error('Invalid response format from Creatomate API');
+          // Use our API wrapper to create the render
+          try {
+            const render = await creatomateApi.createRender(renderParams);
+            allRenders.push(render);
+          } catch (error) {
+            console.error(`Error creating render for platform ${platform.name}:`, error);
+            throw error;
           }
         }
         
@@ -599,7 +574,7 @@ Deno.serve(async (req) => {
       }
       
     } else if (action === 'check-render') {
-      // Check render status action
+      // Check render status action using our API wrapper
       if (req.method !== 'POST') {
         return new Response(JSON.stringify({ error: 'Method not allowed' }), {
           status: 405,
@@ -615,32 +590,28 @@ Deno.serve(async (req) => {
         });
       }
       
-      // Check status for each render ID
+      // Check status for each render ID using the API wrapper
       const statusPromises = renderIds.map(async (renderId: string) => {
-        const response = await fetch(`https://api.creatomate.com/v1/renders/${renderId}`, {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        
-        if (!response.ok) {
-          console.error(`Failed to check render status: ${response.statusText}`);
+        try {
+          const render = await creatomateApi.getRender(renderId);
+          
+          return {
+            id: renderId,
+            status: render.status,
+            progress: render.progress || 0,
+            url: render.url || null
+          };
+        } catch (error) {
+          console.error(`Failed to check render status for ${renderId}:`, error);
+          
           return {
             id: renderId,
             status: 'error',
             progress: 0,
-            url: null
+            url: null,
+            error: error.message
           };
         }
-        
-        const data = await response.json();
-        return {
-          id: renderId,
-          status: data.status,
-          progress: data.progress || 0,
-          url: data.url || null
-        };
       });
       
       const results = await Promise.all(statusPromises);
