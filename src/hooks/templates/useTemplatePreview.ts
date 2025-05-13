@@ -1,3 +1,4 @@
+
 import { Template } from '@/types';
 import { isImageUrl, isAudioUrl, isVideoUrl } from '@/lib/utils';
 
@@ -8,10 +9,14 @@ import { isImageUrl, isAudioUrl, isVideoUrl } from '@/lib/utils';
  * 2. Template's preview_image_url if it's actually an image
  * 3. Default placeholder
  * 
- * @param template The template to get preview image for
+ * @param template The template or template-like object to get preview image for
  * @returns The best available preview image URL
  */
-export function getTemplatePreviewImage(template: Template | null): string {
+export function getTemplatePreviewImage(template: Template | {
+  id: string;
+  preview_image_url?: string;
+  variables?: Record<string, any>;
+} | null): string {
   if (!template) return '/placeholder.svg';
   
   // First try to extract the first media variable URL that is an image

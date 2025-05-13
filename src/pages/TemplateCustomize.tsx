@@ -24,8 +24,7 @@ export default function TemplateCustomize() {
 
   // Set up Creatomate preview
   const { isLoading: previewLoading } = useCreatomatePreview(
-    template?.creatomate_template_id, 
-    variables
+    template?.creatomate_template_id 
   );
 
   // Set up render job creation
@@ -82,7 +81,7 @@ export default function TemplateCustomize() {
     <div className="container py-8 max-w-7xl">
       {template && (
         <TemplateHeader 
-          template={template}
+          templateName={template.name}
           actions={
             <Button 
               onClick={handleRender} 
@@ -114,9 +113,17 @@ export default function TemplateCustomize() {
         <div className="relative">
           {template && (
             <TemplateVariablesEditor
-              template={template}
-              variables={variables}
-              onChange={setVariables}
+              textVariables={[]}
+              mediaVariables={[]}
+              colorVariables={[]}
+              platforms={template.platforms || []}
+              selectedMedia={{}}
+              onTextChange={() => {}}
+              onColorChange={() => {}}
+              onMediaSelect={() => {}}
+              isRendering={isRendering}
+              isUpdating={false}
+              onRender={handleRender}
             />
           )}
         </div>
