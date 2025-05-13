@@ -1,4 +1,3 @@
-
 export type UserRole = 'user' | 'admin';
 
 export interface User {
@@ -64,6 +63,8 @@ export interface RenderJob {
   output_urls: Record<string, string>;
   created_at: string;
   updated_at: string;
+  snapshot_url?: string;
+  name?: string;
 }
 
 export interface Statistics {

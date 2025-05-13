@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { RenderJob, Platform } from "@/types";
@@ -37,7 +36,9 @@ const transformRenderJobData = (item: any): RenderJob => ({
   creatomate_render_ids: item.creatomate_render_ids || [],
   output_urls: item.output_urls || {},
   created_at: item.created_at,
-  updated_at: item.updated_at
+  updated_at: item.updated_at,
+  snapshot_url: item.snapshot_url || null,
+  name: item.name || null
 });
 
 /**

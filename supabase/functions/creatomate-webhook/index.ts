@@ -171,13 +171,25 @@ serve(async (req: Request) => {
       outputUrls[render.id] = render.url;
     }
 
+    // Get the best preview image for the snapshot_url
+    const snapshotUrl = getBestPreviewImage(render);
+    
+    // Update the render job with all the new information
+    const updateData: any = {
+      status: mappedStatus,
+      output_urls: outputUrls,
+      updated_at: new Date().toISOString()
+    };
+    
+    // Only add snapshot_url if we found a valid one
+    if (snapshotUrl) {
+      updateData.snapshot_url = snapshotUrl;
+      console.log(`Adding snapshot URL to render job: ${snapshotUrl}`);
+    }
+
     const { error: updateError } = await supabase
       .from('render_jobs')
-      .update({
-        status: mappedStatus, // Use mapped status
-        output_urls: outputUrls,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', existingJob.id);
 
     if (updateError) {
