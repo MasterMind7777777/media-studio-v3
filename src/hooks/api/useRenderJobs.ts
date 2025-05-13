@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { RenderJob } from "@/types";
 import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { transformRenderJobData } from "./templates/transformers";
 
 // Page size for infinite queries
 const PAGE_SIZE = 12;
@@ -41,7 +42,7 @@ export const useRenderJob = (id: string | undefined) => {
         throw new Error(`Render job not found: ${id}`);
       }
 
-      return data as RenderJob;
+      return transformRenderJobData(data);
     },
     enabled: !!id && !!user,
   });
@@ -68,7 +69,7 @@ export const useRenderJobs = ({ realtime = true } = {}) => {
         throw new Error(`Error fetching render jobs: ${error.message}`);
       }
 
-      return data as RenderJob[];
+      return (data || []).map(transformRenderJobData);
     },
     enabled: !!user,
   });
@@ -129,8 +130,10 @@ export const useInfiniteRenderJobs = () => {
         throw new Error(`Error fetching render jobs: ${error.message}`);
       }
 
+      const transformedData = (data || []).map(transformRenderJobData);
+      
       return {
-        data,
+        data: transformedData,
         cursor: data.length > 0 ? data[data.length - 1].created_at : null,
       };
     },

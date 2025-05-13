@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { RenderJob } from "@/types";
 import { Eye, AlertCircle } from "lucide-react";
 import { useState } from "react";
+import { getProjectName } from "@/utils/getProjectName";
 
 interface ProjectCardProps {
   project: RenderJob;
@@ -44,12 +45,6 @@ export const ProjectCard = ({ project, onClick }: ProjectCardProps) => {
     }
   };
 
-  // Get project name or fallback to ID
-  const getProjectName = () => {
-    if (project.name) return project.name;
-    return `Project ${project.id.substring(0, 8)}`;
-  };
-
   // Format date to readable string
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -78,7 +73,7 @@ export const ProjectCard = ({ project, onClick }: ProjectCardProps) => {
             )}
             <img
               src={project.snapshot_url}
-              alt={getProjectName()}
+              alt={getProjectName(project)}
               className={`h-full w-full object-cover transition-opacity duration-300 ${
                 imageLoaded ? 'opacity-100' : 'opacity-0'
               }`}
@@ -100,7 +95,7 @@ export const ProjectCard = ({ project, onClick }: ProjectCardProps) => {
       <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <div>
-            <CardTitle className="truncate">{getProjectName()}</CardTitle>
+            <CardTitle className="truncate">{getProjectName(project)}</CardTitle>
             <CardDescription>
               Created {formatDate(project.created_at)}
             </CardDescription>

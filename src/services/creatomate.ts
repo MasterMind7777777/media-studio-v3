@@ -1,4 +1,3 @@
-
 import { Template, RenderJob } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { isImageUrl, isAudioUrl } from "@/lib/utils";
@@ -168,6 +167,52 @@ export async function startRenderJob(
     throw error;
   }
 }
+
+/**
+ * Renders a video using the Creatomate API
+ */
+export const renderVideo = async ({
+  templateId,
+  variables,
+  platforms,
+  metadata
+}: {
+  templateId: string;
+  variables: Record<string, any>;
+  platforms: any[];
+  metadata?: Record<string, any>;
+}) => {
+  try {
+    // Call the Supabase Edge Function to render the video
+    const { data, error: supabaseError } = await supabase.functions.invoke('creatomate', {
+      body: {
+        templateId,
+        variables,
+        platforms,
+        metadata
+      }
+    });
+
+    if (supabaseError) {
+      console.error("Error calling creatomate edge function:", supabaseError);
+      return { 
+        renderId: null,
+        error: supabaseError.message
+      };
+    }
+
+    return { 
+      renderId: data.renderId,
+      error: null
+    };
+  } catch (error) {
+    console.error("Error rendering video:", error);
+    return { 
+      renderId: null,
+      error: (error as Error).message
+    };
+  }
+};
 
 /**
  * Helper function to clean up variables before sending to Creatomate API

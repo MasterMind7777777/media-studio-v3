@@ -6,18 +6,16 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useTemplate } from "@/hooks/api";
 import { useRenderJob } from "@/hooks/api/useRenderJobs";
-import { useTemplatePreview } from "@/hooks/templates";
-import { useTemplateVariables } from "@/hooks/templates";
+import { useTemplatePreview, useTemplateVariables, useCreatomatePreview } from "@/hooks/templates";
 import { TemplatePreview } from "@/components/Templates/TemplatePreview";
 import { TemplateVariablesEditor } from "@/components/Templates/TemplateVariablesEditor";
 import { TemplateHeader } from "@/components/Templates/TemplateHeader";
-import { useCreatomatePreview } from "@/hooks/templates";
-import { renderVideo } from "@/services/creatomate";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
+import { renderVideo } from "@/services/creatomate";
 
 export default function TemplateCustomize() {
-  const { id: templateIdOrProjectId, type } = useParams<{ id: string, type?: string }>();
+  const { id: templateIdOrProjectId } = useParams<{ id: string }>();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -38,18 +36,18 @@ export default function TemplateCustomize() {
   // Fetch template data
   const { data: template, isLoading: templateLoading } = useTemplate(templateId);
   
-  // Initialize Creatomate preview
-  const { isLoading: previewLoading } = useCreatomatePreview(
-    template?.creatomate_template_id
-  );
-  
-  // Initialize template variables
-  const { 
+  // Initialize template variables hook
+  const {
     variables,
     setVariables,
     resetVariables,
-    isReady: variablesReady 
+    isReady: variablesReady
   } = useTemplateVariables(template);
+  
+  // Initialize Creatomate preview
+  const { isLoading: previewLoading } = useCreatomatePreview({
+    templateId: template?.creatomate_template_id
+  });
   
   // Initialize template preview
   const { updatePreview } = useTemplatePreview();
@@ -95,17 +93,19 @@ export default function TemplateCustomize() {
     try {
       setIsSubmitting(true);
       
+      const submitData = {
+        user_id: user.id,
+        template_id: template.id,
+        variables: variables,
+        name: `${template.name} - ${new Date().toLocaleString()}`,
+        status: "pending" as const,
+        platforms: template.platforms,
+      };
+      
       // Create a new render job in the database
       const { data: renderJob, error: dbError } = await supabase
         .from("render_jobs")
-        .insert({
-          user_id: user.id,
-          template_id: template.id,
-          variables: variables,
-          name: `${template.name} - ${new Date().toLocaleString()}`,
-          status: "pending",
-          platforms: template.platforms,
-        })
+        .insert(submitData)
         .select()
         .single();
       
@@ -154,13 +154,17 @@ export default function TemplateCustomize() {
   return (
     <div className="flex flex-col gap-8 p-8">
       {/* Header */}
-      <TemplateHeader 
-        template={template} 
-        isLoading={isLoading}
-        showBackButton
-        backUrl={isProjectMode ? "/projects" : "/templates"}
-        backLabel={isProjectMode ? "Back to Projects" : "Back to Templates"}
-      />
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">
+          {isProjectMode ? "Edit Project" : "Customize Template"}
+        </h1>
+        <Button
+          variant="outline"
+          onClick={() => navigate(isProjectMode ? "/projects" : "/templates")}
+        >
+          {isProjectMode ? "Back to Projects" : "Back to Templates"}
+        </Button>
+      </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Preview Area */}
@@ -193,14 +197,29 @@ export default function TemplateCustomize() {
           </div>
           
           <Card className="p-4">
-            <TemplateVariablesEditor 
-              loading={isLoading}
-              variables={variables} 
-              onChange={(key, value) => {
-                setVariables({ ...variables, [key]: value });
-                updatePreview({ ...variables, [key]: value });
-              }}
-            />
+            {isLoading ? (
+              <div className="p-4 text-center">Loading variables...</div>
+            ) : (
+              <div className="space-y-4">
+                {Object.entries(variables || {}).map(([key, value]) => (
+                  <div key={key} className="space-y-2">
+                    <label className="block text-sm font-medium">
+                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                    </label>
+                    <input
+                      type="text"
+                      value={value}
+                      onChange={(e) => {
+                        const newValue = e.target.value;
+                        setVariables({ ...variables, [key]: newValue });
+                        updatePreview({ ...variables, [key]: newValue });
+                      }}
+                      className="w-full rounded-md border px-3 py-2"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
         </div>
       </div>
