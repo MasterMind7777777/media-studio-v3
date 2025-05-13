@@ -34,8 +34,10 @@ const transformRenderJobData = (item: any): RenderJob => ({
     aspect_ratio: platform.aspect_ratio || '1:1'
   })) : [],
   status: item.status || 'pending',
-  creatomate_render_ids: item.creatomate_render_ids || [],
+  creatomate_render_ids: Array.isArray(item.creatomate_render_ids) ? item.creatomate_render_ids : [],
   output_urls: item.output_urls || {},
+  snapshot_url: item.snapshot_url || null,
+  name: item.name || null,
   created_at: item.created_at,
   updated_at: item.updated_at
 });
@@ -44,12 +46,34 @@ const transformRenderJobData = (item: any): RenderJob => ({
  * Hook to fetch all render jobs
  */
 export const useRenderJobs = () => {
+  const queryClient = useQueryClient();
+  
+  // Set up a realtime subscription for render_jobs table
+  useEffect(() => {
+    const channel = supabase
+      .channel('render_jobs_updates')
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'render_jobs'
+      }, () => {
+        // When any job is updated (by the webhook), refresh the data
+        queryClient.invalidateQueries({ queryKey: ["renderJobs"] });
+      })
+      .subscribe();
+    
+    // Clean up subscription on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   return useQuery({
     queryKey: ["renderJobs"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("render_jobs")
-        .select("*")
+        .select("id, name, template_id, status, snapshot_url, variables, created_at, output_urls, creatomate_render_ids, platforms")
         .order("created_at", { ascending: false });
         
       if (error) {
