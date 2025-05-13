@@ -23,9 +23,11 @@ export default function TemplateCustomize() {
   } = useTemplate(id);
 
   // Set up Creatomate preview
-  const { isLoading: previewLoading } = useCreatomatePreview(
-    template?.creatomate_template_id 
-  );
+  const { isLoading: previewLoading } = useCreatomatePreview({
+    containerId: 'creatomate-preview',
+    templateId: template?.creatomate_template_id,
+    variables: variables,
+  });
 
   // Set up render job creation
   const { mutateAsync: createRenderJob, isPending: isSubmitting } = useCreateRenderJob();
