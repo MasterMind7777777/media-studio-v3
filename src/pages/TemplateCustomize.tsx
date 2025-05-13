@@ -6,14 +6,15 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { useTemplate } from "@/hooks/api";
 import { useRenderJob } from "@/hooks/api/useRenderJobs";
-import { useTemplateVariables, useCreatomatePreview } from "@/hooks/templates";
-import { useTemplatePreview } from "@/hooks/templates/useTemplatePreview";
+import { useTemplateVariables, useCreatomatePreview, useTemplatePreview } from "@/hooks/templates";
 import { TemplatePreview } from "@/components/Templates/TemplatePreview";
 import { TemplateVariablesEditor } from "@/components/Templates/TemplateVariablesEditor";
 import { TemplateHeader } from "@/components/Templates/TemplateHeader";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { Json } from "@/integrations/supabase/types";
+import { getTemplatePreviewImage } from "@/hooks/templates";
+import { Platform } from "@/types";
 
 /**
  * Renders a video using the Creatomate API
@@ -70,8 +71,11 @@ export default function TemplateCustomize() {
   // Fetch template data
   const { data: template, isLoading: templateLoading } = useTemplate(templateId);
   
-  // Initialize template variables hook with enhanced type
+  // Initialize template variables hook
   const {
+    textVariables,
+    mediaVariables,
+    colorVariables,
     variables,
     setVariables,
     resetVariables,
@@ -81,7 +85,7 @@ export default function TemplateCustomize() {
   // Initialize Creatomate preview
   const { isLoading: previewLoading } = useCreatomatePreview({
     containerId: "preview-container",
-    templateId: template?.creatomate_template_id
+    templateId: template?.creatomate_template_id || ""
   });
   
   // Initialize template preview
@@ -134,7 +138,8 @@ export default function TemplateCustomize() {
         variables: variables as Json,
         name: `${template.name} - ${new Date().toLocaleString()}`,
         status: "pending" as const,
-        platforms: template.platforms as Json,
+        // Convert platforms to Json before submitting
+        platforms: template.platforms as unknown as Json,
       };
       
       // Create a new render job in the database
@@ -163,7 +168,7 @@ export default function TemplateCustomize() {
       await supabase
         .from("render_jobs")
         .update({
-          creatomate_render_ids: [renderId] as Json,
+          creatomate_render_ids: [renderId] as unknown as Json,
         })
         .eq("id", renderJob.id);
       
@@ -185,6 +190,7 @@ export default function TemplateCustomize() {
   
   const isLoading = templateLoading || previewLoading || projectLoading;
   const shouldDisableSubmit = isLoading || isSubmitting || !template;
+  const previewImageUrl = template ? getTemplatePreviewImage(template) : '';
   
   return (
     <div className="flex flex-col gap-8 p-8">
@@ -207,7 +213,11 @@ export default function TemplateCustomize() {
           <h2 className="text-xl font-semibold">Preview</h2>
           <Card className="overflow-hidden">
             <div id="preview-container" className="aspect-video">
-              <TemplatePreview />
+              <TemplatePreview 
+                previewImageUrl={previewImageUrl}
+                width={template?.platforms[0]?.width || 1920}
+                height={template?.platforms[0]?.height || 1080}
+              />
             </div>
           </Card>
         </div>
