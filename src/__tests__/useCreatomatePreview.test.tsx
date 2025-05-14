@@ -15,11 +15,11 @@ const mockPreviewInstance = {
   pause: jest.fn(),
   dispose: jest.fn(),
   addEventListener: jest.fn((eventName: string, callback: Function) => {
-    // Store callbacks for later triggering
-    if (eventName === 'ready') mockPreviewInstance.onReady = callback;
-    if (eventName === 'error') mockPreviewInstance.onError = callback;
-    if (eventName === 'play') mockPreviewInstance.onPlay = callback;
-    if (eventName === 'pause') mockPreviewInstance.onPause = callback;
+    // Store callbacks for later triggering in a type-safe way
+    if (eventName === 'ready') mockPreviewInstance.onReady = jest.fn(callback);
+    if (eventName === 'error') mockPreviewInstance.onError = jest.fn(callback);
+    if (eventName === 'play') mockPreviewInstance.onPlay = jest.fn(callback);
+    if (eventName === 'pause') mockPreviewInstance.onPause = jest.fn(callback);
   }),
   isPlaying: jest.fn().mockReturnValue(false),
 };

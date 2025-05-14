@@ -106,58 +106,76 @@ export function useCreatomatePreview(
         previewRef.current = preview;
 
         // Set up event handlers using the correct syntax for the Preview class
-        preview.addEventListener('ready', () => {
-          if (isMounted) {
-            setPreviewState(prev => ({ 
-              ...prev, 
-              isReady: true, 
-              isLoading: false,
-              isPlaying: true,
-              togglePlay: () => {
-                if (preview) {
-                  // Using optional chaining with a fallback for isPlaying
-                  const isCurrentlyPlaying = typeof preview.isPlaying === 'function' 
-                    ? preview.isPlaying() 
-                    : false;
+        if (typeof preview.addEventListener === 'function') {
+          // Ready event
+          preview.addEventListener('ready', () => {
+            if (isMounted) {
+              setPreviewState(prev => ({ 
+                ...prev, 
+                isReady: true, 
+                isLoading: false,
+                isPlaying: true,
+                togglePlay: () => {
+                  if (preview) {
+                    // Check if isPlaying exists and is a function
+                    const isCurrentlyPlaying = typeof preview.isPlaying === 'function' 
+                      ? preview.isPlaying() 
+                      : false;
+                      
+                    if (isCurrentlyPlaying) {
+                      preview.pause();
+                    } else {
+                      preview.play();
+                    }
                     
-                  if (isCurrentlyPlaying) {
-                    preview.pause();
-                  } else {
-                    preview.play();
+                    // Update playing state
+                    setPreviewState(current => ({
+                      ...current,
+                      isPlaying: !current.isPlaying
+                    }));
                   }
-                  
-                  // Update playing state
-                  setPreviewState(current => ({
-                    ...current,
-                    isPlaying: !current.isPlaying
-                  }));
-                }
-              },
-              currentVars,
-              forceUpdateVariables
-            }));
-          }
-        });
+                },
+                currentVars,
+                forceUpdateVariables
+              }));
+            }
+          });
 
-        preview.addEventListener('error', (error: Error) => {
-          console.error('Creatomate preview error:', error);
-          if (isMounted) {
-            setPreviewState(prev => ({ 
-              ...prev, 
-              error, 
-              isLoading: false 
-            }));
-            if (onError) onError(error);
-          }
-        });
-        
-        // Handle state changes for play/pause status
-        preview.addEventListener('statechange', (event: any) => {
-          const state = event.detail;
-          if (isMounted && state && typeof state.isPlaying === 'boolean') {
-            setPreviewState(prev => ({ ...prev, isPlaying: state.isPlaying }));
-          }
-        });
+          // Error event
+          preview.addEventListener('error', (error: Error) => {
+            console.error('Creatomate preview error:', error);
+            if (isMounted) {
+              setPreviewState(prev => ({ 
+                ...prev, 
+                error, 
+                isLoading: false 
+              }));
+              if (onError) onError(error);
+            }
+          });
+          
+          // State change event
+          preview.addEventListener('statechange', (event: any) => {
+            const state = event.detail;
+            if (isMounted && state && typeof state.isPlaying === 'boolean') {
+              setPreviewState(prev => ({ ...prev, isPlaying: state.isPlaying }));
+            }
+          });
+        } else {
+          // Fallback for older SDK versions that might use on() instead of addEventListener()
+          console.warn('Preview.addEventListener not available, some events may not be captured');
+          setPreviewState(prev => ({
+            ...prev,
+            isReady: true,
+            isLoading: false,
+            togglePlay: () => {
+              if (preview) {
+                preview.pause();
+                preview.play();
+              }
+            }
+          }));
+        }
 
       } catch (error) {
         console.error('Failed to initialize Creatomate preview:', error);

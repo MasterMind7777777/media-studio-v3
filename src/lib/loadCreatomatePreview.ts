@@ -37,9 +37,10 @@ export async function createPreviewInstance(options: CreatomatePreviewOptions): 
   
   try {
     // Create the preview instance with all required parameters
+    // Note: container must be an HTMLElement, not a string
     const preview = new Preview(
       options.token,
-      options.container,
+      options.container as HTMLDivElement, // Ensure it's cast to the right type
       {
         mode: options.mode || 'interactive',
         templateId: options.templateId,
