@@ -1,27 +1,22 @@
+
 import React from 'react';
 import {
   BrowserRouter,
   Routes,
   Route,
 } from "react-router-dom";
-import { QueryClient, QueryClientProvider } from 'react-query'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
-import Home from "./pages/Home";
+import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import TemplateCustomize from "./pages/TemplateCustomize";
 import Templates from "./pages/Templates";
 import Settings from "./pages/Settings";
-import Admin from "./pages/Admin";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import { Toaster } from "@/components/ui/toaster"
+import Create from "./pages/Create";
+import { Toaster } from "@/components/ui/toaster";
 
-// Import CreatomateLoader
+// Import CreatomateLoader and fix its implementation
 import { CreatomateLoader } from './components/CreatomateLoader';
-
-const queryClient = new QueryClient()
 
 function App() {
   const [isInitialized, setIsInitialized] = React.useState(false);
@@ -34,26 +29,23 @@ function App() {
   }, []);
 
   return (
-    <QueryClientProvider client={queryClient}>
+    <>
       {/* Add the Creatomate loader at the root level */}
       <CreatomateLoader />
       
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Home />} />
+          <Route path="/" element={<Dashboard />} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/templates" element={<Templates />} />
           <Route path="/template/:id" element={<TemplateCustomize />} />
+          <Route path="/create" element={<Create />} />
+          <Route path="/create/:id/customize" element={<TemplateCustomize />} />
           <Route path="/settings" element={<Settings />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
         </Routes>
         <Toaster />
       </BrowserRouter>
-    </QueryClientProvider>
+    </>
   );
 }
 

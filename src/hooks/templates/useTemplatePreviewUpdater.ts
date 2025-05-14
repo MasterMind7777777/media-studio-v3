@@ -1,107 +1,118 @@
-
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
+import { useDebouncedCallback } from '@/hooks/utils/useDebouncedCallback';
 import { MediaAsset } from '@/types';
 
-interface TemplatePreviewUpdaterOptions {
+interface TemplatePreviewUpdaterProps {
   initialVariables: Record<string, any>;
-  onPreviewUpdate?: (variables: Record<string, any>) => void;
+  onPreviewUpdate: (variables: Record<string, any>) => void;
 }
 
 export function useTemplatePreviewUpdater({
   initialVariables,
-  onPreviewUpdate,
-}: TemplatePreviewUpdaterOptions) {
-  // Initialize state with initial variables
-  const [variables, setVariables] = useState<Record<string, any>>(initialVariables || {});
+  onPreviewUpdate
+}: TemplatePreviewUpdaterProps) {
+  const [variables, setVariables] = useState<Record<string, any>>(initialVariables);
   const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
   const [isUpdating, setIsUpdating] = useState(false);
   
-  // Track the latest variables for debounced updates
+  // Keep a reference to the latest variables for debounced functions
   const latestVariables = useRef<Record<string, any>>(variables);
   
-  // Update ref when variables change
-  useEffect(() => {
+  // Update latestVariables ref when variables change
+  useMemo(() => {
     latestVariables.current = variables;
   }, [variables]);
   
-  // Initialize selected media from initial variables
-  useEffect(() => {
-    if (!initialVariables) return;
-    
-    // Extract media assets from variables if they exist
-    const mediaAssets: Record<string, MediaAsset> = {};
-    
-    Object.entries(initialVariables).forEach(([key, value]) => {
-      if (typeof value === 'object' && value !== null && 'file_url' in value && 'name' in value) {
-        mediaAssets[key] = value as MediaAsset;
-      }
-    });
-    
-    setSelectedMedia(mediaAssets);
-    setVariables(initialVariables);
-  }, [initialVariables]);
+  // Debounced update function to prevent too many preview updates
+  const debouncedUpdatePreview = useDebouncedCallback((newVars: Record<string, any>) => {
+    setIsUpdating(true);
+    try {
+      onPreviewUpdate(newVars);
+    } finally {
+      setIsUpdating(false);
+    }
+  }, 300);
   
   // Handle text variable changes
-  const handleTextChange = useCallback((key: string, value: string) => {
-    setIsUpdating(true);
-    
-    setVariables((prev) => {
-      // Always create a new object to ensure proper state updates
-      const updated = { ...prev, [key]: value };
+  const handleTextChange = useCallback((id: string, value: string) => {
+    setVariables(prevVars => {
+      // Create a new copy of the variables object
+      const newVars = { ...prevVars };
       
-      // Notify parent component of the update
-      onPreviewUpdate?.(updated);
+      // If the variable exists, create a new copy of it
+      if (newVars[id]) {
+        newVars[id] = { ...newVars[id], value };
+      } else {
+        // If it doesn't exist, create a new variable
+        newVars[id] = { value };
+      }
       
-      return updated;
+      // Update the preview
+      debouncedUpdatePreview(newVars);
+      
+      return newVars;
     });
-    
-    setIsUpdating(false);
-  }, [onPreviewUpdate]);
+  }, [debouncedUpdatePreview]);
   
   // Handle color variable changes
-  const handleColorChange = useCallback((key: string, value: string) => {
-    setIsUpdating(true);
-    
-    setVariables((prev) => {
-      // Always create a new object to ensure proper state updates
-      const updated = { ...prev, [key]: value };
+  const handleColorChange = useCallback((id: string, value: string) => {
+    setVariables(prevVars => {
+      // Create a new copy of the variables object
+      const newVars = { ...prevVars };
       
-      // Notify parent component of the update
-      onPreviewUpdate?.(updated);
+      // If the variable exists, create a new copy of it
+      if (newVars[id]) {
+        newVars[id] = { ...newVars[id], value };
+      } else {
+        // If it doesn't exist, create a new variable
+        newVars[id] = { value };
+      }
       
-      return updated;
+      // Update the preview
+      debouncedUpdatePreview(newVars);
+      
+      return newVars;
     });
-    
-    setIsUpdating(false);
-  }, [onPreviewUpdate]);
+  }, [debouncedUpdatePreview]);
   
-  // Handle media selection - Fixed to use immutable updates
-  const handleMediaSelected = useCallback((key: string, asset: MediaAsset) => {
-    setIsUpdating(true);
+  // Handle media variable changes
+  const handleMediaSelected = useCallback((id: string, asset: MediaAsset) => {
+    // Update the selected media state
+    setSelectedMedia(prev => ({
+      ...prev,
+      [id]: asset
+    }));
     
-    // Update selected media record - using immutable update
-    setSelectedMedia((prev) => ({ ...prev, [key]: asset }));
-    
-    // Update variables with the media URL - using immutable update
-    setVariables((prev) => {
-      const updated = { ...prev, [key]: asset.file_url };
+    // Update the variables
+    setVariables(prevVars => {
+      // Create a new copy of the variables object
+      const newVars = { ...prevVars };
       
-      // Notify parent component of the update
-      onPreviewUpdate?.(updated);
+      // If the variable exists, create a new copy of it
+      if (newVars[id]) {
+        newVars[id] = { 
+          ...newVars[id], 
+          value: asset.url 
+        };
+      } else {
+        // If it doesn't exist, create a new variable
+        newVars[id] = { value: asset.url };
+      }
       
-      return updated;
+      // Update the preview immediately (no debounce needed for media)
+      onPreviewUpdate(newVars);
+      
+      return newVars;
     });
-    
-    setIsUpdating(false);
   }, [onPreviewUpdate]);
   
   return {
     variables,
     selectedMedia,
     isUpdating,
-    setVariables,
     handleTextChange,
     handleColorChange,
     handleMediaSelected,
+    setVariables
   };
 }
