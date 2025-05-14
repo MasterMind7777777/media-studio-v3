@@ -60,8 +60,7 @@ export function useCreatomateSDKLoader() {
           if (retryCount === 0) {
             toast({
               title: "Retrying SDK load",
-              description: "Attempting to reload the video preview SDK...",
-              duration: 3000
+              description: "Attempting to reload the video preview SDK..."
             });
           }
         } else {
@@ -71,8 +70,7 @@ export function useCreatomateSDKLoader() {
           toast({
             variant: "destructive",
             title: "Failed to load video preview",
-            description: "Please check your internet connection and try refreshing the page.",
-            duration: 5000
+            description: "Please check your internet connection and try refreshing the page."
           });
         }
       }
