@@ -103,8 +103,8 @@ export function useCreatomatePreview(
           throw new Error('Creatomate token not found in environment variables');
         }
         
-        // Create the preview instance using the Preview SDK
-        preview = new window.Creatomate.Preview({
+        // Create the preview instance using the UMD build's global Preview constructor
+        preview = new window.Preview({
           token,
           templateId, 
           container: containerRef.current,

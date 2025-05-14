@@ -11,7 +11,7 @@ import { CREATOMATE_PUBLIC_TOKEN } from "@/config/creatomate";
 import { isImageUrl } from "@/lib/utils";
 
 // Check if Creatomate SDK is disabled using environment variable
-const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
+const isCreatomateDisabled = import.meta.env.VITE_CREATOMATE_PREVIEW === 'off';
 
 interface TemplatePreviewProps {
   previewImageUrl: string;

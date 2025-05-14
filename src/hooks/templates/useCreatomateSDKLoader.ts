@@ -7,9 +7,9 @@ const SDK_LOADED_EVENT = 'creatomate-sdk-loaded';
 const SDK_ERROR_EVENT = 'creatomate-sdk-error';
 
 // Primary and fallback URLs for the Creatomate Preview SDK
-// Using the correct dist/index.js path instead of preview.min.js
-const PRIMARY_SDK_URL = 'https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/index.js';
-const FALLBACK_SDK_URL = 'https://unpkg.com/@creatomate/preview@1.6.0/dist/index.js';
+// Using the UMD build (dist/Preview.js) instead of ESM (dist/index.js)
+const PRIMARY_SDK_URL = 'https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.js';
+const FALLBACK_SDK_URL = 'https://unpkg.com/@creatomate/preview@1.6.0/dist/Preview.js';
 
 // Maximum number of retry attempts
 const MAX_RETRIES = 3;
@@ -127,7 +127,7 @@ export function useCreatomateSDKLoader() {
  * Safely loads the Creatomate SDK script with error handling and deduplication
  * @returns A promise that resolves when the SDK is loaded and ready
  */
-export function loadCreatomateSdk(): Promise<typeof window.Creatomate.Preview> {
+export function loadCreatomateSdk(): Promise<typeof window.Preview> {
   // Default to primary SDK URL
   const sdkUrl = PRIMARY_SDK_URL;
   
@@ -147,7 +147,7 @@ export function loadCreatomateSdk(): Promise<typeof window.Creatomate.Preview> {
         console.log('Creatomate Preview SDK already loaded');
         // Dispatch event for any listeners
         window.dispatchEvent(new CustomEvent(SDK_LOADED_EVENT));
-        return resolve(window.Creatomate.Preview);
+        return resolve(window.Preview);
       }
 
       // Remove any existing failed script tags
@@ -178,9 +178,9 @@ export function loadCreatomateSdk(): Promise<typeof window.Creatomate.Preview> {
             console.log('Creatomate Preview SDK initialized successfully');
             // Dispatch event and resolve promise
             window.dispatchEvent(new CustomEvent(SDK_LOADED_EVENT));
-            resolve(window.Creatomate.Preview);
+            resolve(window.Preview);
           } else {
-            console.error('Script loaded but Creatomate.Preview not available');
+            console.error('Script loaded but Preview not available');
             // Try fallback URL if this was the primary URL
             if (script.src === PRIMARY_SDK_URL) {
               console.log('Trying fallback SDK URL:', FALLBACK_SDK_URL);
@@ -231,5 +231,5 @@ export function loadCreatomateSdk(): Promise<typeof window.Creatomate.Preview> {
  * Check if the Creatomate SDK is available in the window object
  */
 export const isCreatomateSDKAvailable = (): boolean => {
-  return !!window.Creatomate?.Preview;
+  return !!window.Preview;
 };
