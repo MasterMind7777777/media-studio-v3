@@ -3,10 +3,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { cleanupVariables } from '@/lib/variables';
 import { useDebouncedCallback } from '@/hooks/utils/useDebouncedCallback';
 import { toast } from '@/hooks/use-toast';
+import { isCreatomateDisabled, loadCreatomateSdk, isCreatomateSDKAvailable } from '@/components/CreatomateLoader';
 import { ensureCreatomateSDK } from '@/integrations/creatomate/config';
-
-// Check if Creatomate SDK is disabled using environment variable
-const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
 
 interface PreviewOptions {
   containerId: string;
@@ -48,16 +46,16 @@ export function useCreatomatePreview({
   const [previewMode, setPreviewMode] = useState<'interactive' | 'player' | null>(null);
   const [currentVars, setCurrentVars] = useState<Record<string, any>>(variables);
   
+  // Track initialization state
+  const initializationAttempted = useRef(false);
+  const containerRef = useRef<HTMLElement | null>(null);
+  
   // Initialize with provided variables
   useEffect(() => {
     if (Object.keys(variables).length > 0) {
       setCurrentVars(prevVars => ({...prevVars, ...variables}));
     }
   }, [variables]);
-  
-  // Reference for preview container element
-  const containerRef = useRef<HTMLElement | null>(null);
-  const initializationAttempted = useRef(false);
   
   // Debounced function to update preview with new variables
   const debouncedUpdatePreview = useDebouncedCallback((newVars: Record<string, any>) => {
@@ -73,8 +71,126 @@ export function useCreatomatePreview({
     }
   }, 150);
   
+  // Handle SDK ready event
+  useEffect(() => {
+    const handleSDKReady = () => {
+      console.log('SDK ready event received, initializing preview');
+      initializePreviewInstance();
+    };
+    
+    const handleSDKError = (event: CreatomateSDKErrorEvent) => {
+      const { error } = event.detail;
+      console.error('SDK error event received:', error);
+      setError(error);
+      setIsLoading(false);
+      onError?.(error);
+    };
+    
+    // Add event listeners for SDK ready/error events
+    window.addEventListener('creatomate-sdk-ready', handleSDKReady);
+    window.addEventListener('creatomate-sdk-error', handleSDKError);
+    
+    return () => {
+      // Clean up event listeners
+      window.removeEventListener('creatomate-sdk-ready', handleSDKReady);
+      window.removeEventListener('creatomate-sdk-error', handleSDKError);
+    };
+  }, [containerId, templateId, onReady, onError]);
+  
+  // Function to initialize the preview instance
+  const initializePreviewInstance = useCallback(async () => {
+    // Skip if already attempted or disabled
+    if (initializationAttempted.current || isCreatomateDisabled) return;
+    
+    initializationAttempted.current = true;
+    setIsLoading(true);
+    
+    try {
+      // Ensure container exists
+      const container = document.getElementById(containerId);
+      containerRef.current = container;
+      
+      if (!container) {
+        throw new Error(`Container with ID "${containerId}" not found`);
+      }
+      
+      // Ensure SDK is loaded
+      await loadCreatomateSdk();
+      
+      // Double check SDK is available
+      if (!window.Creatomate || typeof window.Creatomate.Preview !== 'function') {
+        throw new Error('Creatomate SDK not loaded or initialized');
+      }
+      
+      // Create preview instance
+      console.log('Creating Creatomate Preview instance');
+      const previewInstance = new window.Creatomate.Preview({
+        container,
+        mode: 'interactive',
+        token: import.meta.env.VITE_CREATOMATE_TOKEN,
+      });
+      
+      // Setup event listeners
+      previewInstance.onReady = () => {
+        console.log('Preview is ready');
+        setIsReady(true);
+        setIsLoading(false);
+        setPreviewMode('interactive');
+        onReady?.();
+        
+        // Load template if provided
+        if (templateId) {
+          console.log('Loading template:', templateId);
+          previewInstance.loadTemplate(templateId);
+        }
+        
+        // Apply initial variables
+        if (Object.keys(currentVars).length > 0) {
+          console.log('Applying initial variables:', currentVars);
+          const cleanVars = cleanupVariables(currentVars);
+          previewInstance.setModifications(cleanVars);
+        }
+      };
+      
+      previewInstance.onError = (err: Error) => {
+        console.error('Preview error:', err);
+        setError(err);
+        setIsLoading(false);
+        onError?.(err);
+      };
+      
+      previewInstance.onPlay = () => {
+        setIsPlaying(true);
+      };
+      
+      previewInstance.onPause = () => {
+        setIsPlaying(false);
+      };
+      
+      // Store preview instance in state
+      setPreview(previewInstance);
+      
+    } catch (err) {
+      console.error('Failed to initialize preview:', err);
+      const error = err instanceof Error ? err : new Error(String(err));
+      setError(error);
+      setIsLoading(false);
+      onError?.(error);
+      
+      // Only show toast for actual failures, not disabled SDK
+      if (!isCreatomateDisabled) {
+        toast({
+          title: "Preview Error",
+          description: "Failed to initialize video preview. Please try refreshing the page.",
+          variant: "destructive"
+        });
+      }
+    }
+  }, [containerId, templateId, currentVars, onReady, onError]);
+  
   // Initialize preview or mock when component mounts
   useEffect(() => {
+    // For disabled SDK mode, use a mock implementation
     if (isCreatomateDisabled) {
       console.log('Creatomate preview disabled - using mock implementation');
       
@@ -104,97 +220,17 @@ export function useCreatomatePreview({
       
       return () => clearTimeout(timer);
     } else {
-      // Prevent duplicate initialization attempts
-      if (initializationAttempted.current) return;
-      initializationAttempted.current = true;
-      
-      // Real SDK initialization
-      const initializePreview = async () => {
-        try {
-          setIsLoading(true);
-          
-          // Make sure SDK is loaded before proceeding
-          await ensureCreatomateSDK();
-          
-          const container = document.getElementById(containerId);
-          containerRef.current = container;
-          
-          if (!container) {
-            throw new Error(`Container with ID "${containerId}" not found`);
-          }
-          
-          // Check if SDK is available on window
-          if (!window.Creatomate) {
-            throw new Error('Creatomate SDK not loaded');
-          }
-          
-          // Create preview instance
-          console.log('Creating Creatomate Preview instance');
-          const previewInstance = new window.Creatomate.Preview({
-            container,
-            mode: 'interactive',
-            token: import.meta.env.VITE_CREATOMATE_TOKEN,
-          });
-          
-          // Setup event listeners
-          previewInstance.onReady = () => {
-            console.log('Preview is ready');
-            setIsReady(true);
-            setIsLoading(false);
-            setPreviewMode('interactive');
-            onReady?.();
-            
-            // Load template if provided
-            if (templateId) {
-              console.log('Loading template:', templateId);
-              previewInstance.loadTemplate(templateId);
-            }
-            
-            // Apply initial variables
-            if (Object.keys(currentVars).length > 0) {
-              console.log('Applying initial variables:', currentVars);
-              const cleanVars = cleanupVariables(currentVars);
-              previewInstance.setModifications(cleanVars);
-            }
-          };
-          
-          previewInstance.onError = (err: Error) => {
-            console.error('Preview error:', err);
-            setError(err);
-            setIsLoading(false);
-            onError?.(err);
-          };
-          
-          previewInstance.onPlay = () => {
-            setIsPlaying(true);
-          };
-          
-          previewInstance.onPause = () => {
-            setIsPlaying(false);
-          };
-          
-          // Store preview instance in state
-          setPreview(previewInstance);
-          
-        } catch (err) {
-          console.error('Failed to initialize preview:', err);
-          const error = err instanceof Error ? err : new Error(String(err));
+      // Check if SDK is already available, otherwise wait for the ready event
+      if (isCreatomateSDKAvailable()) {
+        initializePreviewInstance();
+      } else {
+        // Start loading the SDK (this will trigger the 'creatomate-sdk-ready' event when done)
+        loadCreatomateSdk().catch(error => {
           setError(error);
           setIsLoading(false);
           onError?.(error);
-          
-          // Only show toast for actual failures, not disabled SDK
-          if (!isCreatomateDisabled) {
-            toast({
-              title: "Preview Error",
-              description: error.message,
-              variant: "destructive"
-            });
-          }
-        }
-      };
-      
-      initializePreview();
+        });
+      }
     }
     
     // Cleanup function
@@ -207,7 +243,7 @@ export function useCreatomatePreview({
         }
       }
     };
-  }, [containerId, templateId, onReady, onError]);
+  }, [containerId, templateId, onReady, onError, initializePreviewInstance]);
   
   // Update variables and preview
   const forceUpdateVariables = useCallback((newVariables: Record<string, any>) => {
@@ -229,7 +265,7 @@ export function useCreatomatePreview({
     setIsLoading(true);
     initializationAttempted.current = false;
     
-    // Re-trigger the useEffect
+    // Re-trigger the initialization
     const container = containerRef.current;
     if (container) {
       container.innerHTML = '';
@@ -237,7 +273,10 @@ export function useCreatomatePreview({
     
     // Force a re-render
     setPreview(null);
-  }, []);
+    
+    // Initialize again
+    initializePreviewInstance();
+  }, [initializePreviewInstance]);
   
   // Toggle play/pause
   const togglePlay = useCallback(() => {
