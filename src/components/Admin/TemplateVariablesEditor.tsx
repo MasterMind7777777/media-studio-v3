@@ -1,10 +1,9 @@
-
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Trash2, Plus, RefreshCcw } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { Trash2, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 interface TemplateVariablesEditorProps {
   variables: Record<string, any>;
@@ -12,7 +11,6 @@ interface TemplateVariablesEditorProps {
 }
 
 export function TemplateVariablesEditor({ variables, onChange }: TemplateVariablesEditorProps) {
-  const { toast } = useToast();
   const [newVariableKey, setNewVariableKey] = useState("");
   const [newVariableValue, setNewVariableValue] = useState("");
 
@@ -53,29 +51,18 @@ export function TemplateVariablesEditor({ variables, onChange }: TemplateVariabl
     delete updatedVariables[key];
     onChange(updatedVariables);
     
-    toast({
-      title: "Variable deleted",
-      description: `Variable "${key}" has been removed.`
-    });
+    toast.success(`Variable "${key}" has been removed.`);
   };
 
   const handleAddVariable = () => {
     if (!newVariableKey.trim()) {
-      toast({
-        title: "Invalid variable name",
-        description: "Please enter a valid variable name.",
-        variant: "destructive"
-      });
+      toast.error("Please enter a valid variable name.");
       return;
     }
     
     // Validate variable name format (should contain a dot)
     if (!newVariableKey.includes(".")) {
-      toast({
-        title: "Invalid variable format",
-        description: "Variable name should be in format 'Element.property' (e.g., 'Heading.text')",
-        variant: "destructive"
-      });
+      toast.error("Variable name should be in format 'Element.property' (e.g., 'Heading.text')");
       return;
     }
 
@@ -87,10 +74,7 @@ export function TemplateVariablesEditor({ variables, onChange }: TemplateVariabl
     setNewVariableKey("");
     setNewVariableValue("");
     
-    toast({
-      title: "Variable added",
-      description: `Variable "${newVariableKey}" has been added.`
-    });
+    toast.success(`Variable "${newVariableKey}" has been added.`);
   };
 
   // Sort variables by key for better organization

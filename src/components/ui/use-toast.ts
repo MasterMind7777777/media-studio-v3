@@ -35,7 +35,7 @@ export function useToast() {
         return sonnerToast.warning(content);
       },
       // For legacy code using object style
-      (...args: any[]) {
+      (...args: any[]): any {
         const [content] = args;
         if (typeof content === 'object' && content !== null) {
           const { title, description } = content;

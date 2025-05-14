@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import { MediaAsset } from "@/types";
 import { TemplateVariableSection } from "@/hooks/templates/useTemplateVariables";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 interface TemplateVariablesEditorProps {
   textVariables: TemplateVariableSection[];
