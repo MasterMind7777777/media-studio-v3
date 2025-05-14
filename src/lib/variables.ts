@@ -35,6 +35,7 @@ export function normalizeKeys(variables: Record<string, any>): Record<string, an
       
       // Find first key with a value
       const valueKey = textKeys.find(k => variables[k] !== undefined) || textKeys[0];
+      // Important: Do not trim text values to preserve spaces
       result[normalKey] = variables[valueKey];
     }
     
@@ -92,6 +93,7 @@ export function normalizeKey(key: string): string {
 /**
  * Cleans up variables before sending to Creatomate API
  * Removes null/undefined values and normalizes keys
+ * Preserves spaces in text values
  * @param variables Variables to clean up
  * @returns Cleaned variables object
  */
@@ -108,6 +110,8 @@ export function cleanupVariables(variables: Record<string, any>): Record<string,
     
     // Normalize the key (remove duplicate suffixes)
     const normalizedKey = normalizeKey(key);
+    
+    // Preserve the value as is without trimming
     cleanVars[normalizedKey] = value;
   });
   

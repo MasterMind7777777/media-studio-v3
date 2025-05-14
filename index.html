@@ -17,26 +17,7 @@
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
     
-    <!-- Creatomate Preview SDK - with improved fallback and error handling -->
-    <script>
-      // Global error handler for script loading
-      window.handleCreatomateScriptError = function() {
-        console.error('Failed to load Creatomate SDK from primary source, trying fallback...');
-        var fallbackScript = document.createElement('script');
-        fallbackScript.src = 'https://unpkg.com/@creatomate/preview@1.6.0/dist/Preview.min.js';
-        fallbackScript.defer = true;
-        fallbackScript.onerror = function() {
-          console.error('Failed to load Creatomate SDK from fallback source');
-        };
-        document.head.appendChild(fallbackScript);
-      };
-    </script>
-    <script 
-      src="https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.min.js" 
-      defer 
-      id="creatomate-sdk"
-      onerror="window.handleCreatomateScriptError()">
-    </script>
+    <!-- Removed static Creatomate SDK script tags - SDK now loaded dynamically by CreatomateLoader -->
   </head>
 
   <body>

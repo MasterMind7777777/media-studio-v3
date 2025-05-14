@@ -10,6 +10,9 @@ import { getCreatomateToken } from "@/integrations/creatomate/config";
 import { CREATOMATE_PUBLIC_TOKEN } from "@/config/creatomate";
 import { isImageUrl } from "@/lib/utils";
 
+// Check if Creatomate SDK is disabled using environment variable
+const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
+
 interface TemplatePreviewProps {
   previewImageUrl: string;
   width?: number;
@@ -28,7 +31,6 @@ export function TemplatePreview({
 }: TemplatePreviewProps) {
   const previewContainerRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isDisabled, setIsDisabled] = useState(true);
   const [imgError, setImgError] = useState(false);
   const previewContainerId = "creatomate-preview-container";
   
@@ -42,12 +44,6 @@ export function TemplatePreview({
                               previewImageUrl !== '/placeholder.svg' && 
                               isImageUrl(previewImageUrl) &&
                               !imgError;
-                              
-  // Detect if SDK is disabled
-  useEffect(() => {
-    const isDisabled = sessionStorage.getItem('creatomate-sdk-disabled') === 'true';
-    setIsDisabled(isDisabled);
-  }, []);
 
   return (
     <Card className="h-full">
@@ -57,7 +53,7 @@ export function TemplatePreview({
         className="aspect-video bg-black/80 rounded-t-md flex items-center justify-center relative"
         style={{ minHeight: '240px' }}
       >
-        {isDisabled ? (
+        {isCreatomateDisabled ? (
           <div className="text-white text-center p-8 absolute inset-0 flex flex-col items-center justify-center bg-muted/90">
             <div className="text-xl font-medium mb-2">Preview Disabled</div>
             <p className="text-muted-foreground mb-4">Creatomate SDK temporarily disabled for development</p>
@@ -92,7 +88,7 @@ export function TemplatePreview({
           <Button 
             size="sm" 
             variant="outline"
-            disabled={isDisabled}
+            disabled={isCreatomateDisabled}
           >
             <Play className="h-4 w-4 mr-1" />
             Play
@@ -100,7 +96,7 @@ export function TemplatePreview({
           <Button 
             size="sm" 
             variant="outline"
-            disabled={isDisabled}
+            disabled={isCreatomateDisabled}
           >
             <Maximize className="h-4 w-4 mr-1" />
             Fullscreen

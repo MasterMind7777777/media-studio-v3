@@ -3,8 +3,15 @@
  * Config and helper functions for Creatomate integration
  */
 
+// Check if Creatomate SDK is disabled using environment variable
+export const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
+
 // Check if the Creatomate SDK is available on the window object
 export function isCreatomateSDKAvailable(): boolean {
+  if (isCreatomateDisabled) {
+    return false;
+  }
+  
   return typeof window !== 'undefined' && 
     window.Creatomate !== undefined && 
     typeof window.Creatomate.Preview === 'function';
@@ -47,6 +54,13 @@ export async function getCreatomateTemplateId(): Promise<string> {
 // Helper to ensure SDK script is loaded
 export function ensureCreatomateSDK(): Promise<void> {
   return new Promise((resolve, reject) => {
+    // If SDK is disabled, resolve immediately
+    if (isCreatomateDisabled) {
+      console.log('Creatomate SDK is disabled by environment variable');
+      resolve();
+      return;
+    }
+    
     // If SDK is already available, resolve immediately
     if (isCreatomateSDKAvailable()) {
       console.log('Creatomate SDK already loaded');
@@ -56,39 +70,26 @@ export function ensureCreatomateSDK(): Promise<void> {
     
     console.log('Loading Creatomate SDK dynamically');
     
-    // Create a script element to load the SDK
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.min.js';
-    script.async = true;
-    
-    // Set up event handlers
-    script.onload = () => {
-      console.log('Creatomate SDK loaded successfully');
-      resolve();
-    };
-    
-    script.onerror = () => {
-      console.error('Failed to load Creatomate SDK, trying fallback');
-      
-      // Try fallback CDN
-      const fallbackScript = document.createElement('script');
-      fallbackScript.src = 'https://unpkg.com/@creatomate/preview@1.6.0/dist/Preview.min.js';
-      fallbackScript.async = true;
-      
-      fallbackScript.onload = () => {
-        console.log('Creatomate SDK loaded successfully from fallback');
+    // Use dynamic ESM import instead of creating script elements
+    import('https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.min.js')
+      .then(() => {
+        console.log('Creatomate SDK loaded successfully');
         resolve();
-      };
-      
-      fallbackScript.onerror = () => {
-        const error = new Error('Failed to load Creatomate SDK from both primary and fallback sources');
-        console.error(error);
-        reject(error);
-      };
-      
-      document.head.appendChild(fallbackScript);
-    };
-    
-    document.head.appendChild(script);
+      })
+      .catch((error) => {
+        console.error('Failed to load Creatomate SDK, trying fallback', error);
+        
+        // Try fallback CDN
+        import('https://unpkg.com/@creatomate/preview@1.6.0/dist/Preview.min.js')
+          .then(() => {
+            console.log('Creatomate SDK loaded successfully from fallback');
+            resolve();
+          })
+          .catch((fallbackError) => {
+            const error = new Error('Failed to load Creatomate SDK from both primary and fallback sources');
+            console.error(error);
+            reject(error);
+          });
+      });
   });
 }

@@ -16,6 +16,9 @@ import { AlertTriangle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 
+// Check if Creatomate SDK is disabled using environment variable
+const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
+
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -143,10 +146,10 @@ export default function TemplateCustomize() {
 
   return (
     <div className="container py-8 max-w-7xl">
-      {/* Disabled SDK loader */}
+      {/* Dynamic SDK loader */}
       <CreatomateLoader />
       
-      <Alert className="mb-4">
+      <Alert className="mb-4" variant="default">
         <AlertTriangle className="h-4 w-4 mr-2" />
         <AlertDescription>
           Live preview is temporarily disabled for development. Variable edits won't be reflected in real-time.
