@@ -6,7 +6,7 @@ import { MediaAsset } from "@/types";
 import { TemplateVariableSection } from "@/hooks/templates/useTemplateVariables";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 
 interface TemplateVariablesEditorProps {
   textVariables: TemplateVariableSection[];
@@ -35,6 +35,8 @@ export function TemplateVariablesEditor({
   isUpdating,
   onRender
 }: TemplateVariablesEditorProps) {
+  const { toast } = useToast();
+  
   // Accordion states
   const [textOpen, setTextOpen] = useState(true);
   const [mediaOpen, setMediaOpen] = useState(true);

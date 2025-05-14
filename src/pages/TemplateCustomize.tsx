@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TemplateVariablesEditor } from '@/components/Templates/TemplateVariablesEditor';
@@ -5,7 +6,7 @@ import { TemplateHeader } from '@/components/Templates/TemplateHeader';
 import { useTemplatePreviewUpdater, useTemplateVariables } from '@/hooks/templates';
 import { useTemplate } from '@/hooks/api/templates/useTemplate';
 import { useCreateRenderJob } from '@/hooks/api/useCreateRenderJob';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 import { MediaAsset } from '@/types';
 import { MediaSelectionDialog } from '@/components/Media/MediaSelectionDialog';
 import { CreatomateLoader } from '@/components/CreatomateLoader';
@@ -34,7 +35,6 @@ class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: any, errorInfo: any) {
     console.error('Component error:', error, errorInfo);
-    toast.error('An error occurred. Please try refreshing the page.');
   }
 
   render() {
@@ -48,6 +48,7 @@ class ErrorBoundary extends React.Component<
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   const [isRendering, setIsRendering] = useState(false);
   const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false);
@@ -94,9 +95,11 @@ export default function TemplateCustomize() {
   useEffect(() => {
     if (templateError) {
       console.error('Template error:', templateError);
-      toast.error('Error loading template: ' + templateError.message);
+      toast.error('Error loading template', {
+        description: templateError.message
+      });
     }
-  }, [templateError]);
+  }, [templateError, toast]);
 
   // Handle media select button click - with performance improvements
   const handleMediaSelect = useCallback((key: string) => {
@@ -118,15 +121,19 @@ export default function TemplateCustomize() {
       setIsMediaDialogOpen(false);
     } catch (error) {
       console.error('Error selecting media:', error);
-      toast.error('Error selecting media. Please try again.');
+      toast.error('Error selecting media', {
+        description: 'Please try again'
+      });
       setIsMediaDialogOpen(false);
     }
-  }, [currentMediaKey, handleMediaSelected]);
+  }, [currentMediaKey, handleMediaSelected, toast]);
 
   // Handle render button click with improved error handling
   const handleRender = async () => {
     if (!template || !id) {
-      toast.error('Cannot start render: Template information is missing');
+      toast.error('Cannot start render', {
+        description: 'Template information is missing'
+      });
       return;
     }
 
@@ -146,13 +153,17 @@ export default function TemplateCustomize() {
 
       console.timeEnd('renderJob');
 
-      toast.success('Render started successfully! Your video is now being rendered.');
+      toast.success('Render started successfully!', {
+        description: 'Your video is now being rendered'
+      });
 
       // Navigate to projects page with job ID parameter
       navigate(`/projects?job=${result.id}`);
     } catch (error: any) {
       console.error('Render error:', error);
-      toast.error('Failed to start render: ' + (error.message || 'An unknown error occurred'));
+      toast.error('Failed to start render', {
+        description: error.message || 'An unknown error occurred'
+      });
     } finally {
       setIsRendering(false);
     }

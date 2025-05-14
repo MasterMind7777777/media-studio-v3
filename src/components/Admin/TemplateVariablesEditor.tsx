@@ -1,9 +1,10 @@
+
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Trash2, Plus } from "lucide-react";
-import { toast } from "sonner";
+import { useToast } from "@/hooks/use-toast";
 
 interface TemplateVariablesEditorProps {
   variables: Record<string, any>;
@@ -11,165 +12,121 @@ interface TemplateVariablesEditorProps {
 }
 
 export function TemplateVariablesEditor({ variables, onChange }: TemplateVariablesEditorProps) {
+  const { toast } = useToast();
   const [newVariableKey, setNewVariableKey] = useState("");
   const [newVariableValue, setNewVariableValue] = useState("");
 
-  // Convert variables object to array for easier manipulation
-  const variablesArray = Object.entries(variables || {}).map(([key, value]) => ({
-    key,
-    value: typeof value === "string" ? value : JSON.stringify(value),
-    originalValue: value,
-  }));
-
-  const handleVariableChange = (index: number, key: string, value: string) => {
-    const updatedVariables = { ...variables };
-    
-    // Remove old key if it changed
-    if (variablesArray[index].key !== key && variablesArray[index].key in updatedVariables) {
-      delete updatedVariables[variablesArray[index].key];
-    }
-    
-    // Set new value with the right type
-    try {
-      // Try to parse as JSON if it starts with { or [
-      if ((value.startsWith("{") && value.endsWith("}")) || 
-          (value.startsWith("[") && value.endsWith("]"))) {
-        updatedVariables[key] = JSON.parse(value);
-      } else {
-        updatedVariables[key] = value;
-      }
-    } catch (e) {
-      // If parsing fails, use the raw string
-      updatedVariables[key] = value;
-    }
-    
+  const handleInputChange = (key: string, value: string) => {
+    const updatedVariables = {
+      ...variables,
+      [key]: value
+    };
     onChange(updatedVariables);
   };
 
   const handleDeleteVariable = (key: string) => {
+    // Create a new variables object without the deleted key
     const updatedVariables = { ...variables };
     delete updatedVariables[key];
     onChange(updatedVariables);
     
-    toast.success(`Variable "${key}" has been removed.`);
+    toast({
+      title: "Variable deleted",
+      description: `Variable "${key}" has been removed.`
+    });
   };
 
   const handleAddVariable = () => {
     if (!newVariableKey.trim()) {
-      toast.error("Please enter a valid variable name.");
+      toast({
+        title: "Invalid variable name",
+        description: "Please enter a valid variable name.",
+        variant: "destructive"
+      });
       return;
     }
     
     // Validate variable name format (should contain a dot)
     if (!newVariableKey.includes(".")) {
-      toast.error("Variable name should be in format 'Element.property' (e.g., 'Heading.text')");
+      toast({
+        title: "Invalid variable format",
+        description: "Variable name should be in format 'Element.property' (e.g., 'Heading.text')",
+        variant: "destructive" 
+      });
       return;
     }
 
-    const updatedVariables = { ...variables };
-    updatedVariables[newVariableKey] = newVariableValue;
+    // Add the new variable
+    const updatedVariables = {
+      ...variables,
+      [newVariableKey]: newVariableValue
+    };
     onChange(updatedVariables);
-    
-    // Reset form
     setNewVariableKey("");
     setNewVariableValue("");
     
-    toast.success(`Variable "${newVariableKey}" has been added.`);
+    toast({
+      title: "Variable added",
+      description: `Variable "${newVariableKey}" has been added.`
+    });
   };
 
   // Sort variables by key for better organization
-  const sortedVariables = [...variablesArray].sort((a, b) => a.key.localeCompare(b.key));
-  
-  // Group variables by element name for better organization
-  const groupedVariables: Record<string, typeof variablesArray> = {};
-  
-  sortedVariables.forEach(item => {
-    const elementName = item.key.split('.')[0];
-    if (!groupedVariables[elementName]) {
-      groupedVariables[elementName] = [];
-    }
-    groupedVariables[elementName].push(item);
-  });
+  const sortedVariables = Object.keys(variables).sort();
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium">Template Variables</h3>
-        <div className="text-sm text-muted-foreground">
-          {Object.keys(variables || {}).length} variables found
-        </div>
-      </div>
-
-      {/* Variables list */}
-      <div className="space-y-6">
-        {Object.entries(groupedVariables).map(([elementName, items]) => (
-          <div key={elementName} className="border p-4 rounded-md">
-            <h4 className="text-sm font-medium mb-2">{elementName}</h4>
-            <div className="space-y-3">
-              {items.map((item, index) => (
-                <div key={item.key} className="flex items-center gap-2">
-                  <div className="grid gap-1 flex-1">
-                    <Label htmlFor={`var-key-${index}`} className="sr-only">
-                      Variable Name
-                    </Label>
-                    <Input
-                      id={`var-key-${index}`}
-                      value={item.key}
-                      onChange={(e) => handleVariableChange(index, e.target.value, item.value)}
-                      placeholder="Variable name (e.g., Element.property)"
-                    />
-                  </div>
-                  <div className="grid gap-1 flex-1">
-                    <Label htmlFor={`var-value-${index}`} className="sr-only">
-                      Variable Value
-                    </Label>
-                    <Input
-                      id={`var-value-${index}`}
-                      value={item.value}
-                      onChange={(e) =>
-                        handleVariableChange(index, item.key, e.target.value)
-                      }
-                      placeholder="Value"
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleDeleteVariable(item.key)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                    <span className="sr-only">Delete</span>
-                  </Button>
-                </div>
-              ))}
+      <div className="space-y-4">
+        {sortedVariables.map((key) => (
+          <div key={key} className="flex items-center space-x-2">
+            <div className="grid flex-1 gap-2">
+              <Label htmlFor={`var-${key}`}>{key}</Label>
+              <Input
+                id={`var-${key}`}
+                value={variables[key] || ''}
+                onChange={(e) => handleInputChange(key, e.target.value)}
+                placeholder="Value"
+              />
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => handleDeleteVariable(key)}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
         ))}
       </div>
-
-      {/* Add new variable form */}
-      <div className="border-t pt-4 mt-4">
-        <h4 className="text-sm font-medium mb-2">Add New Variable</h4>
-        <div className="flex items-end gap-2">
-          <div className="grid gap-1 flex-1">
-            <Label htmlFor="new-var-key">Variable Name</Label>
+      
+      {/* Add new variable section */}
+      <div className="border-t pt-4">
+        <h3 className="text-sm font-medium mb-3">Add New Variable</h3>
+        <div className="flex items-end space-x-2">
+          <div className="grid flex-1 gap-2">
+            <Label htmlFor="new-key">Variable Name</Label>
             <Input
-              id="new-var-key"
+              id="new-key"
               value={newVariableKey}
               onChange={(e) => setNewVariableKey(e.target.value)}
-              placeholder="Element.property (e.g., Heading.text)"
+              placeholder="e.g., Heading.text"
             />
           </div>
-          <div className="grid gap-1 flex-1">
-            <Label htmlFor="new-var-value">Value</Label>
+          <div className="grid flex-1 gap-2">
+            <Label htmlFor="new-value">Default Value</Label>
             <Input
-              id="new-var-value"
+              id="new-value"
               value={newVariableValue}
               onChange={(e) => setNewVariableValue(e.target.value)}
-              placeholder="Enter value"
+              placeholder="Value"
             />
           </div>
-          <Button onClick={handleAddVariable}>
+          <Button
+            type="button"
+            onClick={handleAddVariable}
+            className="flex items-center gap-1"
+          >
             <Plus className="h-4 w-4 mr-1" />
             Add
           </Button>

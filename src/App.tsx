@@ -6,7 +6,7 @@ import {
   Navigate,
   useLocation,
 } from "react-router-dom";
-import { Toaster } from "@/components/ui/sonner";
+import { Toaster } from "@/components/ui/toaster";
 import Create from "./pages/Create";
 import Templates from "./pages/Templates";
 import TemplateCustomize from "./pages/TemplateCustomize";
