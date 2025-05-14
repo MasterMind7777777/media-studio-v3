@@ -61,15 +61,7 @@ export default function TemplateCustomize() {
     error: templateError 
   } = useTemplate(id);
 
-  // Extract template variables - wrapped with a try/catch for safety
-  const {
-    textVariables,
-    mediaVariables,
-    colorVariables,
-    hasVariables
-  } = useTemplateVariables(template);
-  
-  // Handle preview updates
+  // Handle preview updates by logging changes
   const handlePreviewUpdate = useCallback((newVars: Record<string, any>) => {
     console.log('Variables updated:', newVars);
   }, []);
@@ -87,6 +79,14 @@ export default function TemplateCustomize() {
     initialVariables: template?.variables || {},
     onPreviewUpdate: handlePreviewUpdate
   });
+
+  // Extract template variables - wrapped with a try/catch for safety
+  const {
+    textVariables,
+    mediaVariables,
+    colorVariables,
+    hasVariables
+  } = useTemplateVariables(template);
 
   // Set up render job creation
   const { mutateAsync: createRenderJob, isPending: isSubmitting } = useCreateRenderJob();
