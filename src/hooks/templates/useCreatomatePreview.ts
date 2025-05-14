@@ -1,6 +1,7 @@
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { cleanupVariables } from '@/lib/variables';
+import { useDebouncedCallback } from '@/hooks/utils/useDebouncedCallback';
 
 // Check if Creatomate SDK is disabled using environment variable
 const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
@@ -20,6 +21,7 @@ interface PreviewHook {
   preview: any;
   error: Error | null;
   previewMode: 'interactive' | 'player' | null;
+  currentVars: Record<string, any>;
   forceUpdateVariables: (variables: Record<string, any>) => void;
   retryInitialization: () => void;
   togglePlay: () => void;
@@ -27,6 +29,7 @@ interface PreviewHook {
 
 /**
  * Hook for Creatomate preview with dynamic loading support
+ * Uses state (not ref) for variables to ensure proper re-rendering
  * Falls back to mock implementation when SDK is disabled
  */
 export function useCreatomatePreview({
@@ -36,19 +39,36 @@ export function useCreatomatePreview({
   onReady,
   onError,
 }: PreviewOptions): PreviewHook {
+  // State setup for all hook properties
   const [isReady, setIsReady] = useState(false);
   const [isLoading, setIsLoading] = useState(!isCreatomateDisabled);
   const [isPlaying, setIsPlaying] = useState(false);
   const [preview, setPreview] = useState<any>(null);
   const [error, setError] = useState<Error | null>(null);
   const [previewMode, setPreviewMode] = useState<'interactive' | 'player' | null>(null);
+  const [currentVars, setCurrentVars] = useState<Record<string, any>>(variables);
   
-  const variablesRef = useRef(variables);
-  
-  // Update ref when variables change
+  // Initialize with provided variables
   useEffect(() => {
-    variablesRef.current = variables;
+    setCurrentVars(prevVars => ({...prevVars, ...variables}));
   }, [variables]);
+  
+  // Reference for preview container element
+  const containerRef = useRef<HTMLElement | null>(null);
+  
+  // Debounced function to update preview with new variables
+  const debouncedUpdatePreview = useDebouncedCallback((newVars: Record<string, any>) => {
+    if (isCreatomateDisabled || !preview) return;
+    
+    try {
+      console.log('Updating preview variables (debounced):', newVars);
+      const cleanVars = cleanupVariables(newVars);
+      preview.setModifications(cleanVars);
+    } catch (err) {
+      console.error('Failed to update preview with new variables:', err);
+      setError(err instanceof Error ? err : new Error(String(err)));
+    }
+  }, 150);
   
   // Initialize preview or mock when component mounts
   useEffect(() => {
@@ -64,6 +84,8 @@ export function useCreatomatePreview({
         
         // Insert a placeholder element
         const container = document.getElementById(containerId);
+        containerRef.current = container;
+        
         if (container) {
           container.innerHTML = `
             <div class="absolute inset-0 flex flex-col items-center justify-center bg-muted">
@@ -79,38 +101,127 @@ export function useCreatomatePreview({
       
       return () => clearTimeout(timer);
     } else {
-      // Real SDK initialization would happen here if SDK is enabled
-      // This code won't run when VITE_DISABLE_CREATOMATE=true
-      console.log('SDK initialization would happen here (disabled for now)');
-      setIsLoading(false);
-    }
-  }, [containerId, onReady, templateId]);
-  
-  // Mock functions that would normally interact with the SDK
-  const forceUpdateVariables = useCallback((newVariables: Record<string, any>) => {
-    if (isCreatomateDisabled) {
-      console.log('Preview update requested (disabled):', newVariables);
-      // Just update the ref
-      variablesRef.current = { ...variablesRef.current, ...newVariables };
-      return;
+      // Real SDK initialization
+      const initializePreview = async () => {
+        try {
+          setIsLoading(true);
+          
+          // Dynamically import Creatomate types
+          const container = document.getElementById(containerId);
+          containerRef.current = container;
+          
+          if (!container) {
+            throw new Error(`Container with ID "${containerId}" not found`);
+          }
+          
+          // Check if SDK is available on window
+          if (!window.Creatomate || !window.Creatomate.Preview) {
+            throw new Error('Creatomate SDK not loaded');
+          }
+          
+          // Create preview instance
+          const previewInstance = new window.Creatomate.Preview({
+            container,
+            mode: 'interactive',
+            token: import.meta.env.VITE_CREATOMATE_TOKEN,
+          });
+          
+          // Setup event listeners
+          previewInstance.on('ready', () => {
+            console.log('Preview is ready');
+            setIsReady(true);
+            setIsLoading(false);
+            setPreviewMode('interactive');
+            onReady?.();
+            
+            // Load template if provided
+            if (templateId) {
+              previewInstance.loadTemplate(templateId);
+            }
+            
+            // Apply initial variables
+            if (Object.keys(currentVars).length > 0) {
+              const cleanVars = cleanupVariables(currentVars);
+              previewInstance.setModifications(cleanVars);
+            }
+          });
+          
+          previewInstance.on('error', (error: Error) => {
+            console.error('Preview error:', error);
+            setError(error);
+            setIsLoading(false);
+            onError?.(error);
+          });
+          
+          previewInstance.on('play', () => {
+            setIsPlaying(true);
+          });
+          
+          previewInstance.on('pause', () => {
+            setIsPlaying(false);
+          });
+          
+          // Store preview instance in state
+          setPreview(previewInstance);
+          
+        } catch (err) {
+          console.error('Failed to initialize preview:', err);
+          setError(err instanceof Error ? err : new Error(String(err)));
+          setIsLoading(false);
+          onError?.(err instanceof Error ? err : new Error(String(err)));
+        }
+      };
+      
+      initializePreview();
     }
     
-    // Real implementation would update the preview
-    if (preview) {
-      console.log('Updating preview variables:', newVariables);
-      // preview.setModifications(cleanupVariables(newVariables));
-    }
-  }, [preview]);
+    // Cleanup function
+    return () => {
+      if (preview && typeof preview.destroy === 'function') {
+        preview.destroy();
+      }
+    };
+  }, [containerId, templateId, onReady, onError]);
   
+  // Update variables and preview
+  const forceUpdateVariables = useCallback((newVariables: Record<string, any>) => {
+    // Create a new object to ensure state updates
+    setCurrentVars((prevVars) => {
+      const updatedVars = {...prevVars, ...newVariables};
+      
+      // Queue the debounced preview update
+      debouncedUpdatePreview(updatedVars);
+      
+      return updatedVars;
+    });
+  }, [debouncedUpdatePreview]);
+  
+  // Retry initialization
   const retryInitialization = useCallback(() => {
     console.log('Retry requested');
-    // Implementation would depend on SDK being enabled or disabled
+    setError(null);
+    setIsLoading(true);
+    
+    // Re-trigger the useEffect
+    const container = containerRef.current;
+    if (container) {
+      container.innerHTML = '';
+    }
+    
+    // Force a re-render
+    setPreview(null);
   }, []);
   
+  // Toggle play/pause
   const togglePlay = useCallback(() => {
-    console.log('Toggle play requested');
-    // Implementation would depend on SDK being enabled or disabled
-  }, []);
+    if (!preview) return;
+    
+    if (isPlaying) {
+      preview.pause();
+    } else {
+      preview.play();
+    }
+  }, [preview, isPlaying]);
   
   return {
     isLoading,
@@ -119,6 +230,7 @@ export function useCreatomatePreview({
     preview,
     error,
     previewMode,
+    currentVars,
     forceUpdateVariables,
     retryInitialization,
     togglePlay

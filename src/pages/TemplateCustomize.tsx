@@ -15,6 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { useCreatomatePreview } from '@/hooks/templates';
 
 // Check if Creatomate SDK is disabled using environment variable with fallback
 const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
@@ -53,6 +54,7 @@ export default function TemplateCustomize() {
   const [isRendering, setIsRendering] = useState(false);
   const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false);
   const [currentMediaKey, setCurrentMediaKey] = useState<string>('');
+  const previewContainerId = 'creatomate-preview-container';
 
   // Fetch template data
   const { 
@@ -61,10 +63,31 @@ export default function TemplateCustomize() {
     error: templateError 
   } = useTemplate(id);
 
-  // Handle preview updates by logging changes
+  // Initialize Creatomate preview
+  const {
+    currentVars,
+    forceUpdateVariables,
+    isReady: previewReady,
+    error: previewError
+  } = useCreatomatePreview({
+    containerId: previewContainerId,
+    templateId: template?.template_id || undefined,
+    variables: template?.variables || {},
+    onError: (error) => {
+      console.error('Preview error:', error);
+      toast({
+        title: "Preview Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    }
+  });
+  
+  // Handle template variable updates
   const handlePreviewUpdate = useCallback((newVars: Record<string, any>) => {
     console.log('Variables updated:', newVars);
-  }, []);
+    forceUpdateVariables(newVars);
+  }, [forceUpdateVariables]);
   
   // Setup template variables updater with normalized initialVariables
   const {
@@ -80,7 +103,7 @@ export default function TemplateCustomize() {
     onPreviewUpdate: handlePreviewUpdate
   });
 
-  // Extract template variables - wrapped with a try/catch for safety
+  // Extract template variables
   const {
     textVariables,
     mediaVariables,
@@ -103,14 +126,14 @@ export default function TemplateCustomize() {
     }
   }, [templateError, toast]);
 
-  // Handle media select button click - with performance improvements
+  // Handle media select button click
   const handleMediaSelect = useCallback((key: string) => {
     console.log('Opening media selection dialog for:', key);
     setCurrentMediaKey(key);
     setIsMediaDialogOpen(true);
   }, []);
 
-  // Handle media selection from dialog - with error handling
+  // Handle media selection from dialog
   const handleMediaDialogSelect = useCallback((asset: MediaAsset) => {
     try {
       if (!currentMediaKey) {
@@ -150,10 +173,10 @@ export default function TemplateCustomize() {
       console.time('renderJob');
       
       // Log the variables being sent for rendering
-      console.log('Starting render with variables:', variables);
+      console.log('Starting render with variables:', currentVars);
       const result = await createRenderJob({
         templateId: id, 
-        variables,
+        variables: currentVars,
         platforms: template.platforms || []
       });
 
@@ -201,12 +224,14 @@ export default function TemplateCustomize() {
       {/* Dynamic SDK loader */}
       <CreatomateLoader />
       
-      <Alert className="mb-4" variant="warning">
-        <AlertTriangle className="h-4 w-4 mr-2" />
-        <AlertDescription>
-          Live preview is temporarily disabled for development. Variable edits will be applied when rendering.
-        </AlertDescription>
-      </Alert>
+      {isCreatomateDisabled && (
+        <Alert className="mb-4" variant="warning">
+          <AlertTriangle className="h-4 w-4 mr-2" />
+          <AlertDescription>
+            Live preview is temporarily disabled for development. Variable edits will be applied when rendering.
+          </AlertDescription>
+        </Alert>
+      )}
       
       {template && (
         <TemplateHeader 
@@ -228,8 +253,9 @@ export default function TemplateCustomize() {
                 </div>
               ) : (
                 <AspectRatio ratio={16/9} className="bg-muted rounded-md overflow-hidden">
-                  <div className="h-full w-full flex items-center justify-center flex-col">
-                    {previewImageUrl && previewImageUrl !== '/placeholder.svg' ? (
+                  <div id={previewContainerId} className="h-full w-full flex items-center justify-center flex-col">
+                    {/* Creatomate preview will render here */}
+                    {!previewReady && previewImageUrl && previewImageUrl !== '/placeholder.svg' && (
                       <img
                         src={previewImageUrl}
                         alt="Template Preview"
@@ -239,20 +265,17 @@ export default function TemplateCustomize() {
                           (e.target as HTMLImageElement).src = '/placeholder.svg';
                         }}
                       />
-                    ) : (
-                      <div className="text-muted-foreground flex flex-col items-center">
-                        <AlertTriangle className="h-8 w-8 mb-2" />
-                        <p>No preview available</p>
-                      </div>
                     )}
                   </div>
                 </AspectRatio>
               )}
 
               <div className="mt-4 flex justify-end gap-2">
-                <div className="text-xs px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-600">
-                  Preview Disabled
-                </div>
+                {isCreatomateDisabled && (
+                  <div className="text-xs px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-600">
+                    Preview Disabled
+                  </div>
+                )}
               </div>
             </div>
           </Card>
