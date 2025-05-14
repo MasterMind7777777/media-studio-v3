@@ -2,7 +2,7 @@
 // This tells TypeScript that there will be a Creatomate global
 interface Window {
   Creatomate?: {
-    Preview: typeof import('@creatomate/preview').Preview;
+    Preview: any;
   };
   __CREATOMATE_SDK_LOADED__?: boolean;
 }
@@ -25,3 +25,4 @@ declare global {
     'creatomate-sdk-loaded': CustomEvent;
   }
 }
+

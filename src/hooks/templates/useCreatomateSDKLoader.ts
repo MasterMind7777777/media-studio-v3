@@ -7,8 +7,9 @@ const SDK_LOADED_EVENT = 'creatomate-sdk-loaded';
 const SDK_ERROR_EVENT = 'creatomate-sdk-error';
 
 // Primary and fallback URLs for the Creatomate Preview SDK
-const PRIMARY_SDK_URL = 'https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/preview.min.js';
-const FALLBACK_SDK_URL = 'https://unpkg.com/@creatomate/preview@1.6.0/dist/preview.min.js';
+// Using the correct dist/index.js path instead of preview.min.js
+const PRIMARY_SDK_URL = 'https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/index.js';
+const FALLBACK_SDK_URL = 'https://unpkg.com/@creatomate/preview@1.6.0/dist/index.js';
 
 // Maximum number of retry attempts
 const MAX_RETRIES = 3;
@@ -34,7 +35,7 @@ export function useCreatomateSDKLoader() {
     }
 
     // Check if SDK already loaded
-    if (window.Creatomate?.Preview) {
+    if (isCreatomateSDKAvailable()) {
       console.log('Creatomate Preview SDK already available in window');
       setIsLoaded(true);
       setIsLoading(false);
@@ -107,7 +108,7 @@ export function useCreatomateSDKLoader() {
       }, retryCount > 0 ? RETRY_DELAY : 0);
       
       return () => clearTimeout(timer);
-    } else if (!window.Creatomate?.Preview) {
+    } else if (!isCreatomateSDKAvailable()) {
       // Script tag exists but SDK not ready yet
       setIsLoading(true);
     }
@@ -142,7 +143,7 @@ export function loadCreatomateSdk(): Promise<typeof window.Creatomate.Preview> {
   return new Promise((resolve, reject) => {
     try {
       // Check if SDK is already loaded
-      if (window.Creatomate?.Preview) {
+      if (isCreatomateSDKAvailable()) {
         console.log('Creatomate Preview SDK already loaded');
         // Dispatch event for any listeners
         window.dispatchEvent(new CustomEvent(SDK_LOADED_EVENT));
@@ -170,27 +171,30 @@ export function loadCreatomateSdk(): Promise<typeof window.Creatomate.Preview> {
         script.dataset.loaded = 'true';
         console.log('Creatomate Preview SDK script loaded successfully');
         
-        // Validate SDK was properly initialized
-        if (window.Creatomate?.Preview) {
-          console.log('Creatomate Preview SDK initialized successfully');
-          // Dispatch event and resolve promise
-          window.dispatchEvent(new CustomEvent(SDK_LOADED_EVENT));
-          resolve(window.Creatomate.Preview);
-        } else {
-          console.error('Script loaded but Creatomate.Preview not available');
-          // Try fallback URL if this was the primary URL
-          if (script.src === PRIMARY_SDK_URL) {
-            console.log('Trying fallback SDK URL:', FALLBACK_SDK_URL);
-            script.src = FALLBACK_SDK_URL;
-            return; // Wait for onload to fire again
+        // Give a small delay to ensure initialization is complete
+        setTimeout(() => {
+          // Validate SDK was properly initialized
+          if (isCreatomateSDKAvailable()) {
+            console.log('Creatomate Preview SDK initialized successfully');
+            // Dispatch event and resolve promise
+            window.dispatchEvent(new CustomEvent(SDK_LOADED_EVENT));
+            resolve(window.Creatomate.Preview);
+          } else {
+            console.error('Script loaded but Creatomate.Preview not available');
+            // Try fallback URL if this was the primary URL
+            if (script.src === PRIMARY_SDK_URL) {
+              console.log('Trying fallback SDK URL:', FALLBACK_SDK_URL);
+              script.src = FALLBACK_SDK_URL;
+              return; // Wait for onload to fire again
+            }
+            
+            const error = new Error('Creatomate Preview SDK failed to initialize after script load');
+            window.dispatchEvent(new CustomEvent(SDK_ERROR_EVENT, {
+              detail: { error }
+            }));
+            reject(error);
           }
-          
-          const error = new Error('Creatomate Preview SDK failed to initialize after script load');
-          window.dispatchEvent(new CustomEvent(SDK_ERROR_EVENT, {
-            detail: { error }
-          }));
-          reject(error);
-        }
+        }, 100);
       };
       
       // Handle load error
