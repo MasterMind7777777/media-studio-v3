@@ -7,7 +7,7 @@ const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
 
 /**
  * Component that conditionally loads the Creatomate SDK
- * Uses dynamic ESM imports to avoid CommonJS exports errors
+ * Uses native script loading instead of ESM imports to avoid TypeScript errors
  */
 export function CreatomateLoader() {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -21,9 +21,29 @@ export function CreatomateLoader() {
       }
 
       try {
-        console.log('Dynamically importing Creatomate SDK');
-        // Using dynamic ESM import to avoid CommonJS exports errors
-        await import('https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.min.js');
+        console.log('Dynamically loading Creatomate SDK');
+        
+        // Using native script loading instead of dynamic ESM imports
+        const loadScript = (url: string): Promise<void> => {
+          return new Promise((resolve, reject) => {
+            const script = document.createElement('script');
+            script.type = 'text/javascript';
+            script.src = url;
+            script.async = true;
+            script.onload = () => {
+              console.log(`Script loaded successfully: ${url}`);
+              resolve();
+            };
+            script.onerror = (error) => {
+              console.error(`Error loading script: ${url}`, error);
+              reject(new Error(`Failed to load script: ${url}`));
+            };
+            document.body.appendChild(script);
+          });
+        };
+
+        // Try to load from primary source
+        await loadScript('https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.min.js');
         console.log('Creatomate SDK loaded successfully');
         setIsLoaded(true);
       } catch (error) {
@@ -31,7 +51,7 @@ export function CreatomateLoader() {
         
         try {
           // Try fallback source if primary fails
-          await import('https://unpkg.com/@creatomate/preview@1.6.0/dist/Preview.min.js');
+          await loadScript('https://unpkg.com/@creatomate/preview@1.6.0/dist/Preview.min.js');
           console.log('Creatomate SDK loaded from fallback source');
           setIsLoaded(true);
         } catch (fallbackError) {
@@ -54,4 +74,23 @@ export function CreatomateLoader() {
 
   // This component doesn't render anything
   return null;
+}
+
+// Helper function for loading scripts, exported for reuse
+export function loadScript(url: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = url;
+    script.async = true;
+    script.onload = () => {
+      console.log(`Script loaded successfully: ${url}`);
+      resolve();
+    };
+    script.onerror = (error) => {
+      console.error(`Error loading script: ${url}`, error);
+      reject(new Error(`Failed to load script: ${url}`));
+    };
+    document.body.appendChild(script);
+  });
 }

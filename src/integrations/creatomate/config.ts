@@ -3,6 +3,9 @@
  * Config and helper functions for Creatomate integration
  */
 
+// Import the loadScript helper
+import { loadScript } from '@/components/CreatomateLoader';
+
 // Check if Creatomate SDK is disabled using environment variable
 export const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
 
@@ -70,8 +73,8 @@ export function ensureCreatomateSDK(): Promise<void> {
     
     console.log('Loading Creatomate SDK dynamically');
     
-    // Use dynamic ESM import instead of creating script elements
-    import('https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.min.js')
+    // Use loadScript helper instead of dynamic ESM imports
+    loadScript('https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.min.js')
       .then(() => {
         console.log('Creatomate SDK loaded successfully');
         resolve();
@@ -80,7 +83,7 @@ export function ensureCreatomateSDK(): Promise<void> {
         console.error('Failed to load Creatomate SDK, trying fallback', error);
         
         // Try fallback CDN
-        import('https://unpkg.com/@creatomate/preview@1.6.0/dist/Preview.min.js')
+        loadScript('https://unpkg.com/@creatomate/preview@1.6.0/dist/Preview.min.js')
           .then(() => {
             console.log('Creatomate SDK loaded successfully from fallback');
             resolve();
