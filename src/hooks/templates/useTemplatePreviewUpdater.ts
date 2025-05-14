@@ -50,7 +50,8 @@ export function useTemplatePreviewUpdater({
             file_type: 'image', // Assume image for now
             created_at: new Date().toISOString(),
             user_id: '',
-            file_size: 0,
+            thumbnail_url: value,
+            content_pack_id: null,
             metadata: {}
           };
         }
