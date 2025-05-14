@@ -88,3 +88,30 @@ export function normalizeKey(key: string): string {
   
   return key;
 }
+
+/**
+ * Cleans up variables before sending to Creatomate API
+ * Removes null/undefined values and normalizes keys
+ * @param variables Variables to clean up
+ * @returns Cleaned variables object
+ */
+export function cleanupVariables(variables: Record<string, any>): Record<string, any> {
+  console.log('Cleaning up variables before sending to Creatomate:', variables);
+  const cleanVars: Record<string, any> = {};
+  
+  // Skip null/undefined values and normalize keys
+  Object.entries(variables).forEach(([key, value]) => {
+    // Skip null/undefined values
+    if (value === null || value === undefined) {
+      return;
+    }
+    
+    // Normalize the key (remove duplicate suffixes)
+    const normalizedKey = normalizeKey(key);
+    cleanVars[normalizedKey] = value;
+  });
+  
+  console.log('Cleaned variables:', cleanVars);
+  return cleanVars;
+}
+
