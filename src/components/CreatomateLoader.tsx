@@ -6,12 +6,20 @@ import { useToast } from '@/hooks/use-toast';
 // Track shown toast IDs to prevent duplicates
 const shownToastIds = new Set<string>();
 
+// Check if Creatomate preview is enabled via environment variable
+export const isCreatomateDisabled = import.meta.env.VITE_CREATOMATE_PREVIEW === 'off';
+
 export function CreatomateLoader() {
   const { isLoading, isLoaded, error } = useCreatomateSDKLoader();
   const { toast } = useToast();
 
   // Show toast notifications for loader status
   useEffect(() => {
+    // Don't show toasts if preview is disabled
+    if (isCreatomateDisabled) {
+      return;
+    }
+    
     if (error) {
       const errorToastId = 'creatomate-sdk-error';
       if (!shownToastIds.has(errorToastId)) {
@@ -38,6 +46,3 @@ export function CreatomateLoader() {
 
   return null; // This is a utility component with no UI
 }
-
-// Flag for testing/debugging
-export const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';

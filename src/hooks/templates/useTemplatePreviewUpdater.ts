@@ -1,3 +1,4 @@
+
 import { useState, useRef } from 'react';
 import { useDebouncedCallback } from '../utils/useDebouncedCallback';
 import { MediaAsset } from '@/types';
@@ -77,8 +78,8 @@ export function useTemplatePreviewUpdater({
       [id]: media
     }));
     
-    // Use source_url from the MediaAsset type
-    const imageUrl = media.source_url || '';
+    // Get the image URL from the media asset, prioritizing source_url if available
+    const imageUrl = media.source_url || media.file_url || '';
     
     // Create immutable copy with new media value
     const newVars = {

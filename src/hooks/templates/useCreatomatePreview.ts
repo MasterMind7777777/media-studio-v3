@@ -1,5 +1,7 @@
+
 import { useRef, useState, useEffect } from 'react';
-import { loadCreatomateSdk, isCreatomateSDKAvailable } from './useCreatomateSDKLoader';
+import { useCreatomateSDKLoader, isCreatomateSDKAvailable } from './useCreatomateSDKLoader';
+import { isCreatomateDisabled } from '@/components/CreatomateLoader';
 
 export interface PreviewState {
   isReady: boolean;
@@ -19,6 +21,9 @@ interface UseCreatomatePreviewOptions {
 export function useCreatomatePreview(
   { containerId, templateId, variables = {}, onError }: UseCreatomatePreviewOptions
 ) {
+  // Use our SDK loader hook
+  const { isLoaded: isSdkLoaded, error: sdkError } = useCreatomateSDKLoader();
+  
   const [previewState, setPreviewState] = useState<PreviewState>({
     isReady: false,
     error: null,
@@ -46,9 +51,36 @@ export function useCreatomatePreview(
     }
   };
 
+  // Initialize preview when SDK becomes available
   useEffect(() => {
     let isMounted = true;
     let preview: any = null;
+    
+    // Don't initialize if Creatomate is disabled
+    if (isCreatomateDisabled) {
+      setPreviewState(prev => ({ 
+        ...prev, 
+        isLoading: false,
+        error: new Error('Creatomate preview disabled via environment variable')
+      }));
+      return;
+    }
+
+    // Handle SDK loading error
+    if (sdkError) {
+      if (onError) onError(sdkError);
+      setPreviewState(prev => ({ 
+        ...prev, 
+        isLoading: false, 
+        error: sdkError 
+      }));
+      return;
+    }
+
+    // Only initialize when SDK is loaded
+    if (!isSdkLoaded) {
+      return;
+    }
 
     const initializePreview = async () => {
       try {
@@ -59,12 +91,6 @@ export function useCreatomatePreview(
         if (!containerRef.current) {
           throw new Error(`Container #${containerId} not found in the DOM`);
         }
-
-        // Load the SDK
-        await loadCreatomateSdk();
-        
-        // Initialize preview after DOM is ready and SDK is loaded
-        if (!isMounted) return;
         
         if (!templateId) {
           console.warn('No template ID provided for Creatomate preview');
@@ -159,7 +185,7 @@ export function useCreatomatePreview(
         }
       }
     };
-  }, [containerId, templateId, onError]);
+  }, [containerId, templateId, isSdkLoaded, sdkError, onError, variables]);
 
   return {
     ...previewState,

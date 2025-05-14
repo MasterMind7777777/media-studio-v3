@@ -1,3 +1,4 @@
+
 export type UserRole = 'user' | 'admin';
 
 export interface User {
@@ -50,6 +51,8 @@ export interface MediaAsset {
   content_pack_id: string | null;
   metadata: Record<string, any>;
   created_at: string;
+  // Add source_url field to fix the build error
+  source_url?: string;
 }
 
 export interface RenderJob {
@@ -96,4 +99,30 @@ export interface NavItem {
 
 export interface SideNavItem extends NavItem {
   items?: NavItem[];
+}
+
+// Export CreatomatePreviewSDK interface
+export interface CreatomatePreviewSDK {
+  Preview: new (config: {
+    token: string;
+    templateId?: string;
+    container: HTMLElement;
+    format?: string;
+    mode?: 'player' | 'interactive';
+    modifications?: Record<string, any>;
+  }) => {
+    onReady: () => void;
+    onError: (error: Error) => void;
+    onTimeUpdate: (time: number) => void;
+    onPlay: () => void;
+    onPause: () => void;
+    loadTemplate: (templateId: string) => Promise<void>;
+    setModifications: (modifications: Record<string, any>) => void;
+    setTime: (time: number) => Promise<void>;
+    play: () => void;
+    pause: () => void;
+    dispose: () => void;
+    on: (event: string, callback: any) => void;
+    isPlaying: () => boolean;
+  };
 }

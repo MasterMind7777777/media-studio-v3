@@ -1,7 +1,8 @@
+
+import { CreatomatePreviewSDK } from '.';
+
 interface Window {
-  Creatomate?: {
-    Preview: new (options: any) => any;
-  };
+  Creatomate?: CreatomatePreviewSDK;
   __CREATOMATE_SDK_LOADED__?: boolean;
 }
 
@@ -20,5 +21,6 @@ declare global {
   interface WindowEventMap {
     'creatomate-sdk-ready': CreatomateSDKReadyEvent;
     'creatomate-sdk-error': CreatomateSDKErrorEvent;
+    'creatomate-sdk-loaded': CustomEvent;
   }
 }
