@@ -114,4 +114,3 @@ export function cleanupVariables(variables: Record<string, any>): Record<string,
   console.log('Cleaned variables:', cleanVars);
   return cleanVars;
 }
-

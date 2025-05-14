@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { normalizeKeys, cleanupVariables } from '@/lib/variables';
 
@@ -80,8 +79,8 @@ export function useCreatomatePreview({
 
       // Clean and normalize the variables before passing to Creatomate
       const cleanedVars = cleanupVariables(latestVariables.current);
-      const normalizedVariables = normalizeKeys(cleanedVars);
-      console.log('Initializing preview with normalized variables:', normalizedVariables);
+      
+      console.log('Initializing preview with cleaned variables:', cleanedVars);
       
       // Initialize the preview with the public token
       previewRef.current = new window.Creatomate.Preview({
@@ -90,7 +89,7 @@ export function useCreatomatePreview({
         container: containerRef.current,
         format: 'mp4',
         mode: 'interactive',
-        modifications: normalizedVariables,
+        modifications: cleanedVars,
         onReady: () => {
           console.log('Creatomate preview ready');
           setIsReady(true);
@@ -149,11 +148,10 @@ export function useCreatomatePreview({
     try {
       // Clean and normalize the variables before updating
       const cleanedVars = cleanupVariables(newVariables);
-      const normalizedVariables = normalizeKeys(cleanedVars);
-      console.log('Updating preview with normalized variables:', normalizedVariables);
+      console.log('Updating preview with cleaned variables:', cleanedVars);
       
       // Apply the variables to the preview
-      previewRef.current.setModifications(normalizedVariables);
+      previewRef.current.setModifications(cleanedVars);
     } catch (error: any) {
       console.error('Error updating preview variables:', error);
       onError?.(error);
