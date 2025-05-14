@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { MediaAsset } from '@/types';
 import { toast } from '@/components/ui/use-toast';
 import { normalizeKeys } from '@/lib/variables';
@@ -10,18 +10,24 @@ interface UseTemplatePreviewUpdaterProps {
 
 /**
  * Hook for managing template preview variables with debounced updates
- * to prevent too many updates firing at once
  */
 export function useTemplatePreviewUpdater({ 
   initialVariables = {}, 
   onPreviewUpdate
 }: UseTemplatePreviewUpdaterProps) {
   // Store the actual state of variables
-  const [variables, setVariables] = useState<Record<string, any>>(initialVariables);
+  const [variables, setVariables] = useState<Record<string, any>>(normalizeKeys(initialVariables));
   // Track if changes are in progress
   const [isUpdating, setIsUpdating] = useState(false);
   // Track selected media
   const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
+  // Keep a ref to the latest variables to avoid closure issues
+  const latestVariables = useRef(variables);
+  
+  // Update the ref when variables change
+  useEffect(() => {
+    latestVariables.current = variables;
+  }, [variables]);
   
   // Initialize variables when initial values change
   useEffect(() => {
@@ -31,8 +37,45 @@ export function useTemplatePreviewUpdater({
       const normalizedVars = normalizeKeys(initialVariables);
       console.log('Normalized initial variables:', normalizedVars);
       setVariables(normalizedVars);
+      
+      // Extract any media assets that are already set
+      const initialMedia: Record<string, MediaAsset> = {};
+      Object.entries(normalizedVars).forEach(([key, value]) => {
+        if (key.includes('.source') && typeof value === 'string' && value.startsWith('http')) {
+          // Create a simple MediaAsset object from the URL
+          initialMedia[key] = {
+            id: key,
+            name: key.split('.')[0],
+            file_url: value,
+            file_type: 'image', // Assume image for now
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            user_id: '',
+            file_size: 0,
+            metadata: {}
+          };
+        }
+      });
+      
+      if (Object.keys(initialMedia).length > 0) {
+        setSelectedMedia(initialMedia);
+      }
     }
   }, [JSON.stringify(initialVariables)]);
+  
+  // Helper to ensure key has correct format
+  const normalizeKey = useCallback((key: string, defaultProperty: string): string => {
+    const parts = key.split('.');
+    const elementName = parts[0];
+    
+    // If key already has property suffix, keep it
+    if (parts.length > 1) {
+      return key; // Keep the original key if it already has a property
+    }
+    
+    // Add the default property suffix if missing
+    return `${elementName}.${defaultProperty}`;
+  }, []);
   
   // Handle text variable changes
   const handleTextChange = useCallback((key: string, value: string) => {
@@ -51,7 +94,7 @@ export function useTemplatePreviewUpdater({
     
     // Clear updating state after a short delay
     setTimeout(() => setIsUpdating(false), 300);
-  }, [onPreviewUpdate]);
+  }, [onPreviewUpdate, normalizeKey]);
   
   // Handle color variable changes
   const handleColorChange = useCallback((key: string, value: string) => {
@@ -70,7 +113,7 @@ export function useTemplatePreviewUpdater({
     
     // Clear updating state after a short delay
     setTimeout(() => setIsUpdating(false), 300);
-  }, [onPreviewUpdate]);
+  }, [onPreviewUpdate, normalizeKey]);
   
   // Handle media asset selection
   const handleMediaSelected = useCallback((key: string, asset: MediaAsset) => {
@@ -96,29 +139,13 @@ export function useTemplatePreviewUpdater({
     
     // Toast notification for better UX
     toast({
-      title: "Updated media",
+      title: "Media updated",
       description: asset.name
     });
     
     // Clear updating state after a short delay
     setTimeout(() => setIsUpdating(false), 300);
-  }, [onPreviewUpdate]);
-  
-  // Helper to normalize a single key
-  const normalizeKey = (key: string, defaultProperty: string): string => {
-    const parts = key.split('.');
-    const elementName = parts[0];
-    
-    // If key already has property suffix, keep it
-    if (parts.length > 1) {
-      // Remove any duplicate suffixes (e.g., "text.text" -> "text")
-      const property = parts[1];
-      return `${elementName}.${property}`;
-    }
-    
-    // Add the default property suffix if missing
-    return `${elementName}.${defaultProperty}`;
-  };
+  }, [onPreviewUpdate, normalizeKey]);
   
   return {
     variables,
@@ -127,6 +154,8 @@ export function useTemplatePreviewUpdater({
     handleTextChange,
     handleColorChange,
     handleMediaSelected,
-    setVariables
+    setVariables,
+    // Add the reference for closure safety
+    variablesRef: latestVariables
   };
 }

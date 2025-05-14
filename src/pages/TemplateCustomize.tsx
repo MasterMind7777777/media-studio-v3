@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TemplateVariablesEditor } from '@/components/Templates/TemplateVariablesEditor';
 import { TemplateHeader } from '@/components/Templates/TemplateHeader';
-import { useCreatomatePreview, useTemplatePreviewUpdater, useTemplateVariables } from '@/hooks/templates';
+import { useTemplatePreviewUpdater, useTemplateVariables } from '@/hooks/templates';
 import { useTemplate } from '@/hooks/api/templates/useTemplate';
 import { useCreateRenderJob } from '@/hooks/api/useCreateRenderJob';
 import { toast } from '@/components/ui/use-toast';
@@ -11,6 +11,10 @@ import { MediaAsset } from '@/types';
 import { MediaSelectionDialog } from '@/components/Media/MediaSelectionDialog';
 import { CreatomateLoader } from '@/components/CreatomateLoader';
 import { normalizeKeys } from '@/lib/variables';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertTriangle } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
@@ -19,7 +23,6 @@ export default function TemplateCustomize() {
   const [isRendering, setIsRendering] = useState(false);
   const [isMediaDialogOpen, setIsMediaDialogOpen] = useState(false);
   const [currentMediaKey, setCurrentMediaKey] = useState<string>('');
-  const [sdkStatus, setSDKStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   // Fetch template data
   const { 
@@ -48,28 +51,8 @@ export default function TemplateCustomize() {
   } = useTemplatePreviewUpdater({
     initialVariables: template?.variables || {},
     onPreviewUpdate: (newVars) => {
-      // This will be called whenever variables change
-      if (creatomatePreview.isReady && creatomatePreview.preview) {
-        console.log('Template Preview: Forcing preview update with new variables', newVars);
-        creatomatePreview.forceUpdateVariables(newVars);
-      } else {
-        console.log('Template Preview: Preview not ready, variables update queued', newVars);
-      }
-    }
-  });
-
-  // Set up Creatomate preview with improved error handling
-  const creatomatePreview = useCreatomatePreview({
-    containerId: 'creatomate-preview',
-    templateId: template?.creatomate_template_id,
-    variables: variables, // Use the normalized variables
-    onReady: () => {
-      console.log('Preview is ready');
-      setSDKStatus('ready');
-    },
-    onError: (error) => {
-      console.error('Preview error:', error);
-      setSDKStatus('error');
+      // Since SDK is disabled, just log the updates
+      console.log('Variables would update preview:', newVars);
     }
   });
 
@@ -155,12 +138,20 @@ export default function TemplateCustomize() {
     }
   };
 
-  const isLoading = templateLoading || creatomatePreview.isLoading;
+  const isLoading = templateLoading;
+  const previewImageUrl = template?.preview_image_url || '/placeholder.svg';
 
   return (
     <div className="container py-8 max-w-7xl">
-      {/* Load the Creatomate SDK */}
+      {/* Disabled SDK loader */}
       <CreatomateLoader />
+      
+      <Alert variant="warning" className="mb-4">
+        <AlertTriangle className="h-4 w-4 mr-2" />
+        <AlertDescription>
+          Live preview is temporarily disabled for development. Variable edits won't be reflected in real-time.
+        </AlertDescription>
+      </Alert>
       
       {template && (
         <TemplateHeader 
@@ -168,36 +159,43 @@ export default function TemplateCustomize() {
         />
       )}
 
-      <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Preview */}
-        <div className="relative aspect-video bg-muted rounded-lg overflow-hidden">
-          {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
-              <div className="animate-pulse text-muted-foreground">Loading preview...</div>
-            </div>
-          )}
+      <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Preview Area */}
+        <Card className="overflow-hidden">
+          <div className="p-4 border-b">
+            <h3 className="font-medium">Preview</h3>
+          </div>
+          <div className="relative p-4">
+            {isLoading ? (
+              <div className="aspect-video bg-muted flex items-center justify-center rounded-md">
+                <p className="text-muted-foreground animate-pulse">Loading template...</p>
+              </div>
+            ) : (
+              <AspectRatio ratio={16/9} className="bg-muted rounded-md overflow-hidden">
+                <div className="h-full w-full flex items-center justify-center flex-col">
+                  {previewImageUrl && previewImageUrl !== '/placeholder.svg' ? (
+                    <img
+                      src={previewImageUrl}
+                      alt="Template Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="text-muted-foreground flex flex-col items-center">
+                      <AlertTriangle className="h-8 w-8 mb-2" />
+                      <p>No preview available</p>
+                    </div>
+                  )}
+                </div>
+              </AspectRatio>
+            )}
 
-          {sdkStatus === 'error' && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 z-10">
-              <div className="text-destructive mb-2">Failed to load preview</div>
-              <button 
-                className="px-3 py-1 text-sm bg-muted rounded-md hover:bg-muted/80"
-                onClick={() => {
-                  setSDKStatus('loading');
-                  creatomatePreview.retryInitialization();
-                }}
-              >
-                Retry
-              </button>
+            <div className="mt-4 flex justify-end gap-2">
+              <div className="text-xs px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-600">
+                Preview Disabled
+              </div>
             </div>
-          )}
-
-          <div 
-            id="creatomate-preview" 
-            className="w-full h-full"
-            data-testid="creatomate-preview"
-          />
-        </div>
+          </div>
+        </Card>
 
         {/* Editor */}
         <div className="relative">

@@ -6,6 +6,7 @@ import { Type, Image, Cog, Check, Loader2 } from "lucide-react";
 import { MediaAsset } from "@/types";
 import { TemplateVariableSection } from "@/hooks/templates/useTemplateVariables";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 
 interface TemplateVariablesEditorProps {
   textVariables: TemplateVariableSection[];
@@ -15,7 +16,7 @@ interface TemplateVariablesEditorProps {
   selectedMedia: Record<string, MediaAsset>;
   onTextChange: (key: string, value: string) => void;
   onColorChange: (key: string, value: string) => void;
-  onMediaSelect: (key: string) => void; // Changed back to accept only key
+  onMediaSelect: (key: string) => void;
   isRendering: boolean;
   isUpdating: boolean;
   onRender: () => void;
@@ -72,14 +73,15 @@ export function TemplateVariablesEditor({
             <CollapsibleContent className="p-4 pt-0 space-y-3">
               {textVariables.map(({key, value, variableName}) => (
                 <div key={key} className="space-y-1">
-                  <label className="text-sm text-muted-foreground">
+                  <label htmlFor={`input-${key}`} className="text-sm text-muted-foreground block">
                     {formatVariableName(key)}
                   </label>
-                  <input 
+                  <Input
+                    id={`input-${key}`}
                     type="text" 
                     value={value || ''}
                     onChange={(e) => onTextChange(key, e.target.value)}
-                    className="w-full px-3 py-1 border rounded-md text-sm"
+                    className="w-full"
                   />
                 </div>
               ))}
@@ -107,12 +109,12 @@ export function TemplateVariablesEditor({
                 const displayName = formatVariableName(key);
                 
                 return (
-                  <div key={key} className="flex items-center gap-2">
-                    <div className="h-10 w-10 bg-muted rounded flex items-center justify-center overflow-hidden">
+                  <div key={key} className="flex items-center gap-3 bg-accent/20 p-2 rounded-md">
+                    <div className="h-12 w-12 bg-muted rounded-md flex items-center justify-center overflow-hidden">
                       {value ? (
                         <img src={value} className="w-full h-full object-cover" alt={displayName} />
                       ) : (
-                        <Image className="h-4 w-4 text-muted-foreground" />
+                        <Image className="h-6 w-6 text-muted-foreground" />
                       )}
                     </div>
                     <div className="flex-grow">
@@ -125,7 +127,7 @@ export function TemplateVariablesEditor({
                     </div>
                     <Button 
                       size="sm" 
-                      variant="outline"
+                      variant="secondary"
                       onClick={() => onMediaSelect(key)}
                     >
                       Change
@@ -143,7 +145,7 @@ export function TemplateVariablesEditor({
             <CollapsibleTrigger className="flex w-full items-center justify-between p-4">
               <div className="flex items-center gap-2">
                 <Cog className="h-4 w-4" />
-                <h4 className="text-sm font-medium">Settings</h4>
+                <h4 className="text-sm font-medium">Colors & Settings</h4>
               </div>
               <div className={`transform transition-transform ${settingsOpen ? 'rotate-180' : ''}`}>
                 <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -156,17 +158,24 @@ export function TemplateVariablesEditor({
                 <div key={key} className="flex items-center justify-between">
                   <label className="text-sm">{formatVariableName(key)}</label>
                   <div className="flex items-center gap-2">
-                    <input 
-                      type="color"
-                      value={value || '#000000'}
-                      onChange={(e) => onColorChange(key, e.target.value)}
-                      className="w-8 h-8 rounded-md cursor-pointer"
-                    />
-                    <input 
+                    <div className="relative">
+                      <input 
+                        type="color"
+                        value={value || '#000000'}
+                        onChange={(e) => onColorChange(key, e.target.value)}
+                        className="w-9 h-9 rounded cursor-pointer opacity-0 absolute inset-0"
+                        id={`color-${key}`}
+                      />
+                      <div 
+                        className="w-9 h-9 rounded-md border" 
+                        style={{ backgroundColor: value || '#000000' }}
+                      />
+                    </div>
+                    <Input 
                       type="text"
                       value={value || '#000000'}
                       onChange={(e) => onColorChange(key, e.target.value)}
-                      className="w-24 px-2 py-1 border rounded-md text-xs"
+                      className="w-24 text-xs h-9"
                     />
                   </div>
                 </div>
@@ -192,22 +201,26 @@ export function TemplateVariablesEditor({
             <p className="text-sm text-muted-foreground mb-2">
               Select the platforms where you want to render this template
             </p>
-            {platforms.map(platform => (
-              <div key={platform.id} className="flex items-center space-x-2">
-                <input 
-                  type="checkbox" 
-                  id={platform.id} 
-                  className="rounded text-studio-600 focus:ring-studio-600"
-                  defaultChecked
-                />
-                <label htmlFor={platform.id} className="text-sm">
-                  {platform.name}
-                  <span className="text-xs text-muted-foreground ml-2">
-                    ({platform.width}×{platform.height}) - {platform.aspect_ratio}
-                  </span>
-                </label>
-              </div>
-            ))}
+            {platforms.length > 0 ? (
+              platforms.map(platform => (
+                <div key={platform.id} className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox" 
+                    id={platform.id} 
+                    className="rounded text-studio-600 focus:ring-studio-600"
+                    defaultChecked
+                  />
+                  <label htmlFor={platform.id} className="text-sm">
+                    {platform.name}
+                    <span className="text-xs text-muted-foreground ml-2">
+                      ({platform.width}×{platform.height}) - {platform.aspect_ratio}
+                    </span>
+                  </label>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground italic">No output platforms defined</p>
+            )}
           </CollapsibleContent>
         </Collapsible>
         
@@ -230,6 +243,9 @@ export function TemplateVariablesEditor({
           isUpdating ? "Saving Changes..." : "Start Render"}
           {(isRendering || isUpdating) && <Loader2 className="h-4 w-4 animate-spin" />}
         </Button>
+        <p className="text-xs text-center text-muted-foreground mt-2">
+          Live preview is currently disabled. Your changes will be applied when rendering.
+        </p>
       </div>
     </Card>
   );

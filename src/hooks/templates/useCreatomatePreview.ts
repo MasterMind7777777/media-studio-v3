@@ -1,5 +1,6 @@
+
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { normalizeKeys, cleanupVariables } from '@/lib/variables';
+import { cleanupVariables } from '@/lib/variables';
 
 interface PreviewOptions {
   containerId: string;
@@ -22,7 +23,8 @@ interface PreviewHook {
 }
 
 /**
- * Hook to initialize and manage Creatomate preview in a container
+ * Mock implementation of Creatomate preview hook
+ * Returns predefined values instead of trying to initialize the SDK
  */
 export function useCreatomatePreview({
   containerId,
@@ -31,165 +33,65 @@ export function useCreatomatePreview({
   onReady,
   onError,
 }: PreviewOptions): PreviewHook {
-  const [isLoading, setIsLoading] = useState(true);
   const [isReady, setIsReady] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
-  const [previewMode, setPreviewMode] = useState<'interactive' | 'player' | null>(null);
-  const previewRef = useRef<any>(null);
-  const containerRef = useRef<HTMLElement | null>(null);
-  const initAttempted = useRef(false);
-  const latestVariables = useRef(variables);
-
-  // Keep the latest variables ref updated
+  const variablesRef = useRef(variables);
+  
+  // Update ref when variables change
   useEffect(() => {
-    latestVariables.current = variables;
+    variablesRef.current = variables;
   }, [variables]);
-
-  // Initialize the preview with normalized variables
-  const initializePreview = useCallback(async () => {
-    if (!templateId || !containerId) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      console.log('Initializing Creatomate preview in container:', containerId);
-      setIsLoading(true);
-      setError(null);
-      
-      // Wait for the window.Creatomate object to be available
-      if (!window.Creatomate) {
-        console.log('Creatomate SDK not loaded yet, waiting...');
-        setTimeout(initializePreview, 1000); // Retry after 1s
-        return;
-      }
-      
-      // Get the container element
-      containerRef.current = document.getElementById(containerId);
-      if (!containerRef.current) {
-        throw new Error(`Container element with ID '${containerId}' not found`);
-      }
-      
-      // Get the token from environment variable
-      const token = import.meta.env.VITE_CREATOMATE_TOKEN;
-      if (!token) {
-        throw new Error('Creatomate token not found in environment variables');
-      }
-
-      // Clean the variables before passing to Creatomate
-      const cleanedVars = cleanupVariables(latestVariables.current);
-      
-      console.log('Initializing preview with cleaned variables:', cleanedVars);
-      
-      // Initialize the preview with the public token - now using the config object
-      previewRef.current = new window.Creatomate.Preview({
-        token,
-        templateId,
-        container: containerRef.current,
-        format: 'mp4',
-        mode: 'interactive',
-        modifications: cleanedVars,
-        onReady: () => {
-          console.log('Creatomate preview ready');
-          setIsReady(true);
-          setIsLoading(false);
-          setPreviewMode('interactive');
-          onReady?.();
-        },
-        onError: (err: Error) => {
-          console.error('Creatomate preview error:', err);
-          setIsLoading(false);
-          setError(err);
-          onError?.(err);
-        },
-        onStateChange: (state: any) => {
-          // Update playing state based on playback state
-          if (state && state.playback) {
-            setIsPlaying(state.playback === 'playing');
-          }
-        }
-      });
-      
-      initAttempted.current = true;
-    } catch (error: any) {
-      console.error('Error initializing Creatomate preview:', error);
-      setIsLoading(false);
-      setError(error);
-      onError?.(error);
-    }
-  }, [containerId, templateId, onReady, onError]);
   
-  // Handle play/pause toggle
-  const togglePlay = useCallback(() => {
-    if (!previewRef.current || !isReady) {
-      console.log('Preview not ready to toggle play state');
-      return;
-    }
-    
-    try {
-      if (isPlaying) {
-        previewRef.current.pause();
-      } else {
-        previewRef.current.play();
-      }
-    } catch (error) {
-      console.error('Error toggling play state:', error);
-    }
-  }, [isReady, isPlaying]);
-  
-  // Force update the preview with new variables
-  const forceUpdateVariables = useCallback((newVariables: Record<string, any>) => {
-    if (!previewRef.current || !isReady) {
-      console.log('Preview not ready to update variables');
-      return;
-    }
-    
-    try {
-      // Clean the variables before updating
-      const cleanedVars = cleanupVariables(newVariables);
-      console.log('Updating preview with cleaned variables:', cleanedVars);
-      
-      // Apply the variables to the preview
-      previewRef.current.setModifications(cleanedVars);
-    } catch (error: any) {
-      console.error('Error updating preview variables:', error);
-      onError?.(error);
-    }
-  }, [isReady, onError]);
-  
-  // Retry initialization if it failed
-  const retryInitialization = useCallback(() => {
-    if (previewRef.current) {
-      previewRef.current = null;
-    }
-    setIsReady(false);
-    setIsLoading(true);
-    setError(null);
-    initializePreview();
-  }, [initializePreview]);
-  
-  // Initialize the preview when the component mounts or dependencies change
+  // Simulate initialization process
   useEffect(() => {
-    if (!initAttempted.current) {
-      initializePreview();
-    }
+    console.log('Creatomate preview disabled - using mock implementation');
     
-    // Cleanup when the component unmounts
-    return () => {
-      if (previewRef.current) {
-        previewRef.current = null;
+    // Simulate ready state after a short delay
+    const timer = setTimeout(() => {
+      setIsReady(true);
+      onReady?.();
+      
+      // Insert a placeholder element
+      const container = document.getElementById(containerId);
+      if (container) {
+        container.innerHTML = `
+          <div class="absolute inset-0 flex flex-col items-center justify-center bg-muted">
+            <div class="text-xl font-medium mb-2">Preview Disabled</div>
+            <p class="text-sm text-muted-foreground mb-4">Creatomate SDK temporarily disabled for development</p>
+            <div class="w-3/4 aspect-video bg-background/40 rounded flex items-center justify-center">
+              <div class="text-muted-foreground">Template Preview Placeholder</div>
+            </div>
+          </div>
+        `;
       }
-    };
-  }, [initializePreview]);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [containerId, onReady]);
+  
+  // Mock functions that would normally interact with the SDK
+  const forceUpdateVariables = useCallback((newVariables: Record<string, any>) => {
+    console.log('Preview update requested (disabled)', newVariables);
+    // Just update the ref
+    variablesRef.current = { ...variablesRef.current, ...newVariables };
+  }, []);
+  
+  const retryInitialization = useCallback(() => {
+    console.log('Retry requested (disabled)');
+    // Do nothing in mock implementation
+  }, []);
+  
+  const togglePlay = useCallback(() => {
+    console.log('Toggle play requested (disabled)');
+    // Do nothing in mock implementation
+  }, []);
   
   return {
-    isLoading,
-    isReady,
-    isPlaying,
-    preview: previewRef.current,
-    error,
-    previewMode,
+    isLoading: false,
+    isReady: true,
+    isPlaying: false,
+    preview: null,
+    error: null,
+    previewMode: 'interactive',
     forceUpdateVariables,
     retryInitialization,
     togglePlay
