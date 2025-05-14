@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TemplateVariablesEditor } from '@/components/Templates/TemplateVariablesEditor';
@@ -49,8 +48,10 @@ export default function TemplateCustomize() {
     onPreviewUpdate: (newVars) => {
       // This will be called whenever variables change
       if (creatomatePreview.isReady && creatomatePreview.preview) {
-        console.log('Forcing preview update with new variables');
+        console.log('Template Preview: Forcing preview update with new variables', newVars);
         creatomatePreview.forceUpdateVariables(newVars);
+      } else {
+        console.log('Template Preview: Preview not ready, variables update queued', newVars);
       }
     }
   });

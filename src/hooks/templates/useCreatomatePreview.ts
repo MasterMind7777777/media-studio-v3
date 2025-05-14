@@ -113,81 +113,85 @@ export function useCreatomatePreview({
 
     try {
       // Create a new preview instance using the SDK
-      const preview = new window.Creatomate.Preview(
-        container, 
-        'player', 
-        import.meta.env.VITE_CREATOMATE_TOKEN || 'public-jb5rna2gay9buhajvtiyp1hb'
-      );
-      
-      // Store the preview mode
-      setPreviewMode('player');
-
-      // Setup preview event handlers
-      preview.onReady = async () => {
-        console.log('Preview ready, loading template:', templateId);
-        setIsLoading(true);
+      if (window.Creatomate && window.Creatomate.Preview) {
+        const preview = new window.Creatomate.Preview(
+          container, 
+          'player', 
+          import.meta.env.VITE_CREATOMATE_TOKEN || 'public-jb5rna2gay9buhajvtiyp1hb'
+        );
         
-        try {
-          if (templateId) {
-            await preview.loadTemplate(templateId);
-            console.log('Template loaded successfully');
-          } else {
-            console.warn('No template ID provided, preview will be empty');
+        // Store the preview mode
+        setPreviewMode('player');
+
+        // Setup preview event handlers
+        preview.onReady = async () => {
+          console.log('Preview ready, loading template:', templateId);
+          setIsLoading(true);
+          
+          try {
+            if (templateId) {
+              await preview.loadTemplate(templateId);
+              console.log('Template loaded successfully');
+            } else {
+              console.warn('No template ID provided, preview will be empty');
+            }
+            
+            // Set initial time to show something interesting
+            await preview.setTime(0.5);
+            
+            // Apply initial variables if available
+            if (Object.keys(variablesRef.current).length > 0) {
+              console.log('Setting initial variables:', variablesRef.current);
+              preview.setModifications(variablesRef.current);
+            }
+            
+            // Auto play if requested
+            if (autoPlay) {
+              preview.play();
+              setIsPlaying(true);
+            }
+            
+            setIsReady(true);
+            setIsLoading(false);
+            onReady?.();
+          } catch (err) {
+            console.error('Error loading template:', err);
+            setError(err instanceof Error ? err : new Error('Failed to load template'));
+            setIsLoading(false);
+            onError?.(err instanceof Error ? err : new Error('Failed to load template'));
+            toast.error('Failed to load video template', {
+              description: err instanceof Error ? err.message : 'Unknown error'
+            });
           }
-          
-          // Set initial time to show something interesting
-          await preview.setTime(0.5);
-          
-          // Apply initial variables if available
-          if (Object.keys(variablesRef.current).length > 0) {
-            console.log('Setting initial variables:', variablesRef.current);
-            preview.setModifications(variablesRef.current);
-          }
-          
-          // Auto play if requested
-          if (autoPlay) {
-            preview.play();
-            setIsPlaying(true);
-          }
-          
-          setIsReady(true);
+        };
+
+        preview.onError = (err: Error) => {
+          console.error('Preview error:', err);
+          setError(err);
           setIsLoading(false);
-          onReady?.();
-        } catch (err) {
-          console.error('Error loading template:', err);
-          setError(err instanceof Error ? err : new Error('Failed to load template'));
-          setIsLoading(false);
-          onError?.(err instanceof Error ? err : new Error('Failed to load template'));
-          toast.error('Failed to load video template', {
-            description: err instanceof Error ? err.message : 'Unknown error'
+          onError?.(err);
+          toast.error('Video preview error', {
+            description: err.message
           });
-        }
-      };
+        };
+        
+        preview.onTimeUpdate = (time: number) => {
+          setCurrentTime(time);
+        };
+        
+        preview.onPlay = () => {
+          setIsPlaying(true);
+        };
+        
+        preview.onPause = () => {
+          setIsPlaying(false);
+        };
 
-      preview.onError = (err: Error) => {
-        console.error('Preview error:', err);
-        setError(err);
-        setIsLoading(false);
-        onError?.(err);
-        toast.error('Video preview error', {
-          description: err.message
-        });
-      };
-      
-      preview.onTimeUpdate = (time: number) => {
-        setCurrentTime(time);
-      };
-      
-      preview.onPlay = () => {
-        setIsPlaying(true);
-      };
-      
-      preview.onPause = () => {
-        setIsPlaying(false);
-      };
-
-      // Store the preview instance
-      previewRef.current = preview;
+        // Store the preview instance
+        previewRef.current = preview;
+      } else {
+        throw new Error('Creatomate SDK not available');
+      }
     } catch (err) {
       console.error('Error initializing preview:', err);
       setError(err instanceof Error ? err : new Error('Failed to initialize preview'));
