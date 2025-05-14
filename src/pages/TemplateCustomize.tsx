@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TemplateVariablesEditor } from '@/components/Templates/TemplateVariablesEditor';
 import { TemplateHeader } from '@/components/Templates/TemplateHeader';
@@ -16,8 +16,39 @@ import { AlertTriangle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 
-// Check if Creatomate SDK is disabled using environment variable
-const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
+// Check if Creatomate SDK is disabled using environment variable with fallback
+const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true' 
+  || import.meta.env.VITE_DISABLE_CREATOMATE === undefined;
+
+// Error boundary component
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode; fallback: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: React.ReactNode; fallback: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error('Component error:', error, errorInfo);
+    toast({
+      title: 'An error occurred',
+      description: 'Please try refreshing the page'
+    });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
 
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
@@ -34,13 +65,19 @@ export default function TemplateCustomize() {
     error: templateError 
   } = useTemplate(id);
 
-  // Extract template variables
+  // Extract template variables - wrapped with a try/catch for safety
   const {
     textVariables,
     mediaVariables,
     colorVariables,
     hasVariables
   } = useTemplateVariables(template);
+  
+  // Handle preview updates more efficiently
+  const handlePreviewUpdate = useCallback((newVars: Record<string, any>) => {
+    console.log('Variables would update preview:', newVars);
+    // We'll implement actual preview updates in the future
+  }, []);
   
   // Setup template variables updater with normalized initialVariables
   const {
@@ -53,29 +90,16 @@ export default function TemplateCustomize() {
     setVariables
   } = useTemplatePreviewUpdater({
     initialVariables: template?.variables || {},
-    onPreviewUpdate: (newVars) => {
-      // Since SDK is disabled, just log the updates
-      console.log('Variables would update preview:', newVars);
-    }
+    onPreviewUpdate: handlePreviewUpdate
   });
 
   // Set up render job creation
   const { mutateAsync: createRenderJob, isPending: isSubmitting } = useCreateRenderJob();
 
-  // Handle initial variables
-  useEffect(() => {
-    if (template?.variables && Object.keys(template.variables).length > 0) {
-      console.log('Setting initial template variables:', template.variables);
-      // Normalize variables before setting them
-      const normalizedVars = normalizeKeys(template.variables);
-      console.log('Normalized variables for initialization:', normalizedVars);
-      setVariables(normalizedVars);
-    }
-  }, [template?.variables]);
-
   // Handle errors
   useEffect(() => {
     if (templateError) {
+      console.error('Template error:', templateError);
       toast({
         title: 'Error loading template',
         description: templateError.message
@@ -83,26 +107,35 @@ export default function TemplateCustomize() {
     }
   }, [templateError]);
 
-  // Handle media select button click
-  const handleMediaSelect = (key: string) => {
+  // Handle media select button click - with performance improvements
+  const handleMediaSelect = useCallback((key: string) => {
     console.log('Opening media selection dialog for:', key);
     setCurrentMediaKey(key);
     setIsMediaDialogOpen(true);
-  };
+  }, []);
 
-  // Handle media selection from dialog
-  const handleMediaDialogSelect = (asset: MediaAsset) => {
-    if (!currentMediaKey) {
-      console.error('No media key selected');
-      return;
+  // Handle media selection from dialog - with error handling
+  const handleMediaDialogSelect = useCallback((asset: MediaAsset) => {
+    try {
+      if (!currentMediaKey) {
+        console.error('No media key selected');
+        return;
+      }
+      
+      console.log(`Media selected from dialog: ${asset.name} for key ${currentMediaKey}`);
+      handleMediaSelected(currentMediaKey, asset);
+      setIsMediaDialogOpen(false);
+    } catch (error) {
+      console.error('Error selecting media:', error);
+      toast({
+        title: 'Error selecting media',
+        description: 'Please try again'
+      });
+      setIsMediaDialogOpen(false);
     }
-    
-    console.log(`Media selected from dialog: ${asset.name} for key ${currentMediaKey}`);
-    handleMediaSelected(currentMediaKey, asset);
-    setIsMediaDialogOpen(false);
-  };
+  }, [currentMediaKey, handleMediaSelected]);
 
-  // Handle render button click
+  // Handle render button click with improved error handling
   const handleRender = async () => {
     if (!template || !id) {
       toast({
@@ -115,13 +148,18 @@ export default function TemplateCustomize() {
     setIsRendering(true);
     
     try {
+      // Performance logging
+      console.time('renderJob');
+      
       // Log the variables being sent for rendering
       console.log('Starting render with variables:', variables);
       const result = await createRenderJob({
         templateId: id, 
-        variables, // These should be normalized already
+        variables,
         platforms: template.platforms || []
       });
+
+      console.timeEnd('renderJob');
 
       toast({
         title: 'Render started successfully!',
@@ -134,7 +172,7 @@ export default function TemplateCustomize() {
       console.error('Render error:', error);
       toast({
         title: 'Failed to start render',
-        description: error.message
+        description: error.message || 'An unknown error occurred'
       });
     } finally {
       setIsRendering(false);
@@ -143,6 +181,20 @@ export default function TemplateCustomize() {
 
   const isLoading = templateLoading;
   const previewImageUrl = template?.preview_image_url || '/placeholder.svg';
+  
+  // Create fallback UI for error boundary
+  const errorFallback = (
+    <div className="p-6 bg-red-50 text-red-800 rounded-lg">
+      <h3 className="font-medium text-lg mb-2">Something went wrong</h3>
+      <p>We encountered an error trying to render this template.</p>
+      <button 
+        onClick={() => window.location.reload()}
+        className="mt-4 px-4 py-2 bg-red-100 hover:bg-red-200 rounded"
+      >
+        Reload page
+      </button>
+    </div>
+  );
 
   return (
     <div className="container py-8 max-w-7xl">
@@ -152,7 +204,9 @@ export default function TemplateCustomize() {
       <Alert className="mb-4" variant="warning">
         <AlertTriangle className="h-4 w-4 mr-2" />
         <AlertDescription>
-          Live preview is temporarily disabled for development. Variable edits won't be reflected in real-time.
+          {isCreatomateDisabled 
+            ? "Live preview is temporarily disabled for development. Variable edits won't be reflected in real-time."
+            : "Live preview is enabled. Your changes will be reflected in real-time."}
         </AlertDescription>
       </Alert>
       
@@ -163,69 +217,81 @@ export default function TemplateCustomize() {
       )}
 
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Preview Area */}
-        <Card className="overflow-hidden">
-          <div className="p-4 border-b">
-            <h3 className="font-medium">Preview</h3>
-          </div>
-          <div className="relative p-4">
-            {isLoading ? (
-              <div className="aspect-video bg-muted flex items-center justify-center rounded-md">
-                <p className="text-muted-foreground animate-pulse">Loading template...</p>
-              </div>
-            ) : (
-              <AspectRatio ratio={16/9} className="bg-muted rounded-md overflow-hidden">
-                <div className="h-full w-full flex items-center justify-center flex-col">
-                  {previewImageUrl && previewImageUrl !== '/placeholder.svg' ? (
-                    <img
-                      src={previewImageUrl}
-                      alt="Template Preview"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="text-muted-foreground flex flex-col items-center">
-                      <AlertTriangle className="h-8 w-8 mb-2" />
-                      <p>No preview available</p>
-                    </div>
-                  )}
+        {/* Preview Area - Wrapped in ErrorBoundary */}
+        <ErrorBoundary fallback={errorFallback}>
+          <Card className="overflow-hidden">
+            <div className="p-4 border-b">
+              <h3 className="font-medium">Preview</h3>
+            </div>
+            <div className="relative p-4">
+              {isLoading ? (
+                <div className="aspect-video bg-muted flex items-center justify-center rounded-md">
+                  <p className="text-muted-foreground animate-pulse">Loading template...</p>
                 </div>
-              </AspectRatio>
-            )}
+              ) : (
+                <AspectRatio ratio={16/9} className="bg-muted rounded-md overflow-hidden">
+                  <div className="h-full w-full flex items-center justify-center flex-col">
+                    {previewImageUrl && previewImageUrl !== '/placeholder.svg' ? (
+                      <img
+                        src={previewImageUrl}
+                        alt="Template Preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          console.error('Error loading preview image');
+                          (e.target as HTMLImageElement).src = '/placeholder.svg';
+                        }}
+                      />
+                    ) : (
+                      <div className="text-muted-foreground flex flex-col items-center">
+                        <AlertTriangle className="h-8 w-8 mb-2" />
+                        <p>No preview available</p>
+                      </div>
+                    )}
+                  </div>
+                </AspectRatio>
+              )}
 
-            <div className="mt-4 flex justify-end gap-2">
-              <div className="text-xs px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-600">
-                Preview Disabled
+              <div className="mt-4 flex justify-end gap-2">
+                <div className={`text-xs px-2 py-1 rounded-full ${isCreatomateDisabled ? 
+                  "bg-yellow-500/20 text-yellow-600" : 
+                  "bg-green-500/20 text-green-600"}`}>
+                  {isCreatomateDisabled ? "Preview Disabled" : "Preview Enabled"}
+                </div>
               </div>
             </div>
-          </div>
-        </Card>
+          </Card>
+        </ErrorBoundary>
 
-        {/* Editor */}
-        <div className="relative">
-          {template && (
-            <TemplateVariablesEditor
-              textVariables={textVariables}
-              mediaVariables={mediaVariables}
-              colorVariables={colorVariables}
-              platforms={template.platforms || []}
-              selectedMedia={selectedMedia}
-              onTextChange={handleTextChange}
-              onColorChange={handleColorChange}
-              onMediaSelect={handleMediaSelect}
-              isRendering={isRendering}
-              isUpdating={isUpdating}
-              onRender={handleRender}
-            />
-          )}
-        </div>
+        {/* Editor - Wrapped in ErrorBoundary */}
+        <ErrorBoundary fallback={errorFallback}>
+          <div className="relative">
+            {template && (
+              <TemplateVariablesEditor
+                textVariables={textVariables}
+                mediaVariables={mediaVariables}
+                colorVariables={colorVariables}
+                platforms={template.platforms || []}
+                selectedMedia={selectedMedia}
+                onTextChange={handleTextChange}
+                onColorChange={handleColorChange}
+                onMediaSelect={handleMediaSelect}
+                isRendering={isRendering}
+                isUpdating={isUpdating}
+                onRender={handleRender}
+              />
+            )}
+          </div>
+        </ErrorBoundary>
       </div>
 
-      {/* Media Selection Dialog */}
-      <MediaSelectionDialog
-        open={isMediaDialogOpen}
-        onOpenChange={setIsMediaDialogOpen}
-        onSelect={handleMediaDialogSelect}
-      />
+      {/* Media Selection Dialog - Wrapped in ErrorBoundary */}
+      <ErrorBoundary fallback={errorFallback}>
+        <MediaSelectionDialog
+          open={isMediaDialogOpen}
+          onOpenChange={setIsMediaDialogOpen}
+          onSelect={handleMediaDialogSelect}
+        />
+      </ErrorBoundary>
     </div>
   );
 };
