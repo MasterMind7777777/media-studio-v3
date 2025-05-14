@@ -105,8 +105,8 @@ export function useCreatomatePreview(
         
         previewRef.current = preview;
 
-        // Set up event handlers
-        preview.on('ready', () => {
+        // Set up event handlers using the correct syntax
+        preview.addEventListener('ready', () => {
           if (isMounted) {
             setPreviewState(prev => ({ 
               ...prev, 
@@ -115,7 +115,7 @@ export function useCreatomatePreview(
               isPlaying: true,
               togglePlay: () => {
                 if (preview) {
-                  if (preview.isPlaying()) {
+                  if (preview.isPlaying?.() || false) {
                     preview.pause();
                   } else {
                     preview.play();
@@ -134,7 +134,7 @@ export function useCreatomatePreview(
           }
         });
 
-        preview.on('error', (error: Error) => {
+        preview.addEventListener('error', (error: Error) => {
           console.error('Creatomate preview error:', error);
           if (isMounted) {
             setPreviewState(prev => ({ 
@@ -147,7 +147,8 @@ export function useCreatomatePreview(
         });
         
         // Handle state changes for play/pause status
-        preview.on('statechange', (state: any) => {
+        preview.addEventListener('statechange', (event: any) => {
+          const state = event.detail;
           if (isMounted && state && typeof state.isPlaying === 'boolean') {
             setPreviewState(prev => ({ ...prev, isPlaying: state.isPlaying }));
           }

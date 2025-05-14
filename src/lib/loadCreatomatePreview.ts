@@ -36,10 +36,17 @@ export async function createPreviewInstance(options: CreatomatePreviewOptions): 
   }
   
   try {
-    // Create the preview instance using the ESM module
-    const preview = new Preview({
-      ...options,
-    });
+    // Create the preview instance with all required parameters
+    // The Preview constructor expects: token, elementId/container, config
+    const preview = new Preview(
+      options.token,
+      options.container,
+      {
+        mode: options.mode || 'interactive',
+        templateId: options.templateId,
+        modifications: options.modifications
+      }
+    );
     
     // Return the preview instance
     return preview;

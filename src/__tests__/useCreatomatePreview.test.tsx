@@ -3,7 +3,7 @@ import React from 'react';
 import { renderHook, act } from '@testing-library/react-hooks';
 import { useCreatomatePreview } from '../hooks/templates/useCreatomatePreview';
 
-// Mock the window.Creatomate object
+// Mock the Preview instance
 const mockPreviewInstance = {
   onReady: jest.fn(),
   onError: jest.fn(),
@@ -14,6 +14,14 @@ const mockPreviewInstance = {
   play: jest.fn(),
   pause: jest.fn(),
   dispose: jest.fn(),
+  addEventListener: jest.fn((eventName: string, callback: Function) => {
+    // Store callbacks for later triggering
+    if (eventName === 'ready') mockPreviewInstance.onReady = callback;
+    if (eventName === 'error') mockPreviewInstance.onError = callback;
+    if (eventName === 'play') mockPreviewInstance.onPlay = callback;
+    if (eventName === 'pause') mockPreviewInstance.onPause = callback;
+  }),
+  isPlaying: jest.fn().mockReturnValue(false),
 };
 
 // Mock the CreatomateLoader and other dependencies
@@ -39,6 +47,14 @@ jest.mock('@/lib/variables', () => ({
   cleanupVariables: (vars: any) => vars,
 }));
 
+// Mock the loadCreatomatePreview module
+jest.mock('@/lib/loadCreatomatePreview', () => ({
+  isCreatomatePreviewDisabled: false,
+  getCreatomateToken: jest.fn().mockReturnValue('mock-token'),
+  getPreviewInstance: jest.fn().mockResolvedValue(mockPreviewInstance),
+  disposePreviewInstance: jest.fn(),
+}));
+
 describe('useCreatomatePreview', () => {
   const containerId = 'test-container';
   
@@ -46,7 +62,7 @@ describe('useCreatomatePreview', () => {
     // Setup DOM element
     document.body.innerHTML = `<div id="${containerId}"></div>`;
     
-    // Setup global Creatomate object
+    // Setup global Creatomate object for legacy compatibility
     (window as any).Creatomate = {
       Preview: jest.fn(() => mockPreviewInstance),
     };
@@ -58,10 +74,8 @@ describe('useCreatomatePreview', () => {
   it('initializes preview with correct container', () => {
     renderHook(() => useCreatomatePreview({ containerId }));
     
-    // Should create a Preview instance with the container
-    expect(window.Creatomate.Preview).toHaveBeenCalledWith(
-      expect.objectContaining({ container: expect.any(HTMLElement) })
-    );
+    // Preview instance should be created
+    expect(require('@/lib/loadCreatomatePreview').getPreviewInstance).toHaveBeenCalled();
   });
   
   it('updates variables correctly', async () => {

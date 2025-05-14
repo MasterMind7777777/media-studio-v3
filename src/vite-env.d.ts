@@ -4,5 +4,14 @@
 // Import Creatomate types directly from the module
 import type { Preview } from '@creatomate/preview';
 
-// No need to extend Window interface anymore since we're using ESM imports
+// Define window.Creatomate for backward compatibility with tests
+interface CreatomateNamespace {
+  Preview: typeof Preview;
+}
 
+// Extend the Window interface
+declare global {
+  interface Window {
+    Creatomate?: CreatomateNamespace;
+  }
+}
