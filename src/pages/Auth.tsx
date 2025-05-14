@@ -1,37 +1,43 @@
-
-import { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/context/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, AlertTriangle } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from "react";
+import { Navigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Loader2, AlertTriangle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function Auth() {
   const { user, loading, signIn, signUp, isEmailSignupDisabled } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
+  const [authMode, setAuthMode] = useState<"login" | "register">("login");
   const queryClient = useQueryClient();
-  
+
   // Form states
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+
   // Clear any stale caches when the component mounts
   useEffect(() => {
     queryClient.clear();
   }, [queryClient]);
-  
+
   // If already logged in, redirect to dashboard
   if (!loading && user) {
     return <Navigate to="/" />;
   }
-  
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -40,25 +46,25 @@ export default function Auth() {
       // Redirect handled by auth context
       queryClient.clear(); // Clear any stale caches on login
     } catch (error) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
       await signUp(email, password, name);
-      setAuthMode('login'); // Switch to login after successful registration
+      setAuthMode("login"); // Switch to login after successful registration
     } catch (error) {
-      console.error('Registration error:', error);
+      console.error("Registration error:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
-  
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center">
@@ -66,15 +72,17 @@ export default function Auth() {
       </div>
     );
   }
-  
+
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 p-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <h1 className="text-3xl font-bold">Media Studio</h1>
-          <p className="text-muted-foreground">Create and manage your video content</p>
+          <p className="text-muted-foreground">
+            Create and manage your video content
+          </p>
         </div>
-        
+
         <Card>
           <CardHeader>
             <CardTitle>Welcome</CardTitle>
@@ -83,30 +91,35 @@ export default function Auth() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {isEmailSignupDisabled && authMode === 'register' && (
+            {isEmailSignupDisabled && authMode === "register" && (
               <Alert className="mb-4" variant="destructive">
                 <AlertTriangle className="h-4 w-4" />
                 <AlertTitle>Registration Disabled</AlertTitle>
                 <AlertDescription>
-                  Email signup is currently disabled by the administrator. Please contact support for assistance or use an alternative sign-in method.
+                  Email signup is currently disabled by the administrator.
+                  Please contact support for assistance or use an alternative
+                  sign-in method.
                 </AlertDescription>
               </Alert>
             )}
-            
-            <Tabs value={authMode} onValueChange={(v) => setAuthMode(v as 'login' | 'register')}>
+
+            <Tabs
+              value={authMode}
+              onValueChange={(v) => setAuthMode(v as "login" | "register")}
+            >
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Login</TabsTrigger>
                 <TabsTrigger value="register">Register</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="login">
                 <form onSubmit={handleSignIn} className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
-                    <Input 
-                      id="email" 
-                      type="email" 
-                      placeholder="you@example.com" 
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="you@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -114,15 +127,19 @@ export default function Auth() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-                    <Input 
-                      id="password" 
+                    <Input
+                      id="password"
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isSubmitting}
+                  >
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -134,14 +151,14 @@ export default function Auth() {
                   </Button>
                 </form>
               </TabsContent>
-              
+
               <TabsContent value="register">
                 <form onSubmit={handleSignUp} className="space-y-4 pt-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Name</Label>
-                    <Input 
-                      id="name" 
-                      placeholder="John Doe" 
+                    <Input
+                      id="name"
+                      placeholder="John Doe"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
@@ -149,10 +166,10 @@ export default function Auth() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-email">Email</Label>
-                    <Input 
-                      id="register-email" 
-                      type="email" 
-                      placeholder="you@example.com" 
+                    <Input
+                      id="register-email"
+                      type="email"
+                      placeholder="you@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       required
@@ -160,17 +177,17 @@ export default function Auth() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="register-password">Password</Label>
-                    <Input 
-                      id="register-password" 
+                    <Input
+                      id="register-password"
                       type="password"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       required
                     />
                   </div>
-                  <Button 
-                    type="submit" 
-                    className="w-full" 
+                  <Button
+                    type="submit"
+                    className="w-full"
                     disabled={isSubmitting || isEmailSignupDisabled}
                   >
                     {isSubmitting ? (
@@ -190,7 +207,8 @@ export default function Auth() {
           </CardContent>
           <CardFooter>
             <p className="text-sm text-muted-foreground">
-              By continuing, you agree to our Terms of Service and Privacy Policy.
+              By continuing, you agree to our Terms of Service and Privacy
+              Policy.
             </p>
           </CardFooter>
         </Card>

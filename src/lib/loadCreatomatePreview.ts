@@ -1,12 +1,11 @@
-
-import { Preview } from '@creatomate/preview';
+import { Preview } from "@creatomate/preview";
 
 /**
  * Flag to check if Creatomate preview is disabled via environment variable
  */
-export const isCreatomatePreviewDisabled = 
-  typeof import.meta !== 'undefined' && 
-  import.meta.env?.VITE_CREATOMATE_PREVIEW === 'off';
+export const isCreatomatePreviewDisabled =
+  typeof import.meta !== "undefined" &&
+  import.meta.env?.VITE_CREATOMATE_PREVIEW === "off";
 
 /**
  * Typed interface for Preview options
@@ -15,7 +14,7 @@ export interface CreatomatePreviewOptions {
   token: string;
   templateId?: string;
   container: HTMLElement;
-  mode?: 'player' | 'interactive';
+  mode?: "player" | "interactive";
   modifications?: Record<string, any>;
 }
 
@@ -26,58 +25,66 @@ let previewInstance: Preview | null = null;
 
 /**
  * Creates and returns a Creatomate Preview instance
- * 
+ *
  * @param options Configuration options for the preview
  * @returns Promise resolving to a Preview instance
  */
-export async function createPreviewInstance(options: CreatomatePreviewOptions): Promise<Preview> {
+export async function createPreviewInstance(
+  options: CreatomatePreviewOptions,
+): Promise<Preview> {
   if (isCreatomatePreviewDisabled) {
-    throw new Error('Creatomate preview is disabled via environment variable');
+    throw new Error("Creatomate preview is disabled via environment variable");
   }
-  
+
   try {
     // Create the preview instance with all required parameters
     // Note: container must be an HTMLElement, not a string
     const preview = new Preview(
-      options.token,
-      options.container as HTMLDivElement, // Ensure it's cast to the right type
-      {
-        mode: options.mode || 'interactive',
-        templateId: options.templateId,
-        modifications: options.modifications
-      }
+      options.container as HTMLDivElement, // 1️⃣ element first
+      options.mode || "interactive", // 2️⃣ mode second
+      options.token, // 3️⃣ public token last
     );
-    
+
+    // Load a template (and modifications) once the SDK is ready
+    preview.onReady = async () => {
+      if (options.templateId) {
+        await preview.loadTemplate(options.templateId);
+        if (options.modifications) {
+          await preview.applyModifications(options.modifications);
+        }
+      }
+    };
+
     // Return the preview instance
     return preview;
   } catch (error) {
-    console.error('Error initializing Creatomate Preview:', error);
+    console.error("Error initializing Creatomate Preview:", error);
     throw error;
   }
 }
 
 /**
  * Creates or retrieves a cached preview instance
- * 
+ *
  * @param options Configuration options for the preview
  * @param forceNew Whether to force creating a new instance
  * @returns Promise resolving to a Preview instance
  */
 export async function getPreviewInstance(
   options: CreatomatePreviewOptions,
-  forceNew = false
+  forceNew = false,
 ): Promise<Preview> {
   // If we already have an instance and we're not forcing a new one, return it
   if (previewInstance && !forceNew) {
     return previewInstance;
   }
-  
+
   // Create a new instance
   const newInstance = await createPreviewInstance(options);
-  
+
   // Cache the instance
   previewInstance = newInstance;
-  
+
   return newInstance;
 }
 
@@ -89,7 +96,7 @@ export function disposePreviewInstance(): void {
     try {
       previewInstance.dispose();
     } catch (error) {
-      console.warn('Error disposing Creatomate preview instance:', error);
+      console.warn("Error disposing Creatomate preview instance:", error);
     }
     previewInstance = null;
   }
@@ -101,8 +108,8 @@ export function disposePreviewInstance(): void {
 export function getCreatomateToken(): string {
   const token = import.meta.env.VITE_CREATOMATE_TOKEN;
   if (!token) {
-    console.error('Missing Creatomate token in environment variables');
-    return '';
+    console.error("Missing Creatomate token in environment variables");
+    return "";
   }
   return token;
 }
