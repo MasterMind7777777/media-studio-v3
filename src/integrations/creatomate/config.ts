@@ -6,6 +6,7 @@
 // Import the loadScript helper
 import { loadCreatomateSdk, isCreatomateSDKAvailable, isCreatomateDisabled } from '@/components/CreatomateLoader';
 import { toast } from '@/hooks/use-toast';
+import { CREATOMATE_PUBLIC_TOKEN } from '@/config/creatomate';
 
 // Re-export the isCreatomateDisabled flag
 export { isCreatomateDisabled, isCreatomateSDKAvailable };
@@ -14,16 +15,27 @@ export { isCreatomateDisabled, isCreatomateSDKAvailable };
  * Get the Creatomate token from the environment or a default value
  */
 export async function getCreatomateToken(): Promise<string> {
-  // First check if we have an environment variable
-  const envToken = import.meta.env.VITE_CREATOMATE_TOKEN;
-  
-  if (envToken) {
-    return envToken;
+  try {
+    // First check if we have an environment variable
+    const envToken = import.meta.env.VITE_CREATOMATE_TOKEN;
+    
+    if (envToken) {
+      return envToken;
+    }
+    
+    // Fallback to config constant
+    if (CREATOMATE_PUBLIC_TOKEN) {
+      return CREATOMATE_PUBLIC_TOKEN;
+    }
+    
+    // Final fallback (should never reach this in production)
+    console.warn('No Creatomate token found in environment or config, using hardcoded default token');
+    return 'public-jb5rna2gay9buhajvtiyp1hb';
+  } catch (error) {
+    console.error('Error getting Creatomate token:', error);
+    // Final fallback
+    return 'public-jb5rna2gay9buhajvtiyp1hb';
   }
-  
-  // Fallback to default token (for development)
-  console.warn('No Creatomate token found in environment, using default token');
-  return 'public-jb5rna2gay9buhajvtiyp1hb';
 }
 
 /**

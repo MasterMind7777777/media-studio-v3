@@ -4,7 +4,7 @@ import { cleanupVariables } from '@/lib/variables';
 import { useDebouncedCallback } from '@/hooks/utils/useDebouncedCallback';
 import { toast } from '@/hooks/use-toast';
 import { isCreatomateDisabled, loadCreatomateSdk, isCreatomateSDKAvailable } from '@/components/CreatomateLoader';
-import { ensureCreatomateSDK } from '@/integrations/creatomate/config';
+import { ensureCreatomateSDK, getCreatomateToken } from '@/integrations/creatomate/config';
 
 interface PreviewOptions {
   containerId: string;
@@ -46,9 +46,10 @@ export function useCreatomatePreview({
   const [previewMode, setPreviewMode] = useState<'interactive' | 'player' | null>(null);
   const [currentVars, setCurrentVars] = useState<Record<string, any>>(variables);
   
-  // Track initialization state
+  // Track initialization state and reference to the preview instance
   const initializationAttempted = useRef(false);
   const containerRef = useRef<HTMLElement | null>(null);
+  const previewRef = useRef<any>(null);
   
   // Initialize with provided variables
   useEffect(() => {
@@ -59,12 +60,12 @@ export function useCreatomatePreview({
   
   // Debounced function to update preview with new variables
   const debouncedUpdatePreview = useDebouncedCallback((newVars: Record<string, any>) => {
-    if (isCreatomateDisabled || !preview) return;
+    if (isCreatomateDisabled || !previewRef.current) return;
     
     try {
       console.log('Updating preview variables (debounced):', newVars);
       const cleanVars = cleanupVariables(newVars);
-      preview.setModifications(cleanVars);
+      previewRef.current.setModifications(cleanVars);
     } catch (err) {
       console.error('Failed to update preview with new variables:', err);
       setError(err instanceof Error ? err : new Error(String(err)));
@@ -78,12 +79,20 @@ export function useCreatomatePreview({
       initializePreviewInstance();
     };
     
-    const handleSDKError = (event: CreatomateSDKErrorEvent) => {
+    const handleSDKError = (event: any) => {
       const { error } = event.detail;
       console.error('SDK error event received:', error);
       setError(error);
       setIsLoading(false);
       onError?.(error);
+      
+      // Deduplicate toast error message
+      toast({
+        id: 'creatomate-preview-error',
+        title: "Preview Error",
+        description: error.message || "Failed to initialize video preview",
+        variant: "destructive"
+      });
     };
     
     // Add event listeners for SDK ready/error events
@@ -114,7 +123,7 @@ export function useCreatomatePreview({
         throw new Error(`Container with ID "${containerId}" not found`);
       }
       
-      // Ensure SDK is loaded
+      // Ensure SDK is loaded first
       await loadCreatomateSdk();
       
       // Double check SDK is available
@@ -122,54 +131,67 @@ export function useCreatomatePreview({
         throw new Error('Creatomate SDK not loaded or initialized');
       }
       
-      // Create preview instance
-      console.log('Creating Creatomate Preview instance');
-      const previewInstance = new window.Creatomate.Preview({
-        container,
-        mode: 'interactive',
-        token: import.meta.env.VITE_CREATOMATE_TOKEN,
-      });
+      // Get the token for initialization
+      const token = await getCreatomateToken();
       
-      // Setup event listeners
-      previewInstance.onReady = () => {
-        console.log('Preview is ready');
-        setIsReady(true);
-        setIsLoading(false);
-        setPreviewMode('interactive');
-        onReady?.();
+      // Create preview instance only if not already created
+      if (!previewRef.current) {
+        console.log('Creating Creatomate Preview instance');
         
-        // Load template if provided
-        if (templateId) {
-          console.log('Loading template:', templateId);
-          previewInstance.loadTemplate(templateId);
-        }
+        previewRef.current = new window.Creatomate.Preview({
+          container,
+          mode: 'interactive',
+          token: token,
+        });
         
-        // Apply initial variables
-        if (Object.keys(currentVars).length > 0) {
-          console.log('Applying initial variables:', currentVars);
-          const cleanVars = cleanupVariables(currentVars);
-          previewInstance.setModifications(cleanVars);
-        }
-      };
-      
-      previewInstance.onError = (err: Error) => {
-        console.error('Preview error:', err);
-        setError(err);
-        setIsLoading(false);
-        onError?.(err);
-      };
-      
-      previewInstance.onPlay = () => {
-        setIsPlaying(true);
-      };
-      
-      previewInstance.onPause = () => {
-        setIsPlaying(false);
-      };
-      
-      // Store preview instance in state
-      setPreview(previewInstance);
-      
+        // Store the preview instance in component state
+        setPreview(previewRef.current);
+        
+        // Setup event listeners
+        previewRef.current.onReady = () => {
+          console.log('Preview is ready');
+          setIsReady(true);
+          setIsLoading(false);
+          setPreviewMode('interactive');
+          onReady?.();
+          
+          // Load template if provided
+          if (templateId) {
+            console.log('Loading template:', templateId);
+            previewRef.current.loadTemplate(templateId);
+          }
+          
+          // Apply initial variables
+          if (Object.keys(currentVars).length > 0) {
+            console.log('Applying initial variables:', currentVars);
+            const cleanVars = cleanupVariables(currentVars);
+            previewRef.current.setModifications(cleanVars);
+          }
+        };
+        
+        previewRef.current.onError = (err: Error) => {
+          console.error('Preview error:', err);
+          setError(err);
+          setIsLoading(false);
+          onError?.(err);
+          
+          // Deduplicate toast error message
+          toast({
+            id: 'creatomate-preview-error',
+            title: "Preview Error",
+            description: err.message || "An error occurred with the preview",
+            variant: "destructive"
+          });
+        };
+        
+        previewRef.current.onPlay = () => {
+          setIsPlaying(true);
+        };
+        
+        previewRef.current.onPause = () => {
+          setIsPlaying(false);
+        };
+      }
     } catch (err) {
       console.error('Failed to initialize preview:', err);
       const error = err instanceof Error ? err : new Error(String(err));
@@ -179,9 +201,11 @@ export function useCreatomatePreview({
       
       // Only show toast for actual failures, not disabled SDK
       if (!isCreatomateDisabled) {
+        // Deduplicate toast error message
         toast({
+          id: 'creatomate-preview-error',
           title: "Preview Error",
-          description: "Failed to initialize video preview. Please try refreshing the page.",
+          description: error.message || "Failed to initialize video preview",
           variant: "destructive"
         });
       }
@@ -235,12 +259,13 @@ export function useCreatomatePreview({
     
     // Cleanup function
     return () => {
-      if (preview && typeof preview.dispose === 'function') {
+      if (previewRef.current && typeof previewRef.current.dispose === 'function') {
         try {
-          preview.dispose();
+          previewRef.current.dispose();
         } catch (err) {
           console.error('Error disposing preview:', err);
         }
+        previewRef.current = null;
       }
     };
   }, [containerId, templateId, onReady, onError, initializePreviewInstance]);
@@ -273,6 +298,7 @@ export function useCreatomatePreview({
     
     // Force a re-render
     setPreview(null);
+    previewRef.current = null;
     
     // Initialize again
     initializePreviewInstance();
@@ -280,14 +306,14 @@ export function useCreatomatePreview({
   
   // Toggle play/pause
   const togglePlay = useCallback(() => {
-    if (!preview) return;
+    if (!previewRef.current) return;
     
     if (isPlaying) {
-      preview.pause();
+      previewRef.current.pause();
     } else {
-      preview.play();
+      previewRef.current.play();
     }
-  }, [preview, isPlaying]);
+  }, [isPlaying]);
   
   return {
     isLoading,

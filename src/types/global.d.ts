@@ -1,4 +1,3 @@
-
 interface Window {
   Creatomate?: {
     Preview: new (options: any) => any;
@@ -11,9 +10,10 @@ interface CreatomateSDKReadyEvent extends CustomEvent {
   type: 'creatomate-sdk-ready';
 }
 
-interface CreatomateSDKErrorEvent extends CustomEvent {
-  type: 'creatomate-sdk-error';
-  detail: { error: Error };
+interface CreatomateSDKErrorEvent extends Event {
+  detail: {
+    error: Error;
+  };
 }
 
 declare global {

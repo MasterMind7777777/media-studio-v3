@@ -1,5 +1,5 @@
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { MediaAsset } from '@/types';
 
 interface TemplatePreviewUpdaterOptions {
@@ -15,6 +15,14 @@ export function useTemplatePreviewUpdater({
   const [variables, setVariables] = useState<Record<string, any>>(initialVariables || {});
   const [selectedMedia, setSelectedMedia] = useState<Record<string, MediaAsset>>({});
   const [isUpdating, setIsUpdating] = useState(false);
+  
+  // Track the latest variables for debounced updates
+  const latestVariables = useRef<Record<string, any>>(variables);
+  
+  // Update ref when variables change
+  useEffect(() => {
+    latestVariables.current = variables;
+  }, [variables]);
   
   // Initialize selected media from initial variables
   useEffect(() => {
@@ -67,14 +75,14 @@ export function useTemplatePreviewUpdater({
     setIsUpdating(false);
   }, [onPreviewUpdate]);
   
-  // Handle media selection
+  // Handle media selection - Fixed to use immutable updates
   const handleMediaSelected = useCallback((key: string, asset: MediaAsset) => {
     setIsUpdating(true);
     
-    // Update selected media record
+    // Update selected media record - using immutable update
     setSelectedMedia((prev) => ({ ...prev, [key]: asset }));
     
-    // Update variables with the media URL
+    // Update variables with the media URL - using immutable update
     setVariables((prev) => {
       const updated = { ...prev, [key]: asset.file_url };
       

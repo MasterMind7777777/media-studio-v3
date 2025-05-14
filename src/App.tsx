@@ -1,81 +1,59 @@
-
-import { useEffect } from 'react';
+import React from 'react';
 import {
+  BrowserRouter,
   Routes,
   Route,
-  Navigate,
-  useLocation,
 } from "react-router-dom";
-import { Toaster } from "@/components/ui/toaster";
-import Create from "./pages/Create";
-import Templates from "./pages/Templates";
-import TemplateCustomize from "./pages/TemplateCustomize";
-import Projects from "./pages/Projects";
-import Media from "./pages/Media"; // Import the Media page
-import { useAuth } from '@/context/AuthContext';
-import Login from './pages/Auth';
-import Register from './pages/Auth';
-import Account from './pages/Settings';
-import { CreatomateLoader } from './components/CreatomateLoader';
-import { ProtectedRoute } from './components/ProtectedRoute';
-import { AdminProtectedRoute } from './components/AdminProtectedRoute';
-import Dashboard from './pages/Dashboard';
+import { QueryClient, QueryClientProvider } from 'react-query'
 
-// Import admin page components
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminTemplates from './pages/admin/AdminTemplates';
-import AdminContentPacks from './pages/admin/AdminContentPacks';
-import AdminUsers from './pages/admin/AdminUsers';
+import Home from "./pages/Home";
+import Projects from "./pages/Projects";
+import TemplateCustomize from "./pages/TemplateCustomize";
+import Templates from "./pages/Templates";
+import Settings from "./pages/Settings";
+import Admin from "./pages/Admin";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import { Toaster } from "@/components/ui/toaster"
+
+// Import CreatomateLoader
+import { CreatomateLoader } from './components/CreatomateLoader';
+
+const queryClient = new QueryClient()
 
 function App() {
-  const { user } = useAuth();
-  
-  useEffect(() => {
-    if (!user) {
-      console.log('User is not logged in');
-    } else {
-      console.log('User is logged in');
-    }
-  }, [user]);
-  
+  const [isInitialized, setIsInitialized] = React.useState(false);
+
+  React.useEffect(() => {
+    // Simulate initialization process
+    setTimeout(() => {
+      setIsInitialized(true);
+    }, 500);
+  }, []);
+
   return (
-    <>
-      {/* Add the loader near the top of the component tree */}
+    <QueryClientProvider client={queryClient}>
+      {/* Add the Creatomate loader at the root level */}
       <CreatomateLoader />
       
-      <Routes>
-        {/* Public routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/auth" element={<Login />} />
-        
-        {/* Protected routes with layout */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/create" element={<Create />} />
-          <Route path="/create/:id/customize" element={<TemplateCustomize />} />
-          <Route path="/templates" element={<Templates />} />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Home />} />
           <Route path="/projects" element={<Projects />} />
-          <Route path="/media" element={<Media />} /> {/* Add the Media route */}
-          <Route path="/account" element={<Account />} />
-          <Route path="/settings" element={<Account />} />
-        </Route>
-        
-        {/* Admin routes with admin layout */}
-        <Route element={<AdminProtectedRoute />}>
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/templates" element={<AdminTemplates />} />
-          <Route path="/admin/content-packs" element={<AdminContentPacks />} />
-          <Route path="/admin/users" element={<AdminUsers />} />
-          <Route path="/admin/settings" element={<Account />} />
-        </Route>
-        
-        {/* Redirects */}
-        <Route path="/" element={<Navigate to="/dashboard" />} />
-        <Route path="*" element={<Navigate to="/dashboard" />} />
-      </Routes>
-      <Toaster />
-    </>
+          <Route path="/templates" element={<Templates />} />
+          <Route path="/template/:id" element={<TemplateCustomize />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+        </Routes>
+        <Toaster />
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
 

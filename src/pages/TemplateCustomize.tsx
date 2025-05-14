@@ -3,21 +3,17 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TemplateVariablesEditor } from '@/components/Templates/TemplateVariablesEditor';
 import { TemplateHeader } from '@/components/Templates/TemplateHeader';
-import { useTemplatePreviewUpdater, useTemplateVariables } from '@/hooks/templates';
+import { useTemplatePreviewUpdater, useTemplateVariables, useCreatomatePreview } from '@/hooks/templates';
 import { useTemplate } from '@/hooks/api/templates/useTemplate';
 import { useCreateRenderJob } from '@/hooks/api/useCreateRenderJob';
 import { useToast } from '@/hooks/use-toast';
 import { MediaAsset } from '@/types';
 import { MediaSelectionDialog } from '@/components/Media/MediaSelectionDialog';
-import { CreatomateLoader } from '@/components/CreatomateLoader';
+import { isCreatomateDisabled } from '@/components/CreatomateLoader';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { useCreatomatePreview } from '@/hooks/templates';
-
-// Check if Creatomate SDK is disabled using environment variable with fallback
-const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
 
 // Error boundary component
 class ErrorBoundary extends React.Component<
@@ -74,9 +70,11 @@ export default function TemplateCustomize() {
     variables: template?.variables || {},
     onError: (error) => {
       console.error('Preview error:', error);
+      // Use ID for error toast to prevent duplicates
       toast({
+        id: 'template-preview-error',
         title: "Preview Error",
-        description: error.message,
+        description: error.message || "An error occurred with the preview",
         variant: "destructive"
       });
     }
@@ -118,8 +116,9 @@ export default function TemplateCustomize() {
     if (templateError) {
       console.error('Template error:', templateError);
       toast({
+        id: 'template-error',
         title: "Error loading template",
-        description: templateError.message,
+        description: templateError.message || "Failed to load template data",
         variant: "destructive"
       });
     }
@@ -146,6 +145,7 @@ export default function TemplateCustomize() {
     } catch (error) {
       console.error('Error selecting media:', error);
       toast({
+        id: 'media-selection-error',
         title: "Error selecting media",
         description: "Please try again",
         variant: "destructive"
@@ -158,6 +158,7 @@ export default function TemplateCustomize() {
   const handleRender = async () => {
     if (!template || !id) {
       toast({
+        id: 'render-missing-data',
         title: "Cannot start render",
         description: "Template information is missing"
       });
@@ -181,6 +182,7 @@ export default function TemplateCustomize() {
       console.timeEnd('renderJob');
 
       toast({
+        id: 'render-success',
         title: "Render started successfully!",
         description: "Your video is now being rendered"
       });
@@ -190,6 +192,7 @@ export default function TemplateCustomize() {
     } catch (error: any) {
       console.error('Render error:', error);
       toast({
+        id: 'render-failure',
         title: "Failed to start render",
         description: error.message || "An unknown error occurred"
       });
@@ -217,8 +220,7 @@ export default function TemplateCustomize() {
 
   return (
     <div className="container py-8 max-w-7xl">
-      {/* Dynamic SDK loader */}
-      <CreatomateLoader />
+      {/* Note: CreatomateLoader is already included at the App level, don't duplicate it here */}
       
       {isCreatomateDisabled && (
         <Alert className="mb-4" variant="warning">
@@ -320,4 +322,4 @@ export default function TemplateCustomize() {
       </ErrorBoundary>
     </div>
   );
-};
+}
