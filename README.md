@@ -30,6 +30,32 @@ This project uses Creatomate for interactive video previews and editing. To set 
    - This key should be stored in the Supabase secrets table
    - It should never be exposed to the frontend
 
+## Local Development Setup
+
+For local development, the project loads the Creatomate Preview SDK (v1.6.0) from CDN. If you prefer to use the NPM package directly:
+
+1. **Install the Preview SDK**:
+   ```
+   npm install @creatomate/preview@1.6.0
+   ```
+
+2. **Import in your components**:
+   ```typescript
+   import { Preview } from '@creatomate/preview';
+   ```
+
+3. **Initialize the Preview**:
+   ```typescript
+   const preview = new Preview({
+     token: 'your-public-token',
+     templateId: 'your-template-id',
+     container: document.getElementById('preview-container'),
+     mode: 'interactive'
+   });
+   ```
+
+The project's implementation automatically handles loading the SDK from CDN with fallback options, so manual installation is optional.
+
 If configured correctly, the interactive preview will load and allow drag-and-drop editing in the `/create/:id/customize` page.
 
 ### Using the Creatomate API Wrapper
@@ -48,6 +74,7 @@ The project includes a type-safe Creatomate API wrapper that handles all interac
 - The Creatomate secret API key must only be used in edge functions, never in frontend code.
 - For production deployments, make sure to add the environment variables to your hosting platform (Vercel, Render, etc.).
 - The preview uses jsDelivr CDN with an unpkg fallback for reliability.
+- You can disable the preview temporarily by setting `VITE_CREATOMATE_PREVIEW=off` in your .env file.
 
 ## How can I edit this code?
 

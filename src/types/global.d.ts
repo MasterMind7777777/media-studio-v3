@@ -1,8 +1,9 @@
 
-import { CreatomatePreviewSDK } from '.';
-
+// This tells TypeScript that there will be a Creatomate global
 interface Window {
-  Creatomate?: CreatomatePreviewSDK;
+  Creatomate?: {
+    Preview: typeof import('@creatomate/preview').Preview;
+  };
   __CREATOMATE_SDK_LOADED__?: boolean;
 }
 

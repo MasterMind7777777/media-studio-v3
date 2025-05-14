@@ -99,13 +99,16 @@ export function useCreatomatePreview(
         }
 
         const token = import.meta.env.VITE_CREATOMATE_TOKEN;
+        if (!token) {
+          throw new Error('Creatomate token not found in environment variables');
+        }
         
-        // Create the preview instance
+        // Create the preview instance using the Preview SDK
         preview = new window.Creatomate.Preview({
           token,
           templateId, 
           container: containerRef.current,
-          mode: 'interactive',
+          mode: 'interactive', // Use interactive mode for editing
           modifications: variables
         });
         
