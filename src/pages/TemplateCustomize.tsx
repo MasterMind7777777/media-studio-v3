@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TemplateVariablesEditor } from '@/components/Templates/TemplateVariablesEditor';
@@ -9,6 +10,7 @@ import { toast } from '@/components/ui/use-toast';
 import { MediaAsset } from '@/types';
 import { MediaSelectionDialog } from '@/components/Media/MediaSelectionDialog';
 import { CreatomateLoader } from '@/components/CreatomateLoader';
+import { normalizeKeys } from '@/lib/variables';
 
 export default function TemplateCustomize() {
   const { id } = useParams<{ id: string }>();
@@ -34,7 +36,7 @@ export default function TemplateCustomize() {
     hasVariables
   } = useTemplateVariables(template);
   
-  // Setup template variables updater
+  // Setup template variables updater with normalized initialVariables
   const {
     variables,
     selectedMedia,
@@ -60,7 +62,7 @@ export default function TemplateCustomize() {
   const creatomatePreview = useCreatomatePreview({
     containerId: 'creatomate-preview',
     templateId: template?.creatomate_template_id,
-    variables: variables,
+    variables: variables, // Use the normalized variables
     onReady: () => {
       console.log('Preview is ready');
       setSDKStatus('ready');
@@ -78,7 +80,10 @@ export default function TemplateCustomize() {
   useEffect(() => {
     if (template?.variables && Object.keys(template.variables).length > 0) {
       console.log('Setting initial template variables:', template.variables);
-      setVariables(template.variables);
+      // Normalize variables before setting them
+      const normalizedVars = normalizeKeys(template.variables);
+      console.log('Normalized variables for initialization:', normalizedVars);
+      setVariables(normalizedVars);
     }
   }, [template?.variables]);
 
@@ -124,10 +129,11 @@ export default function TemplateCustomize() {
     setIsRendering(true);
     
     try {
+      // Log the variables being sent for rendering
       console.log('Starting render with variables:', variables);
       const result = await createRenderJob({
         templateId: id, 
-        variables, 
+        variables, // These should be normalized already
         platforms: template.platforms || []
       });
 

@@ -66,31 +66,61 @@ export interface RenderParams {
  * Helper function to clean up variables before sending to Creatomate API
  */
 function cleanupVariables(variables: Record<string, any>): Record<string, any> {
+  console.log('Cleaning up variables before sending to Creatomate:', variables);
   const cleanVars: Record<string, any> = {};
+  const elementMap = new Map<string, string[]>();
   
-  // Process each variable to ensure we don't have duplicated keys
+  // Skip null/undefined values and group keys by element name
   Object.entries(variables).forEach(([key, value]) => {
     // Skip null/undefined values
     if (value === null || value === undefined) {
       return;
     }
     
-    // Fix duplicated suffixes (like .text.text becoming just .text)
-    const suffixes = ['.text', '.fill', '.source'];
+    const parts = key.split('.');
+    const elementName = parts[0];
     
-    let cleanKey = key;
-    suffixes.forEach(suffix => {
-      // Check if key has duplicate suffixes (e.g., "Heading.text.text")
-      const regex = new RegExp(`(${suffix.replace('.', '\\.')})+$`);
-      if (regex.test(key)) {
-        cleanKey = key.replace(regex, suffix);
-      }
-    });
+    if (!elementMap.has(elementName)) {
+      elementMap.set(elementName, []);
+    }
     
-    // Store with clean key
-    cleanVars[cleanKey] = value;
+    elementMap.get(elementName)?.push(key);
   });
   
+  // Process each element group
+  elementMap.forEach((keys, elementName) => {
+    // Categorize keys by property type
+    const textKeys = keys.filter(k => k.includes('.text'));
+    const sourceKeys = keys.filter(k => k.includes('.source'));
+    const fillKeys = keys.filter(k => k.includes('.fill'));
+    
+    // Process text properties
+    if (textKeys.length > 0) {
+      const normalKey = `${elementName}.text`;
+      cleanVars[normalKey] = variables[textKeys[0]]; // Use the first available value
+    }
+    
+    // Process source properties
+    if (sourceKeys.length > 0) {
+      const normalKey = `${elementName}.source`;
+      cleanVars[normalKey] = variables[sourceKeys[0]]; // Use the first available value
+    }
+    
+    // Process fill properties
+    if (fillKeys.length > 0) {
+      const normalKey = `${elementName}.fill`;
+      cleanVars[normalKey] = variables[fillKeys[0]]; // Use the first available value
+    }
+    
+    // Handle keys that don't match our known property types
+    keys.forEach(key => {
+      if (!key.includes('.text') && !key.includes('.source') && !key.includes('.fill')) {
+        cleanVars[key] = variables[key];
+      }
+    });
+  });
+  
+  console.log('Cleaned variables for Creatomate:', cleanVars);
   return cleanVars;
 }
 

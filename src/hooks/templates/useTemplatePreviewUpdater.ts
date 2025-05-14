@@ -1,7 +1,7 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { MediaAsset } from '@/types';
-import { toast } from 'sonner';
+import { toast } from '@/components/ui/use-toast';
+import { normalizeKeys } from '@/lib/variables';
 
 interface UseTemplatePreviewUpdaterProps {
   initialVariables: Record<string, any>;
@@ -27,17 +27,23 @@ export function useTemplatePreviewUpdater({
   useEffect(() => {
     if (Object.keys(initialVariables).length > 0) {
       console.log('Initializing template variables:', initialVariables);
-      setVariables(initialVariables);
+      // Normalize the initial variables to ensure consistent format
+      const normalizedVars = normalizeKeys(initialVariables);
+      console.log('Normalized initial variables:', normalizedVars);
+      setVariables(normalizedVars);
     }
   }, [JSON.stringify(initialVariables)]);
   
   // Handle text variable changes
   const handleTextChange = useCallback((key: string, value: string) => {
-    console.log(`Text variable changed: ${key} = "${value}"`);
+    // Ensure key has correct format
+    const normalizedKey = normalizeKey(key, 'text');
+    console.log(`Text variable changed: ${key} -> ${normalizedKey} = "${value}"`);
+    
     setIsUpdating(true);
     
     setVariables(prev => {
-      const newVars = { ...prev, [key]: value };
+      const newVars = { ...prev, [normalizedKey]: value };
       // Notify parent component about the update
       onPreviewUpdate?.(newVars);
       return newVars;
@@ -49,11 +55,14 @@ export function useTemplatePreviewUpdater({
   
   // Handle color variable changes
   const handleColorChange = useCallback((key: string, value: string) => {
-    console.log(`Color variable changed: ${key} = "${value}"`);
+    // Ensure key has correct format
+    const normalizedKey = normalizeKey(key, 'fill');
+    console.log(`Color variable changed: ${key} -> ${normalizedKey} = "${value}"`);
+    
     setIsUpdating(true);
     
     setVariables(prev => {
-      const newVars = { ...prev, [key]: value };
+      const newVars = { ...prev, [normalizedKey]: value };
       // Notify parent component about the update
       onPreviewUpdate?.(newVars);
       return newVars;
@@ -65,18 +74,20 @@ export function useTemplatePreviewUpdater({
   
   // Handle media asset selection
   const handleMediaSelected = useCallback((key: string, asset: MediaAsset) => {
-    console.log(`Media selected for ${key}:`, asset);
+    // Ensure key has correct format
+    const normalizedKey = normalizeKey(key, 'source');
+    console.log(`Media selected for ${key} -> ${normalizedKey}:`, asset);
     
     setSelectedMedia(prev => ({
       ...prev,
-      [key]: asset
+      [normalizedKey]: asset
     }));
     
     setIsUpdating(true);
     setVariables(prev => {
       const newVars = { 
         ...prev, 
-        [key]: asset.file_url 
+        [normalizedKey]: asset.file_url 
       };
       // Notify parent component about the update
       onPreviewUpdate?.(newVars);
@@ -84,11 +95,30 @@ export function useTemplatePreviewUpdater({
     });
     
     // Toast notification for better UX
-    toast.success(`Updated ${asset.name}`);
+    toast({
+      title: "Updated media",
+      description: asset.name
+    });
     
     // Clear updating state after a short delay
     setTimeout(() => setIsUpdating(false), 300);
   }, [onPreviewUpdate]);
+  
+  // Helper to normalize a single key
+  const normalizeKey = (key: string, defaultProperty: string): string => {
+    const parts = key.split('.');
+    const elementName = parts[0];
+    
+    // If key already has property suffix, keep it
+    if (parts.length > 1) {
+      // Remove any duplicate suffixes (e.g., "text.text" -> "text")
+      const property = parts[1];
+      return `${elementName}.${property}`;
+    }
+    
+    // Add the default property suffix if missing
+    return `${elementName}.${defaultProperty}`;
+  };
   
   return {
     variables,
