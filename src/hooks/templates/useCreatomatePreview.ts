@@ -105,7 +105,7 @@ export function useCreatomatePreview(
         
         previewRef.current = preview;
 
-        // Set up event handlers using the correct syntax
+        // Set up event handlers using the correct syntax for the Preview class
         preview.addEventListener('ready', () => {
           if (isMounted) {
             setPreviewState(prev => ({ 
@@ -115,7 +115,12 @@ export function useCreatomatePreview(
               isPlaying: true,
               togglePlay: () => {
                 if (preview) {
-                  if (preview.isPlaying?.() || false) {
+                  // Using optional chaining with a fallback for isPlaying
+                  const isCurrentlyPlaying = typeof preview.isPlaying === 'function' 
+                    ? preview.isPlaying() 
+                    : false;
+                    
+                  if (isCurrentlyPlaying) {
                     preview.pause();
                   } else {
                     preview.play();

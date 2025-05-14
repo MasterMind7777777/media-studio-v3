@@ -3,7 +3,7 @@ import React from 'react';
 import { renderHook, act } from '@testing-library/react-hooks';
 import { useCreatomatePreview } from '../hooks/templates/useCreatomatePreview';
 
-// Mock the Preview instance
+// Mock the Preview instance with proper Jest mock types
 const mockPreviewInstance = {
   onReady: jest.fn(),
   onError: jest.fn(),

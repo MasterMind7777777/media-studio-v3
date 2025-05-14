@@ -37,7 +37,6 @@ export async function createPreviewInstance(options: CreatomatePreviewOptions): 
   
   try {
     // Create the preview instance with all required parameters
-    // The Preview constructor expects: token, elementId/container, config
     const preview = new Preview(
       options.token,
       options.container,
