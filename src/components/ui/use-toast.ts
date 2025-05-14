@@ -1,32 +1,50 @@
 
 // Standardize to use sonner toast system
-import { toast } from "sonner";
+import { toast as sonnerToast } from "sonner";
 
 // Re-export toast from sonner
-export { toast };
+export { sonnerToast as toast };
 
 // Compatibility layer for existing code that uses useToast hook
 export function useToast() {
   return {
     toast: {
       // Map common toast methods to sonner equivalents
-      success: (content: string) => toast.success(content),
-      error: (content: string) => toast.error(content),
-      info: (content: string) => toast(content),
-      warning: (content: string) => toast.warning(content),
+      success: (content: string | { title: string; description?: string }) => {
+        if (typeof content === 'object') {
+          return sonnerToast.success(content.title, { description: content.description });
+        }
+        return sonnerToast.success(content);
+      },
+      error: (content: string | { title: string; description?: string }) => {
+        if (typeof content === 'object') {
+          return sonnerToast.error(content.title, { description: content.description });
+        }
+        return sonnerToast.error(content);
+      },
+      info: (content: string | { title: string; description?: string }) => {
+        if (typeof content === 'object') {
+          return sonnerToast(content.title, { description: content.description });
+        }
+        return sonnerToast(content);
+      },
+      warning: (content: string | { title: string; description?: string }) => {
+        if (typeof content === 'object') {
+          return sonnerToast.warning(content.title, { description: content.description });
+        }
+        return sonnerToast.warning(content);
+      },
       // For legacy code using object style
-      // This allows { title, description } style calls to work with sonner
-      // which expects a string message and optional description
       (...args: any[]) {
         const [content] = args;
         if (typeof content === 'object' && content !== null) {
           const { title, description } = content;
           if (description) {
-            return toast(title, { description });
+            return sonnerToast(title, { description });
           }
-          return toast(title);
+          return sonnerToast(title);
         }
-        return toast(content);
+        return sonnerToast(content);
       }
     }
   };
