@@ -77,12 +77,12 @@ export function useCreatomatePreview({
         throw new Error('Creatomate token not found in environment variables');
       }
 
-      // Clean and normalize the variables before passing to Creatomate
+      // Clean the variables before passing to Creatomate
       const cleanedVars = cleanupVariables(latestVariables.current);
       
       console.log('Initializing preview with cleaned variables:', cleanedVars);
       
-      // Initialize the preview with the public token
+      // Initialize the preview with the public token - now using the config object
       previewRef.current = new window.Creatomate.Preview({
         token,
         templateId,
@@ -146,7 +146,7 @@ export function useCreatomatePreview({
     }
     
     try {
-      // Clean and normalize the variables before updating
+      // Clean the variables before updating
       const cleanedVars = cleanupVariables(newVariables);
       console.log('Updating preview with cleaned variables:', cleanedVars);
       

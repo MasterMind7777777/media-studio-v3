@@ -1,9 +1,9 @@
-
 import { Template, RenderJob } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { isImageUrl, isAudioUrl } from "@/lib/utils";
 import { z } from "zod";
 import axios, { AxiosInstance, AxiosRequestConfig } from "axios";
+import { cleanupVariables as cleanupVariablesFromLib } from "@/lib/variables";
 
 /**
  * Zod schema definitions for Creatomate API responses
@@ -64,64 +64,11 @@ export interface RenderParams {
 
 /**
  * Helper function to clean up variables before sending to Creatomate API
+ * @deprecated Use the cleanupVariables from @/lib/variables instead
  */
-function cleanupVariables(variables: Record<string, any>): Record<string, any> {
-  console.log('Cleaning up variables before sending to Creatomate:', variables);
-  const cleanVars: Record<string, any> = {};
-  const elementMap = new Map<string, string[]>();
-  
-  // Skip null/undefined values and group keys by element name
-  Object.entries(variables).forEach(([key, value]) => {
-    // Skip null/undefined values
-    if (value === null || value === undefined) {
-      return;
-    }
-    
-    const parts = key.split('.');
-    const elementName = parts[0];
-    
-    if (!elementMap.has(elementName)) {
-      elementMap.set(elementName, []);
-    }
-    
-    elementMap.get(elementName)?.push(key);
-  });
-  
-  // Process each element group
-  elementMap.forEach((keys, elementName) => {
-    // Categorize keys by property type
-    const textKeys = keys.filter(k => k.includes('.text'));
-    const sourceKeys = keys.filter(k => k.includes('.source'));
-    const fillKeys = keys.filter(k => k.includes('.fill'));
-    
-    // Process text properties
-    if (textKeys.length > 0) {
-      const normalKey = `${elementName}.text`;
-      cleanVars[normalKey] = variables[textKeys[0]]; // Use the first available value
-    }
-    
-    // Process source properties
-    if (sourceKeys.length > 0) {
-      const normalKey = `${elementName}.source`;
-      cleanVars[normalKey] = variables[sourceKeys[0]]; // Use the first available value
-    }
-    
-    // Process fill properties
-    if (fillKeys.length > 0) {
-      const normalKey = `${elementName}.fill`;
-      cleanVars[normalKey] = variables[fillKeys[0]]; // Use the first available value
-    }
-    
-    // Handle keys that don't match our known property types
-    keys.forEach(key => {
-      if (!key.includes('.text') && !key.includes('.source') && !key.includes('.fill')) {
-        cleanVars[key] = variables[key];
-      }
-    });
-  });
-  
-  console.log('Cleaned variables for Creatomate:', cleanVars);
-  return cleanVars;
+function cleanupVariablesForApi(variables: Record<string, any>): Record<string, any> {
+  // Delegate to the shared implementation
+  return cleanupVariablesFromLib(variables);
 }
 
 /**
@@ -242,8 +189,8 @@ export async function startRenderJob(
     console.log("Platforms:", platforms);
     console.log("Database job ID:", database_job_id);
 
-    // Clean variables (remove any duplicated keys)
-    const cleanVariables = cleanupVariables(variables);
+    // Clean variables (remove any duplicated keys) - use the imported function from /lib
+    const cleanVariables = cleanupVariablesFromLib(variables);
 
     // Get the current user ID
     const { data: { user } } = await supabase.auth.getUser();
@@ -317,4 +264,3 @@ export async function updateTemplatePreviews(): Promise<{
     throw error;
   }
 }
-

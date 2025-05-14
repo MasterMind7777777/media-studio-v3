@@ -3,11 +3,17 @@
 
 // Add Creatomate global type definitions
 interface CreatomatePreviewSDK {
-  Preview: new (
-    container: HTMLElement,
-    mode: 'player' | 'interactive',
-    token: string
-  ) => {
+  Preview: new (config: {
+    token: string;
+    templateId?: string;
+    container: HTMLElement;
+    format?: string;
+    mode?: 'player' | 'interactive';
+    modifications?: Record<string, any>;
+    onReady?: () => void;
+    onError?: (error: Error) => void;
+    onStateChange?: (state: any) => void;
+  }) => {
     onReady: () => void;
     onError: (error: Error) => void;
     onTimeUpdate: (time: number) => void;
@@ -27,4 +33,3 @@ interface Window {
   Creatomate?: CreatomatePreviewSDK;
   handleCreatomateScriptError?: () => void;
 }
-
