@@ -103,7 +103,8 @@ export function TemplatePreview({
   
   // Only proceed with preview initialization after we've attempted to load credentials
   const {
-    isLoaded,
+    isLoading,
+    isReady,
     isPlaying,
     error,
     togglePlay,
@@ -113,7 +114,6 @@ export function TemplatePreview({
     containerId: previewContainerId,
     templateId: templateId,
     variables,
-    autoPlay: false,
     onReady: () => console.log("Preview is ready")
   });
   
@@ -139,7 +139,7 @@ export function TemplatePreview({
         className="aspect-video bg-black/80 rounded-t-md flex items-center justify-center relative"
         style={{ minHeight: '240px' }}
       >
-        {!isLoaded && !error && (
+        {!isReady && !error && (
           <div className="text-white text-center p-8 absolute inset-0 flex flex-col items-center justify-center">
             <div className="text-xl font-medium mb-4">Loading Preview</div>
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
@@ -213,7 +213,7 @@ export function TemplatePreview({
             size="sm" 
             variant="outline"
             onClick={togglePlay}
-            disabled={!isLoaded || !!error}
+            disabled={!isReady || !!error}
           >
             {isPlaying ? <Pause className="h-4 w-4 mr-1" /> : <Play className="h-4 w-4 mr-1" />}
             {isPlaying ? 'Pause' : 'Play'}
@@ -222,7 +222,7 @@ export function TemplatePreview({
             size="sm" 
             variant="outline"
             onClick={handleFullscreen}
-            disabled={!isLoaded || !!error}
+            disabled={!isReady || !!error}
           >
             <Maximize className="h-4 w-4 mr-1" />
             Fullscreen
