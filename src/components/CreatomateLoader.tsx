@@ -27,7 +27,7 @@ export function CreatomateLoader() {
         const loadScript = (url: string): Promise<void> => {
           return new Promise((resolve, reject) => {
             const script = document.createElement('script');
-            script.type = 'text/javascript';
+            script.type = 'module'; // Changed to module type for ESM compatibility
             script.src = url;
             script.async = true;
             script.onload = () => {
@@ -42,16 +42,16 @@ export function CreatomateLoader() {
           });
         };
 
-        // Try to load from primary source
-        await loadScript('https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.min.js');
+        // Try to load from ESM-compatible source
+        await loadScript('https://esm.sh/@creatomate/preview@1.6.0');
         console.log('Creatomate SDK loaded successfully');
         setIsLoaded(true);
       } catch (error) {
         console.error('Failed to load Creatomate SDK, trying fallback', error);
         
         try {
-          // Try fallback source if primary fails
-          await loadScript('https://unpkg.com/@creatomate/preview@1.6.0/dist/Preview.min.js');
+          // Try fallback ESM source
+          await loadScript('https://cdn.skypack.dev/@creatomate/preview@1.6.0');
           console.log('Creatomate SDK loaded from fallback source');
           setIsLoaded(true);
         } catch (fallbackError) {
@@ -77,10 +77,10 @@ export function CreatomateLoader() {
 }
 
 // Helper function for loading scripts, exported for reuse
-export function loadScript(url: string): Promise<void> {
+export function loadScript(url: string, type: 'module' | 'text/javascript' = 'module'): Promise<void> {
   return new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.type = 'text/javascript';
+    script.type = type;
     script.src = url;
     script.async = true;
     script.onload = () => {

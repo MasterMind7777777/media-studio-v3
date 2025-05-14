@@ -1,7 +1,6 @@
-
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { MediaAsset } from '@/types';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { normalizeKeys } from '@/lib/variables';
 
 interface UseTemplatePreviewUpdaterProps {
@@ -37,7 +36,12 @@ export function useTemplatePreviewUpdater({
   // Update the ref when variables change
   useEffect(() => {
     latestVariables.current = variables;
-  }, [variables]);
+    
+    // Notify the parent component when variables change (but not during initialization)
+    if (Object.keys(variables).length > 0 && !isInitializing.current) {
+      onPreviewUpdate?.(variables);
+    }
+  }, [variables, onPreviewUpdate]);
   
   // Initialize variables when initial values change
   useEffect(() => {
@@ -97,7 +101,7 @@ export function useTemplatePreviewUpdater({
     return `${elementName}.${defaultProperty}`;
   }, []);
   
-  // Handle text variable changes with debouncing
+  // Handle text variable changes with immediate updates
   const handleTextChange = useCallback((key: string, value: string) => {
     // Ensure key has correct format
     const normalizedKey = normalizeKey(key, 'text');
@@ -105,24 +109,17 @@ export function useTemplatePreviewUpdater({
     // Set updating flag
     setIsUpdating(true);
     
-    // Batch update to improve performance
+    // Immediate update to improve user experience
     setVariables(prev => {
       const newVars = { ...prev, [normalizedKey]: value };
-      
-      // Use timeout to debounce notification to parent component
-      setTimeout(() => {
-        // Use the ref to ensure we have the latest state
-        onPreviewUpdate?.(newVars);
-      }, 300);
-      
       return newVars;
     });
     
     // Clear updating state after a short delay
-    setTimeout(() => setIsUpdating(false), 300);
-  }, [onPreviewUpdate, normalizeKey]);
+    setTimeout(() => setIsUpdating(false), 100);
+  }, [normalizeKey]);
   
-  // Handle color variable changes with debouncing
+  // Handle color variable changes with immediate updates
   const handleColorChange = useCallback((key: string, value: string) => {
     // Ensure key has correct format
     const normalizedKey = normalizeKey(key, 'fill');
@@ -130,21 +127,15 @@ export function useTemplatePreviewUpdater({
     // Set updating flag
     setIsUpdating(true);
     
-    // Batch update to improve performance
+    // Immediate update to improve user experience
     setVariables(prev => {
       const newVars = { ...prev, [normalizedKey]: value };
-      
-      // Use timeout to debounce notification to parent component
-      setTimeout(() => {
-        onPreviewUpdate?.(newVars);
-      }, 300);
-      
       return newVars;
     });
     
     // Clear updating state after a short delay
-    setTimeout(() => setIsUpdating(false), 300);
-  }, [onPreviewUpdate, normalizeKey]);
+    setTimeout(() => setIsUpdating(false), 100);
+  }, [normalizeKey]);
   
   // Handle media asset selection with error handling
   const handleMediaSelected = useCallback((key: string, asset: MediaAsset) => {
@@ -162,46 +153,30 @@ export function useTemplatePreviewUpdater({
       setIsUpdating(true);
       
       // Batch our updates
-      const updateMedia = () => {
-        setSelectedMedia(prev => ({
-          ...prev,
-          [normalizedKey]: asset
-        }));
-        
-        setVariables(prev => {
-          const newVars = { 
-            ...prev, 
-            [normalizedKey]: asset.file_url 
-          };
-          
-          // Notify parent component about the update after a small delay
-          setTimeout(() => {
-            onPreviewUpdate?.(newVars);
-          }, 100);
-          
-          return newVars;
-        });
-        
-        // Toast notification for better UX
-        toast({
-          title: "Media updated",
-          description: asset.name
-        });
-      };
+      setSelectedMedia(prev => ({
+        ...prev,
+        [normalizedKey]: asset
+      }));
       
-      updateMedia();
+      setVariables(prev => {
+        const newVars = { 
+          ...prev, 
+          [normalizedKey]: asset.file_url 
+        };
+        return newVars;
+      });
+      
+      // Toast notification for better UX
+      toast.success(`Media updated: ${asset.name}`);
       
       // Clear updating state after a short delay
-      setTimeout(() => setIsUpdating(false), 300);
+      setTimeout(() => setIsUpdating(false), 100);
     } catch (error) {
       console.error('Error selecting media:', error);
       setIsUpdating(false);
-      toast({
-        title: "Error updating media",
-        description: "Please try again"
-      });
+      toast.error("Error updating media. Please try again.");
     }
-  }, [onPreviewUpdate, normalizeKey]);
+  }, [normalizeKey]);
   
   return {
     variables,

@@ -244,7 +244,7 @@ export function TemplateVariablesEditor({
           {(isRendering || isUpdating) && <Loader2 className="h-4 w-4 animate-spin" />}
         </Button>
         <p className="text-xs text-center text-muted-foreground mt-2">
-          Live preview is currently disabled. Your changes will be applied when rendering.
+          Live preview is disabled. Your changes will be applied when rendering.
         </p>
       </div>
     </Card>

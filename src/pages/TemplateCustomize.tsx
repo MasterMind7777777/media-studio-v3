@@ -6,7 +6,7 @@ import { TemplateHeader } from '@/components/Templates/TemplateHeader';
 import { useTemplatePreviewUpdater, useTemplateVariables } from '@/hooks/templates';
 import { useTemplate } from '@/hooks/api/templates/useTemplate';
 import { useCreateRenderJob } from '@/hooks/api/useCreateRenderJob';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { MediaAsset } from '@/types';
 import { MediaSelectionDialog } from '@/components/Media/MediaSelectionDialog';
 import { CreatomateLoader } from '@/components/CreatomateLoader';
@@ -17,8 +17,7 @@ import { Card } from '@/components/ui/card';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 // Check if Creatomate SDK is disabled using environment variable with fallback
-const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true' 
-  || import.meta.env.VITE_DISABLE_CREATOMATE === undefined;
+const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
 
 // Error boundary component
 class ErrorBoundary extends React.Component<
@@ -36,10 +35,7 @@ class ErrorBoundary extends React.Component<
 
   componentDidCatch(error: any, errorInfo: any) {
     console.error('Component error:', error, errorInfo);
-    toast({
-      title: 'An error occurred',
-      description: 'Please try refreshing the page'
-    });
+    toast.error('An error occurred. Please try refreshing the page.');
   }
 
   render() {
@@ -73,10 +69,9 @@ export default function TemplateCustomize() {
     hasVariables
   } = useTemplateVariables(template);
   
-  // Handle preview updates more efficiently
+  // Handle preview updates
   const handlePreviewUpdate = useCallback((newVars: Record<string, any>) => {
-    console.log('Variables would update preview:', newVars);
-    // We'll implement actual preview updates in the future
+    console.log('Variables updated:', newVars);
   }, []);
   
   // Setup template variables updater with normalized initialVariables
@@ -100,10 +95,7 @@ export default function TemplateCustomize() {
   useEffect(() => {
     if (templateError) {
       console.error('Template error:', templateError);
-      toast({
-        title: 'Error loading template',
-        description: templateError.message
-      });
+      toast.error('Error loading template: ' + templateError.message);
     }
   }, [templateError]);
 
@@ -127,10 +119,7 @@ export default function TemplateCustomize() {
       setIsMediaDialogOpen(false);
     } catch (error) {
       console.error('Error selecting media:', error);
-      toast({
-        title: 'Error selecting media',
-        description: 'Please try again'
-      });
+      toast.error('Error selecting media. Please try again.');
       setIsMediaDialogOpen(false);
     }
   }, [currentMediaKey, handleMediaSelected]);
@@ -138,10 +127,7 @@ export default function TemplateCustomize() {
   // Handle render button click with improved error handling
   const handleRender = async () => {
     if (!template || !id) {
-      toast({
-        title: 'Cannot start render',
-        description: 'Template information is missing'
-      });
+      toast.error('Cannot start render: Template information is missing');
       return;
     }
 
@@ -161,19 +147,13 @@ export default function TemplateCustomize() {
 
       console.timeEnd('renderJob');
 
-      toast({
-        title: 'Render started successfully!',
-        description: 'Your video is now being rendered. You will be redirected to the Projects page.'
-      });
+      toast.success('Render started successfully! Your video is now being rendered.');
 
       // Navigate to projects page with job ID parameter
       navigate(`/projects?job=${result.id}`);
     } catch (error: any) {
       console.error('Render error:', error);
-      toast({
-        title: 'Failed to start render',
-        description: error.message || 'An unknown error occurred'
-      });
+      toast.error('Failed to start render: ' + (error.message || 'An unknown error occurred'));
     } finally {
       setIsRendering(false);
     }
@@ -204,9 +184,7 @@ export default function TemplateCustomize() {
       <Alert className="mb-4" variant="warning">
         <AlertTriangle className="h-4 w-4 mr-2" />
         <AlertDescription>
-          {isCreatomateDisabled 
-            ? "Live preview is temporarily disabled for development. Variable edits won't be reflected in real-time."
-            : "Live preview is enabled. Your changes will be reflected in real-time."}
+          Live preview is temporarily disabled for development. Variable edits will be applied when rendering.
         </AlertDescription>
       </Alert>
       
@@ -252,10 +230,8 @@ export default function TemplateCustomize() {
               )}
 
               <div className="mt-4 flex justify-end gap-2">
-                <div className={`text-xs px-2 py-1 rounded-full ${isCreatomateDisabled ? 
-                  "bg-yellow-500/20 text-yellow-600" : 
-                  "bg-green-500/20 text-green-600"}`}>
-                  {isCreatomateDisabled ? "Preview Disabled" : "Preview Enabled"}
+                <div className="text-xs px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-600">
+                  Preview Disabled
                 </div>
               </div>
             </div>
