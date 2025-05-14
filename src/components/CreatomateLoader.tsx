@@ -1,9 +1,25 @@
 
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 
 // Standardize SDK availability detection
 const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
+
+// Helper function to load external scripts
+export const loadScript = (src: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.type = 'module';
+    script.async = true;
+    script.defer = true;
+    
+    script.onload = () => resolve();
+    script.onerror = (e) => reject(new Error(`Failed to load script: ${src}`));
+    
+    document.body.appendChild(script);
+  });
+};
 
 export function CreatomateLoader() {
   const [loading, setLoading] = useState(false);
@@ -18,7 +34,7 @@ export function CreatomateLoader() {
     }
     
     // Prevent duplicate loading
-    if (window.creatomate || loading || loaded) {
+    if (window.Creatomate || loading || loaded) {
       return;
     }
     
@@ -46,7 +62,7 @@ export function CreatomateLoader() {
         await loadPromise;
         
         // Ensure the SDK is available
-        if (!window.creatomate) {
+        if (!window.Creatomate) {
           throw new Error('Creatomate SDK loaded but not available in window');
         }
         
@@ -71,7 +87,11 @@ export function CreatomateLoader() {
   // Show error in UI if loading fails
   useEffect(() => {
     if (error) {
-      toast.error(`Failed to load preview: ${error}`);
+      toast({
+        title: "Failed to load preview",
+        description: error,
+        variant: "destructive"
+      });
     }
   }, [error]);
   

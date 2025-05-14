@@ -95,8 +95,10 @@ export default function TemplateCustomize() {
   useEffect(() => {
     if (templateError) {
       console.error('Template error:', templateError);
-      toast.error('Error loading template', {
-        description: templateError.message
+      toast({
+        title: "Error loading template",
+        description: templateError.message,
+        variant: "destructive"
       });
     }
   }, [templateError, toast]);
@@ -121,8 +123,10 @@ export default function TemplateCustomize() {
       setIsMediaDialogOpen(false);
     } catch (error) {
       console.error('Error selecting media:', error);
-      toast.error('Error selecting media', {
-        description: 'Please try again'
+      toast({
+        title: "Error selecting media",
+        description: "Please try again",
+        variant: "destructive"
       });
       setIsMediaDialogOpen(false);
     }
@@ -131,8 +135,10 @@ export default function TemplateCustomize() {
   // Handle render button click with improved error handling
   const handleRender = async () => {
     if (!template || !id) {
-      toast.error('Cannot start render', {
-        description: 'Template information is missing'
+      toast({
+        title: "Cannot start render",
+        description: "Template information is missing",
+        variant: "destructive"
       });
       return;
     }
@@ -153,16 +159,20 @@ export default function TemplateCustomize() {
 
       console.timeEnd('renderJob');
 
-      toast.success('Render started successfully!', {
-        description: 'Your video is now being rendered'
+      toast({
+        title: "Render started successfully!",
+        description: "Your video is now being rendered",
+        variant: "default"
       });
 
       // Navigate to projects page with job ID parameter
       navigate(`/projects?job=${result.id}`);
     } catch (error: any) {
       console.error('Render error:', error);
-      toast.error('Failed to start render', {
-        description: error.message || 'An unknown error occurred'
+      toast({
+        title: "Failed to start render",
+        description: error.message || "An unknown error occurred",
+        variant: "destructive"
       });
     } finally {
       setIsRendering(false);

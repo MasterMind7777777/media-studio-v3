@@ -73,7 +73,7 @@ export function ensureCreatomateSDK(): Promise<void> {
     
     console.log('Loading Creatomate SDK dynamically');
     
-    // Use loadScript helper instead of dynamic ESM imports
+    // Use loadScript helper to load SDK
     loadScript('https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.min.js')
       .then(() => {
         console.log('Creatomate SDK loaded successfully');
