@@ -2,6 +2,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { cleanupVariables } from '@/lib/variables';
 import { useDebouncedCallback } from '@/hooks/utils/useDebouncedCallback';
+import { toast } from '@/hooks/use-toast';
+import { ensureCreatomateSDK } from '@/integrations/creatomate/config';
 
 // Check if Creatomate SDK is disabled using environment variable
 const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
@@ -29,8 +31,6 @@ interface PreviewHook {
 
 /**
  * Hook for Creatomate preview with dynamic loading support
- * Uses state (not ref) for variables to ensure proper re-rendering
- * Falls back to mock implementation when SDK is disabled
  */
 export function useCreatomatePreview({
   containerId,
@@ -50,11 +50,14 @@ export function useCreatomatePreview({
   
   // Initialize with provided variables
   useEffect(() => {
-    setCurrentVars(prevVars => ({...prevVars, ...variables}));
+    if (Object.keys(variables).length > 0) {
+      setCurrentVars(prevVars => ({...prevVars, ...variables}));
+    }
   }, [variables]);
   
   // Reference for preview container element
   const containerRef = useRef<HTMLElement | null>(null);
+  const initializationAttempted = useRef(false);
   
   // Debounced function to update preview with new variables
   const debouncedUpdatePreview = useDebouncedCallback((newVars: Record<string, any>) => {
@@ -101,12 +104,18 @@ export function useCreatomatePreview({
       
       return () => clearTimeout(timer);
     } else {
+      // Prevent duplicate initialization attempts
+      if (initializationAttempted.current) return;
+      initializationAttempted.current = true;
+      
       // Real SDK initialization
       const initializePreview = async () => {
         try {
           setIsLoading(true);
           
-          // Dynamically import Creatomate types
+          // Make sure SDK is loaded before proceeding
+          await ensureCreatomateSDK();
+          
           const container = document.getElementById(containerId);
           containerRef.current = container;
           
@@ -115,11 +124,12 @@ export function useCreatomatePreview({
           }
           
           // Check if SDK is available on window
-          if (!window.Creatomate || !window.Creatomate.Preview) {
+          if (!window.Creatomate) {
             throw new Error('Creatomate SDK not loaded');
           }
           
           // Create preview instance
+          console.log('Creating Creatomate Preview instance');
           const previewInstance = new window.Creatomate.Preview({
             container,
             mode: 'interactive',
@@ -136,21 +146,23 @@ export function useCreatomatePreview({
             
             // Load template if provided
             if (templateId) {
+              console.log('Loading template:', templateId);
               previewInstance.loadTemplate(templateId);
             }
             
             // Apply initial variables
             if (Object.keys(currentVars).length > 0) {
+              console.log('Applying initial variables:', currentVars);
               const cleanVars = cleanupVariables(currentVars);
               previewInstance.setModifications(cleanVars);
             }
           };
           
-          previewInstance.onError = (error: Error) => {
-            console.error('Preview error:', error);
-            setError(error);
+          previewInstance.onError = (err: Error) => {
+            console.error('Preview error:', err);
+            setError(err);
             setIsLoading(false);
-            onError?.(error);
+            onError?.(err);
           };
           
           previewInstance.onPlay = () => {
@@ -166,9 +178,19 @@ export function useCreatomatePreview({
           
         } catch (err) {
           console.error('Failed to initialize preview:', err);
-          setError(err instanceof Error ? err : new Error(String(err)));
+          const error = err instanceof Error ? err : new Error(String(err));
+          setError(error);
           setIsLoading(false);
-          onError?.(err instanceof Error ? err : new Error(String(err)));
+          onError?.(error);
+          
+          // Only show toast for actual failures, not disabled SDK
+          if (!isCreatomateDisabled) {
+            toast({
+              title: "Preview Error",
+              description: error.message,
+              variant: "destructive"
+            });
+          }
         }
       };
       
@@ -178,10 +200,14 @@ export function useCreatomatePreview({
     // Cleanup function
     return () => {
       if (preview && typeof preview.dispose === 'function') {
-        preview.dispose();
+        try {
+          preview.dispose();
+        } catch (err) {
+          console.error('Error disposing preview:', err);
+        }
       }
     };
-  }, [containerId, templateId, onReady, onError, currentVars]);
+  }, [containerId, templateId, onReady, onError]);
   
   // Update variables and preview
   const forceUpdateVariables = useCallback((newVariables: Record<string, any>) => {
@@ -201,6 +227,7 @@ export function useCreatomatePreview({
     console.log('Retry requested');
     setError(null);
     setIsLoading(true);
+    initializationAttempted.current = false;
     
     // Re-trigger the useEffect
     const container = containerRef.current;

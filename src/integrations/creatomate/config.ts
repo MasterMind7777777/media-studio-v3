@@ -5,6 +5,7 @@
 
 // Import the loadScript helper
 import { loadScript } from '@/components/CreatomateLoader';
+import { toast } from '@/hooks/use-toast';
 
 // Check if Creatomate SDK is disabled using environment variable
 export const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
@@ -16,8 +17,7 @@ export function isCreatomateSDKAvailable(): boolean {
   }
   
   return typeof window !== 'undefined' && 
-    window.Creatomate !== undefined && 
-    typeof window.Creatomate.Preview === 'function';
+    window.Creatomate !== undefined;
 }
 
 /**
@@ -54,9 +54,18 @@ export async function getCreatomateTemplateId(): Promise<string> {
   return '36481fd5-8dfe-4359-9544-76d8857acf3d';
 }
 
+// Track SDK load attempts
+let loadAttempts = 0;
+let loadingPromise: Promise<void> | null = null;
+
 // Helper to ensure SDK script is loaded
 export function ensureCreatomateSDK(): Promise<void> {
-  return new Promise((resolve, reject) => {
+  // If we already have a loading promise in progress, return it
+  if (loadingPromise) {
+    return loadingPromise;
+  }
+  
+  loadingPromise = new Promise<void>((resolve, reject) => {
     // If SDK is disabled, resolve immediately
     if (isCreatomateDisabled) {
       console.log('Creatomate SDK is disabled by environment variable');
@@ -71,28 +80,62 @@ export function ensureCreatomateSDK(): Promise<void> {
       return;
     }
     
-    console.log('Loading Creatomate SDK dynamically');
+    // Prevent too many load attempts
+    if (loadAttempts >= 2) {
+      const error = new Error(`Creatomate SDK load failed after ${loadAttempts} attempts`);
+      console.error(error);
+      toast({
+        title: "Failed to load preview",
+        description: "Too many load attempts. Please refresh the page.",
+        variant: "destructive"
+      });
+      reject(error);
+      return;
+    }
     
-    // Use loadScript helper to load SDK
-    loadScript('https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.min.js')
+    console.log(`Loading Creatomate SDK dynamically (attempt ${loadAttempts + 1})`);
+    loadAttempts++;
+    
+    // Try to load the SDK
+    loadScript('https://cdn.creatomate.com/js/sdk/latest/creatomate.js')
       .then(() => {
-        console.log('Creatomate SDK loaded successfully');
-        resolve();
+        // Give the script time to initialize
+        setTimeout(() => {
+          if (window.Creatomate) {
+            console.log('Creatomate SDK loaded successfully');
+            resolve();
+          } else {
+            console.error('Creatomate SDK script loaded but global not available');
+            reject(new Error('Creatomate SDK not initialized correctly'));
+          }
+        }, 300);
       })
       .catch((error) => {
         console.error('Failed to load Creatomate SDK, trying fallback', error);
         
-        // Try fallback CDN
-        loadScript('https://unpkg.com/@creatomate/preview@1.6.0/dist/Preview.min.js')
+        // Try fallback URL
+        loadScript('https://unpkg.com/@creatomate/preview@latest/dist/index.js')
           .then(() => {
-            console.log('Creatomate SDK loaded successfully from fallback');
-            resolve();
+            setTimeout(() => {
+              if (window.Creatomate) {
+                console.log('Creatomate SDK loaded from fallback');
+                resolve();
+              } else {
+                reject(new Error('Creatomate SDK fallback loaded but not initialized'));
+              }
+            }, 300);
           })
           .catch((fallbackError) => {
-            const error = new Error('Failed to load Creatomate SDK from both primary and fallback sources');
+            const error = new Error('Failed to load Creatomate SDK from both sources');
             console.error(error);
             reject(error);
           });
+      })
+      .finally(() => {
+        // Reset the loading promise so we can try again if needed
+        loadingPromise = null;
       });
   });
+  
+  return loadingPromise;
 }

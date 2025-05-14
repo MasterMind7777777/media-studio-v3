@@ -17,9 +17,8 @@ export const loadScript = (src: string): Promise<void> => {
     
     const script = document.createElement('script');
     script.src = src;
-    script.type = 'module';
+    script.type = 'text/javascript'; // Changed from module to text/javascript
     script.async = true;
-    script.defer = true;
     
     script.onload = () => resolve();
     script.onerror = (e) => reject(new Error(`Failed to load script: ${src}`));
@@ -49,8 +48,8 @@ export function CreatomateLoader() {
       try {
         setLoading(true);
         
-        // Try loading from the primary CDN
-        await loadScript('https://cdn.creatomate.com/js/sdk/1.6.0/creatomate-preview-sdk.min.js');
+        // Try loading from the CDN
+        await loadScript('https://cdn.creatomate.com/js/sdk/latest/creatomate.js');
         
         // Give the script a moment to initialize
         setTimeout(() => {
@@ -62,13 +61,13 @@ export function CreatomateLoader() {
           console.info('✓ Creatomate SDK loaded');
           setLoaded(true);
           setLoading(false);
-        }, 100);
+        }, 500); // Increased timeout to ensure SDK has time to initialize
       } catch (err) {
         console.error('Error loading Creatomate SDK:', err);
         
         // Try fallback CDN
         try {
-          await loadScript('https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.min.js');
+          await loadScript('https://unpkg.com/@creatomate/preview@latest/dist/index.js');
           
           setTimeout(() => {
             if (!window.Creatomate) {
@@ -78,10 +77,16 @@ export function CreatomateLoader() {
             console.info('✓ Creatomate SDK loaded from fallback');
             setLoaded(true);
             setLoading(false);
-          }, 100);
+          }, 500);
         } catch (fallbackErr) {
-          setError(fallbackErr instanceof Error ? fallbackErr.message : 'Unknown error loading SDK');
+          const errMsg = fallbackErr instanceof Error ? fallbackErr.message : 'Unknown error loading SDK';
+          setError(errMsg);
           setLoading(false);
+          toast({
+            title: "Failed to load preview",
+            description: errMsg,
+            variant: "destructive"
+          });
         }
       }
     };
@@ -93,17 +98,6 @@ export function CreatomateLoader() {
       // Nothing specific to clean up for script loading
     };
   }, []);
-  
-  // Show error in UI if loading fails
-  useEffect(() => {
-    if (error) {
-      toast({
-        title: "Failed to load preview",
-        description: error,
-        variant: "destructive"
-      });
-    }
-  }, [error]);
   
   // This component doesn't render anything visible
   return null;

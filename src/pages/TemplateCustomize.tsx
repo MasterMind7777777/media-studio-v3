@@ -10,7 +10,6 @@ import { useToast } from '@/hooks/use-toast';
 import { MediaAsset } from '@/types';
 import { MediaSelectionDialog } from '@/components/Media/MediaSelectionDialog';
 import { CreatomateLoader } from '@/components/CreatomateLoader';
-import { normalizeKeys } from '@/lib/variables';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertTriangle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
@@ -77,7 +76,8 @@ export default function TemplateCustomize() {
       console.error('Preview error:', error);
       toast({
         title: "Preview Error",
-        description: error.message
+        description: error.message,
+        variant: "destructive"
       });
     }
   });
@@ -119,7 +119,8 @@ export default function TemplateCustomize() {
       console.error('Template error:', templateError);
       toast({
         title: "Error loading template",
-        description: templateError.message
+        description: templateError.message,
+        variant: "destructive"
       });
     }
   }, [templateError, toast]);
@@ -146,7 +147,8 @@ export default function TemplateCustomize() {
       console.error('Error selecting media:', error);
       toast({
         title: "Error selecting media",
-        description: "Please try again"
+        description: "Please try again",
+        variant: "destructive"
       });
       setIsMediaDialogOpen(false);
     }

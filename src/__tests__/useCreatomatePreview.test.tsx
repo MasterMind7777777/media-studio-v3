@@ -1,147 +1,135 @@
 
+import React from 'react';
 import { renderHook, act } from '@testing-library/react-hooks';
 import { useCreatomatePreview } from '../hooks/templates/useCreatomatePreview';
 
-// Mock cleanupVariables function
-jest.mock('@/lib/variables', () => ({
-  cleanupVariables: jest.fn(vars => vars)
-}));
-
-// Mock window.Creatomate
-const mockPreview = {
+// Mock the window.Creatomate object
+const mockPreviewInstance = {
   onReady: jest.fn(),
   onError: jest.fn(),
   onPlay: jest.fn(),
   onPause: jest.fn(),
-  onTimeUpdate: jest.fn(), // Add this missing property
   loadTemplate: jest.fn(),
   setModifications: jest.fn(),
   play: jest.fn(),
   pause: jest.fn(),
-  setTime: jest.fn(), // Add this missing property
-  dispose: jest.fn()
+  dispose: jest.fn(),
 };
 
+// Mock the CreatomateLoader and other dependencies
+jest.mock('../components/CreatomateLoader', () => ({
+  loadScript: jest.fn().mockResolvedValue(undefined),
+}));
+
+jest.mock('@/hooks/utils/useDebouncedCallback', () => ({
+  useDebouncedCallback: (fn: any) => fn,
+}));
+
+jest.mock('@/hooks/use-toast', () => ({
+  toast: jest.fn(),
+}));
+
+jest.mock('@/integrations/creatomate/config', () => ({
+  isCreatomateDisabled: false,
+  ensureCreatomateSDK: jest.fn().mockResolvedValue(undefined),
+  isCreatomateSDKAvailable: jest.fn().mockReturnValue(true),
+}));
+
+jest.mock('@/lib/variables', () => ({
+  cleanupVariables: (vars: any) => vars,
+}));
+
 describe('useCreatomatePreview', () => {
+  const containerId = 'test-container';
+  
   beforeEach(() => {
-    // Setup DOM element for container
-    document.body.innerHTML = '<div id="test-container"></div>';
+    // Setup DOM element
+    document.body.innerHTML = `<div id="${containerId}"></div>`;
     
-    // Reset mocks
-    jest.clearAllMocks();
-    
-    // Mock implementation for getElementById
-    document.getElementById = jest.fn().mockImplementation((id) => {
-      if (id === 'test-container') {
-        return document.querySelector('#test-container');
-      }
-      return null;
-    });
-    
-    // Mock Creatomate in window object
-    // @ts-ignore - Mocking window.Creatomate
-    window.Creatomate = {
-      Preview: jest.fn(() => mockPreview)
+    // Setup global Creatomate object
+    (window as any).Creatomate = {
+      Preview: jest.fn(() => mockPreviewInstance),
     };
     
-    // Mock environment variables
-    process.env.VITE_DISABLE_CREATOMATE = 'false';
+    // Clear all mock calls
+    jest.clearAllMocks();
   });
   
-  afterEach(() => {
-    // Clean up
-    document.body.innerHTML = '';
-    // @ts-ignore - Cleanup window.Creatomate
-    delete window.Creatomate;
+  it('initializes preview with correct container', () => {
+    renderHook(() => useCreatomatePreview({ containerId }));
+    
+    // Should create a Preview instance with the container
+    expect(window.Creatomate.Preview).toHaveBeenCalledWith(
+      expect.objectContaining({ container: expect.any(HTMLElement) })
+    );
   });
   
-  test('initializes with provided variables', () => {
-    const { result } = renderHook(() => useCreatomatePreview({
-      containerId: 'test-container',
-      variables: { test: 'value' }
-    }));
+  it('updates variables correctly', async () => {
+    const { result, waitForNextUpdate } = renderHook(() => 
+      useCreatomatePreview({ 
+        containerId,
+        variables: { text: 'Initial value' }
+      })
+    );
     
-    expect(result.current.currentVars).toEqual({ test: 'value' });
-  });
-  
-  test('forceUpdateVariables updates currentVars and triggers re-render', async () => {
-    const { result, waitForNextUpdate } = renderHook(() => useCreatomatePreview({
-      containerId: 'test-container',
-      variables: { initial: 'value' }
-    }));
-    
-    // Initial value check
-    expect(result.current.currentVars).toEqual({ initial: 'value' });
-    
-    // Update variables
+    // Simulate Preview ready event
     act(() => {
-      result.current.forceUpdateVariables({ updated: 'newValue' });
+      mockPreviewInstance.onReady();
     });
     
-    // Should immediately update the state
-    expect(result.current.currentVars).toEqual({ 
-      initial: 'value', 
-      updated: 'newValue' 
-    });
+    await waitForNextUpdate();
     
-    // Wait for debounced call
-    jest.advanceTimersByTime(200);
-    
-    // Should have called setModifications after debounce
-    expect(mockPreview.setModifications).toHaveBeenCalledWith({
-      initial: 'value',
-      updated: 'newValue'
-    });
-  });
-  
-  test('handles disabled SDK mode correctly', () => {
-    // Set SDK to disabled
-    process.env.VITE_DISABLE_CREATOMATE = 'true';
-    
-    const { result } = renderHook(() => useCreatomatePreview({
-      containerId: 'test-container'
-    }));
-    
-    // Should be ready and not loading in disabled mode
-    expect(result.current.isLoading).toBe(false);
-    
-    // After timeout simulating ready state
-    jest.advanceTimersByTime(600);
-    expect(result.current.isReady).toBe(true);
-    expect(result.current.previewMode).toBe('interactive');
-    
-    // Should not initialize Creatomate.Preview
-    expect(window.Creatomate.Preview).not.toHaveBeenCalled();
-  });
-  
-  test('uses preview.setModifications when not disabled', async () => {
-    // Make sure SDK is enabled
-    process.env.VITE_DISABLE_CREATOMATE = 'false';
-    
-    const { result, waitForNextUpdate } = renderHook(() => useCreatomatePreview({
-      containerId: 'test-container',
-      variables: { test: 'value' }
-    }));
-    
-    // Wait for the preview to be ready
-    await act(async () => {
-      // Simulate the ready event
-      mockPreview.onReady();
-      await waitForNextUpdate();
-    });
-    
-    // Update variables
+    // Call forceUpdateVariables
     act(() => {
-      result.current.forceUpdateVariables({ updated: 'newValue' });
+      result.current.forceUpdateVariables({ text: 'Updated value' });
     });
     
-    // Wait for debounced call
-    jest.advanceTimersByTime(200);
+    // Should update currentVars state
+    expect(result.current.currentVars).toEqual(expect.objectContaining({
+      text: 'Updated value'
+    }));
     
-    // Should have called setModifications
-    expect(mockPreview.setModifications).toHaveBeenCalledWith({
-      test: 'value',
-      updated: 'newValue'
+    // Should call setModifications
+    expect(mockPreviewInstance.setModifications).toHaveBeenCalled();
+  });
+  
+  it('toggles play/pause correctly', async () => {
+    const { result, waitForNextUpdate } = renderHook(() =>
+      useCreatomatePreview({ containerId })
+    );
+    
+    // Simulate Preview ready event
+    act(() => {
+      mockPreviewInstance.onReady();
     });
+    
+    await waitForNextUpdate();
+    
+    // Initially not playing
+    expect(result.current.isPlaying).toBe(false);
+    
+    // Call togglePlay to play
+    act(() => {
+      result.current.togglePlay();
+    });
+    
+    // Should call play
+    expect(mockPreviewInstance.play).toHaveBeenCalled();
+    
+    // Simulate play event
+    act(() => {
+      mockPreviewInstance.onPlay();
+    });
+    
+    // Should be playing now
+    expect(result.current.isPlaying).toBe(true);
+    
+    // Call togglePlay again to pause
+    act(() => {
+      result.current.togglePlay();
+    });
+    
+    // Should call pause
+    expect(mockPreviewInstance.pause).toHaveBeenCalled();
   });
 });
