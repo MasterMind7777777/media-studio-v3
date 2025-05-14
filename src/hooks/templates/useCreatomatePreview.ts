@@ -1,147 +1,169 @@
+import { useRef, useState, useEffect } from 'react';
+import { loadCreatomateSdk, isCreatomateSDKAvailable } from './useCreatomateSDKLoader';
 
-import { useState, useEffect, useRef } from 'react';
-import { loadCreatomateSdk } from './useCreatomateSDKLoader';
+export interface PreviewState {
+  isReady: boolean;
+  error: Error | null;
+  isLoading: boolean;
+  isPlaying: boolean;
+  togglePlay: () => void;
+}
 
-interface CreatomatePreviewOptions {
+interface UseCreatomatePreviewOptions {
   containerId: string;
   templateId?: string;
   variables?: Record<string, any>;
   onError?: (error: Error) => void;
 }
 
-interface PreviewState {
-  currentVars: Record<string, any>;
-  forceUpdateVariables: (newVars: Record<string, any>) => void;
-  isReady: boolean;
-  error: Error | null;
-}
+export function useCreatomatePreview(
+  { containerId, templateId, variables = {}, onError }: UseCreatomatePreviewOptions
+) {
+  const [previewState, setPreviewState] = useState<PreviewState>({
+    isReady: false,
+    error: null,
+    isLoading: true,
+    isPlaying: false,
+    togglePlay: () => {}
+  });
 
-export function useCreatomatePreview(options: CreatomatePreviewOptions): PreviewState {
-  const { containerId, templateId, variables = {}, onError } = options;
-  
-  const [isReady, setIsReady] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
   const [currentVars, setCurrentVars] = useState<Record<string, any>>(variables);
-  
   const previewRef = useRef<any>(null);
   const containerRef = useRef<HTMLElement | null>(null);
-  const varsRef = useRef(variables);
-  
-  // Initialize the preview
+
+  const forceUpdateVariables = (newVars: Record<string, any>) => {
+    try {
+      if (previewRef.current && isCreatomateSDKAvailable()) {
+        // Use immutable update for current variables
+        setCurrentVars(newVars);
+        
+        // Apply to the preview
+        previewRef.current.setModifications(newVars);
+      }
+    } catch (error) {
+      console.error('Error updating preview variables:', error);
+      if (onError) onError(error as Error);
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
-    
+    let preview: any = null;
+
     const initializePreview = async () => {
       try {
-        if (!templateId) {
-          console.log('No template ID provided, skipping preview initialization');
-          return;
-        }
+        setPreviewState(prev => ({ ...prev, isLoading: true }));
         
-        // Get container element
+        // Ensure container exists
         containerRef.current = document.getElementById(containerId);
         if (!containerRef.current) {
-          throw new Error(`Container with ID "${containerId}" not found`);
+          throw new Error(`Container #${containerId} not found in the DOM`);
         }
-        
-        // Ensure SDK is loaded before initializing preview
+
+        // Load the SDK
         await loadCreatomateSdk();
         
-        if (!window.Creatomate) {
-          throw new Error('Creatomate SDK not available');
-        }
-        
+        // Initialize preview after DOM is ready and SDK is loaded
         if (!isMounted) return;
         
-        if (!previewRef.current) {
-          // Initialize preview only once
-          console.log('Initializing Creatomate preview with template ID:', templateId);
-          
-          previewRef.current = new window.Creatomate.Preview({
-            container: containerRef.current,
-            templateId: templateId,
-            mode: 'interactive',
-            initialVariables: variables,
-            onReady: () => {
-              if (isMounted) {
-                console.log('Creatomate preview ready');
-                setIsReady(true);
-              }
-            },
-            onError: (err: Error) => {
-              console.error('Creatomate preview error:', err);
-              if (isMounted) {
-                setError(err);
-                if (onError) onError(err);
-              }
-            },
-          });
+        if (!templateId) {
+          console.warn('No template ID provided for Creatomate preview');
+          setPreviewState(prev => ({ ...prev, isLoading: false, isReady: false }));
+          return;
         }
-      } catch (err: any) {
-        console.error('Failed to initialize Creatomate preview:', err);
+
+        const token = import.meta.env.VITE_CREATOMATE_TOKEN;
+        
+        // Create the preview instance
+        preview = new window.Creatomate.Preview({
+          token,
+          templateId, 
+          container: containerRef.current,
+          mode: 'interactive',
+          modifications: variables
+        });
+        
+        previewRef.current = preview;
+
+        // Set up event handlers
+        preview.on('ready', () => {
+          if (isMounted) {
+            setPreviewState(prev => ({ 
+              ...prev, 
+              isReady: true, 
+              isLoading: false,
+              isPlaying: true,
+              togglePlay: () => {
+                if (preview) {
+                  if (preview.isPlaying()) {
+                    preview.pause();
+                  } else {
+                    preview.play();
+                  }
+                  
+                  // Update playing state
+                  setPreviewState(current => ({
+                    ...current,
+                    isPlaying: !current.isPlaying
+                  }));
+                }
+              }
+            }));
+          }
+        });
+
+        preview.on('error', (error: Error) => {
+          console.error('Creatomate preview error:', error);
+          if (isMounted) {
+            setPreviewState(prev => ({ 
+              ...prev, 
+              error, 
+              isLoading: false 
+            }));
+            if (onError) onError(error);
+          }
+        });
+        
+        // Handle state changes for play/pause status
+        preview.on('statechange', (state: any) => {
+          if (isMounted && state && typeof state.isPlaying === 'boolean') {
+            setPreviewState(prev => ({ ...prev, isPlaying: state.isPlaying }));
+          }
+        });
+
+      } catch (error) {
+        console.error('Failed to initialize Creatomate preview:', error);
         if (isMounted) {
-          setError(err);
-          if (onError) onError(err);
+          setPreviewState(prev => ({
+            ...prev,
+            error: error as Error,
+            isLoading: false,
+            isReady: false
+          }));
+          if (onError) onError(error as Error);
         }
       }
     };
-    
-    // Skip initialization if SDK is disabled
-    if (import.meta.env.VITE_DISABLE_CREATOMATE === 'true') {
-      console.log('Creatomate preview disabled via environment variable');
-      return;
-    }
-    
+
     initializePreview();
-    
+
     return () => {
       isMounted = false;
-      // Clean up preview instance
+      // Clean up preview if needed
       if (previewRef.current) {
         try {
-          previewRef.current.destroy();
-        } catch (err) {
-          console.error('Error destroying Creatomate preview:', err);
+          previewRef.current.dispose();
+          previewRef.current = null;
+        } catch (e) {
+          console.warn('Error disposing Creatomate preview:', e);
         }
-        previewRef.current = null;
       }
     };
   }, [containerId, templateId, onError]);
-  
-  // Update variables when they change
-  useEffect(() => {
-    varsRef.current = variables;
-    setCurrentVars(variables);
-    
-    if (previewRef.current && isReady) {
-      try {
-        console.log('Setting preview variables:', variables);
-        previewRef.current.setVariables(variables);
-      } catch (err) {
-        console.error('Error setting preview variables:', err);
-      }
-    }
-  }, [variables, isReady]);
-  
-  // Force update function
-  const forceUpdateVariables = (newVars: Record<string, any>) => {
-    try {
-      if (previewRef.current && isReady) {
-        console.log('Forcing update of preview variables:', newVars);
-        previewRef.current.setVariables(newVars);
-      }
-      setCurrentVars(newVars);
-    } catch (err: any) {
-      console.error('Error forcing update of preview variables:', err);
-      setError(err);
-      if (onError) onError(err);
-    }
-  };
-  
+
   return {
+    ...previewState,
     currentVars,
-    forceUpdateVariables,
-    isReady,
-    error
+    forceUpdateVariables
   };
 }
