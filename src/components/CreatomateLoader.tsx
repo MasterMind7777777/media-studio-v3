@@ -8,6 +8,13 @@ const isCreatomateDisabled = import.meta.env.VITE_DISABLE_CREATOMATE === 'true';
 // Helper function to load external scripts
 export const loadScript = (src: string): Promise<void> => {
   return new Promise((resolve, reject) => {
+    // Check if script is already loaded
+    const existingScript = document.querySelector(`script[src="${src}"]`);
+    if (existingScript) {
+      resolve();
+      return;
+    }
+    
     const script = document.createElement('script');
     script.src = src;
     script.type = 'module';
@@ -42,37 +49,40 @@ export function CreatomateLoader() {
       try {
         setLoading(true);
         
-        // Create a script element for ES module
-        const script = document.createElement('script');
-        script.src = 'https://cdn.creatomate.com/js/sdk/0.0.24/creatomate-preview-sdk.min.js';
-        script.type = 'module';
-        script.async = true;
-        script.defer = true;
+        // Try loading from the primary CDN
+        await loadScript('https://cdn.creatomate.com/js/sdk/1.6.0/creatomate-preview-sdk.min.js');
         
-        // Create a promise that resolves when the script loads
-        const loadPromise = new Promise((resolve, reject) => {
-          script.onload = resolve;
-          script.onerror = (e) => reject(new Error('Failed to load Creatomate SDK script'));
-        });
-        
-        // Add the script to the DOM
-        document.body.appendChild(script);
-        
-        // Wait for the script to load
-        await loadPromise;
-        
-        // Ensure the SDK is available
-        if (!window.Creatomate) {
-          throw new Error('Creatomate SDK loaded but not available in window');
-        }
-        
-        console.info('✓ Creatomate SDK loaded');
-        setLoaded(true);
+        // Give the script a moment to initialize
+        setTimeout(() => {
+          // Ensure the SDK is available
+          if (!window.Creatomate) {
+            throw new Error('Creatomate SDK loaded but not available in window');
+          }
+          
+          console.info('✓ Creatomate SDK loaded');
+          setLoaded(true);
+          setLoading(false);
+        }, 100);
       } catch (err) {
         console.error('Error loading Creatomate SDK:', err);
-        setError(err instanceof Error ? err.message : 'Unknown error loading SDK');
-      } finally {
-        setLoading(false);
+        
+        // Try fallback CDN
+        try {
+          await loadScript('https://cdn.jsdelivr.net/npm/@creatomate/preview@1.6.0/dist/Preview.min.js');
+          
+          setTimeout(() => {
+            if (!window.Creatomate) {
+              throw new Error('Creatomate SDK fallback loaded but not available in window');
+            }
+            
+            console.info('✓ Creatomate SDK loaded from fallback');
+            setLoaded(true);
+            setLoading(false);
+          }, 100);
+        } catch (fallbackErr) {
+          setError(fallbackErr instanceof Error ? fallbackErr.message : 'Unknown error loading SDK');
+          setLoading(false);
+        }
       }
     };
     

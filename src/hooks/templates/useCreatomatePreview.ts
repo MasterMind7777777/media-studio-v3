@@ -181,7 +181,7 @@ export function useCreatomatePreview({
         preview.dispose();
       }
     };
-  }, [containerId, templateId, onReady, onError]);
+  }, [containerId, templateId, onReady, onError, currentVars]);
   
   // Update variables and preview
   const forceUpdateVariables = useCallback((newVariables: Record<string, any>) => {

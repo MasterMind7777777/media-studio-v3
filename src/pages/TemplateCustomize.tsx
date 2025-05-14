@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TemplateVariablesEditor } from '@/components/Templates/TemplateVariablesEditor';
@@ -234,18 +235,7 @@ export default function TemplateCustomize() {
 
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Preview Area - Wrapped in ErrorBoundary */}
-        <ErrorBoundary fallback={
-          <div className="p-6 bg-red-50 text-red-800 rounded-lg">
-            <h3 className="font-medium text-lg mb-2">Something went wrong</h3>
-            <p>We encountered an error trying to render this template.</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="mt-4 px-4 py-2 bg-red-100 hover:bg-red-200 rounded"
-            >
-              Reload page
-            </button>
-          </div>
-        }>
+        <ErrorBoundary fallback={errorFallback}>
           <Card className="overflow-hidden">
             <div className="p-4 border-b">
               <h3 className="font-medium">Preview</h3>
@@ -286,18 +276,7 @@ export default function TemplateCustomize() {
         </ErrorBoundary>
 
         {/* Editor */}
-        <ErrorBoundary fallback={
-          <div className="p-6 bg-red-50 text-red-800 rounded-lg">
-            <h3 className="font-medium text-lg mb-2">Something went wrong</h3>
-            <p>We encountered an error trying to render the editor.</p>
-            <button 
-              onClick={() => window.location.reload()}
-              className="mt-4 px-4 py-2 bg-red-100 hover:bg-red-200 rounded"
-            >
-              Reload page
-            </button>
-          </div>
-        }>
+        <ErrorBoundary fallback={errorFallback}>
           <div className="relative">
             {template && (
               <TemplateVariablesEditor

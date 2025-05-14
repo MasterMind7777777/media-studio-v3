@@ -34,6 +34,19 @@ export function TemplatePreview({
   const [imgError, setImgError] = useState(false);
   const previewContainerId = "creatomate-preview-container";
   
+  // Initialize the preview
+  const {
+    isLoading,
+    isReady,
+    isPlaying,
+    togglePlay,
+    error
+  } = useCreatomatePreview({
+    containerId: previewContainerId,
+    templateId: creatomateTemplateId,
+    variables
+  });
+  
   // Reset image error state when previewImageUrl changes
   useEffect(() => {
     setImgError(false);
@@ -44,6 +57,34 @@ export function TemplatePreview({
                               previewImageUrl !== '/placeholder.svg' && 
                               isImageUrl(previewImageUrl) &&
                               !imgError;
+
+  // Handle fullscreen toggling
+  const handleFullscreenToggle = () => {
+    const container = previewContainerRef.current;
+    if (!container) return;
+    
+    if (!isFullscreen) {
+      if (container.requestFullscreen) {
+        container.requestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
+  
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement !== null);
+    };
+    
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    };
+  }, []);
 
   return (
     <Card className="h-full">
@@ -77,9 +118,11 @@ export function TemplatePreview({
             )}
           </div>
         ) : (
-          <div className="text-white text-center p-8 absolute inset-0 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-          </div>
+          !isReady && (
+            <div className="text-white text-center p-8 absolute inset-0 flex items-center justify-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+            </div>
+          )
         )}
       </div>
       
@@ -88,24 +131,31 @@ export function TemplatePreview({
           <Button 
             size="sm" 
             variant="outline"
-            disabled={isCreatomateDisabled}
+            disabled={isCreatomateDisabled || !isReady}
+            onClick={togglePlay}
           >
-            <Play className="h-4 w-4 mr-1" />
-            Play
+            {isPlaying ? (
+              <><Pause className="h-4 w-4 mr-1" />Pause</>
+            ) : (
+              <><Play className="h-4 w-4 mr-1" />Play</>
+            )}
           </Button>
           <Button 
             size="sm" 
             variant="outline"
-            disabled={isCreatomateDisabled}
+            disabled={isCreatomateDisabled || !isReady}
+            onClick={handleFullscreenToggle}
           >
             <Maximize className="h-4 w-4 mr-1" />
             Fullscreen
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-500`}>
-            Preview Disabled
-          </span>
+          {isCreatomateDisabled && (
+            <span className={`px-2 py-1 text-xs rounded-full bg-yellow-500/20 text-yellow-500`}>
+              Preview Disabled
+            </span>
+          )}
           <div className="text-muted-foreground text-sm">
             {width} × {height}
           </div>

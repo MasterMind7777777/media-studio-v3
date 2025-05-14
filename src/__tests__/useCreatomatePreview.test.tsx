@@ -13,10 +13,12 @@ const mockPreview = {
   onError: jest.fn(),
   onPlay: jest.fn(),
   onPause: jest.fn(),
+  onTimeUpdate: jest.fn(), // Add this missing property
   loadTemplate: jest.fn(),
   setModifications: jest.fn(),
   play: jest.fn(),
   pause: jest.fn(),
+  setTime: jest.fn(), // Add this missing property
   dispose: jest.fn()
 };
 
