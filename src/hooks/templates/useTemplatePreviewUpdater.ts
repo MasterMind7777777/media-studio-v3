@@ -24,7 +24,7 @@ export function useTemplatePreviewUpdater({
     const mediaAssets: Record<string, MediaAsset> = {};
     
     Object.entries(initialVariables).forEach(([key, value]) => {
-      if (typeof value === 'object' && value !== null && 'url' in value && 'name' in value) {
+      if (typeof value === 'object' && value !== null && 'file_url' in value && 'name' in value) {
         mediaAssets[key] = value as MediaAsset;
       }
     });
@@ -76,7 +76,7 @@ export function useTemplatePreviewUpdater({
     
     // Update variables with the media URL
     setVariables((prev) => {
-      const updated = { ...prev, [key]: asset.url };
+      const updated = { ...prev, [key]: asset.file_url };
       
       // Notify parent component of the update
       onPreviewUpdate?.(updated);

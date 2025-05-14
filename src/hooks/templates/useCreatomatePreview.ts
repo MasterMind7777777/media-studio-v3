@@ -127,7 +127,7 @@ export function useCreatomatePreview({
           });
           
           // Setup event listeners
-          previewInstance.on('ready', () => {
+          previewInstance.onReady = () => {
             console.log('Preview is ready');
             setIsReady(true);
             setIsLoading(false);
@@ -144,22 +144,22 @@ export function useCreatomatePreview({
               const cleanVars = cleanupVariables(currentVars);
               previewInstance.setModifications(cleanVars);
             }
-          });
+          };
           
-          previewInstance.on('error', (error: Error) => {
+          previewInstance.onError = (error: Error) => {
             console.error('Preview error:', error);
             setError(error);
             setIsLoading(false);
             onError?.(error);
-          });
+          };
           
-          previewInstance.on('play', () => {
+          previewInstance.onPlay = () => {
             setIsPlaying(true);
-          });
+          };
           
-          previewInstance.on('pause', () => {
+          previewInstance.onPause = () => {
             setIsPlaying(false);
-          });
+          };
           
           // Store preview instance in state
           setPreview(previewInstance);
@@ -177,8 +177,8 @@ export function useCreatomatePreview({
     
     // Cleanup function
     return () => {
-      if (preview && typeof preview.destroy === 'function') {
-        preview.destroy();
+      if (preview && typeof preview.dispose === 'function') {
+        preview.dispose();
       }
     };
   }, [containerId, templateId, onReady, onError]);

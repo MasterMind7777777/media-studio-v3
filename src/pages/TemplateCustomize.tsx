@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TemplateVariablesEditor } from '@/components/Templates/TemplateVariablesEditor';
@@ -71,14 +70,13 @@ export default function TemplateCustomize() {
     error: previewError
   } = useCreatomatePreview({
     containerId: previewContainerId,
-    templateId: template?.template_id || undefined,
+    templateId: template?.creatomate_template_id || undefined,
     variables: template?.variables || {},
     onError: (error) => {
       console.error('Preview error:', error);
       toast({
         title: "Preview Error",
-        description: error.message,
-        variant: "destructive"
+        description: error.message
       });
     }
   });
@@ -120,8 +118,7 @@ export default function TemplateCustomize() {
       console.error('Template error:', templateError);
       toast({
         title: "Error loading template",
-        description: templateError.message,
-        variant: "destructive"
+        description: templateError.message
       });
     }
   }, [templateError, toast]);
@@ -148,8 +145,7 @@ export default function TemplateCustomize() {
       console.error('Error selecting media:', error);
       toast({
         title: "Error selecting media",
-        description: "Please try again",
-        variant: "destructive"
+        description: "Please try again"
       });
       setIsMediaDialogOpen(false);
     }
@@ -160,8 +156,7 @@ export default function TemplateCustomize() {
     if (!template || !id) {
       toast({
         title: "Cannot start render",
-        description: "Template information is missing",
-        variant: "destructive"
+        description: "Template information is missing"
       });
       return;
     }
@@ -184,8 +179,7 @@ export default function TemplateCustomize() {
 
       toast({
         title: "Render started successfully!",
-        description: "Your video is now being rendered",
-        variant: "default"
+        description: "Your video is now being rendered"
       });
 
       // Navigate to projects page with job ID parameter
@@ -194,8 +188,7 @@ export default function TemplateCustomize() {
       console.error('Render error:', error);
       toast({
         title: "Failed to start render",
-        description: error.message || "An unknown error occurred",
-        variant: "destructive"
+        description: error.message || "An unknown error occurred"
       });
     } finally {
       setIsRendering(false);
@@ -241,7 +234,18 @@ export default function TemplateCustomize() {
 
       <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Preview Area - Wrapped in ErrorBoundary */}
-        <ErrorBoundary fallback={errorFallback}>
+        <ErrorBoundary fallback={
+          <div className="p-6 bg-red-50 text-red-800 rounded-lg">
+            <h3 className="font-medium text-lg mb-2">Something went wrong</h3>
+            <p>We encountered an error trying to render this template.</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-red-100 hover:bg-red-200 rounded"
+            >
+              Reload page
+            </button>
+          </div>
+        }>
           <Card className="overflow-hidden">
             <div className="p-4 border-b">
               <h3 className="font-medium">Preview</h3>
@@ -281,8 +285,19 @@ export default function TemplateCustomize() {
           </Card>
         </ErrorBoundary>
 
-        {/* Editor - Wrapped in ErrorBoundary */}
-        <ErrorBoundary fallback={errorFallback}>
+        {/* Editor */}
+        <ErrorBoundary fallback={
+          <div className="p-6 bg-red-50 text-red-800 rounded-lg">
+            <h3 className="font-medium text-lg mb-2">Something went wrong</h3>
+            <p>We encountered an error trying to render the editor.</p>
+            <button 
+              onClick={() => window.location.reload()}
+              className="mt-4 px-4 py-2 bg-red-100 hover:bg-red-200 rounded"
+            >
+              Reload page
+            </button>
+          </div>
+        }>
           <div className="relative">
             {template && (
               <TemplateVariablesEditor
@@ -303,8 +318,19 @@ export default function TemplateCustomize() {
         </ErrorBoundary>
       </div>
 
-      {/* Media Selection Dialog - Wrapped in ErrorBoundary */}
-      <ErrorBoundary fallback={errorFallback}>
+      {/* Media Selection Dialog */}
+      <ErrorBoundary fallback={
+        <div className="p-6 bg-red-50 text-red-800 rounded-lg">
+          <h3 className="font-medium text-lg mb-2">Something went wrong</h3>
+          <p>We encountered an error with the media dialog.</p>
+          <button 
+            onClick={() => setIsMediaDialogOpen(false)}
+            className="mt-4 px-4 py-2 bg-red-100 hover:bg-red-200 rounded"
+          >
+            Close
+          </button>
+        </div>
+      }>
         <MediaSelectionDialog
           open={isMediaDialogOpen}
           onOpenChange={setIsMediaDialogOpen}

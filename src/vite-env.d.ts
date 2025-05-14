@@ -10,9 +10,6 @@ interface CreatomatePreviewSDK {
     format?: string;
     mode?: 'player' | 'interactive';
     modifications?: Record<string, any>;
-    onReady?: () => void;
-    onError?: (error: Error) => void;
-    onStateChange?: (state: any) => void;
   }) => {
     onReady: () => void;
     onError: (error: Error) => void;

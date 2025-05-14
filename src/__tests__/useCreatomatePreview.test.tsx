@@ -9,17 +9,15 @@ jest.mock('@/lib/variables', () => ({
 
 // Mock window.Creatomate
 const mockPreview = {
-  on: jest.fn((event, callback) => {
-    if (event === 'ready') {
-      // Simulate ready event
-      setTimeout(() => callback(), 10);
-    }
-  }),
+  onReady: jest.fn(),
+  onError: jest.fn(),
+  onPlay: jest.fn(),
+  onPause: jest.fn(),
   loadTemplate: jest.fn(),
   setModifications: jest.fn(),
   play: jest.fn(),
   pause: jest.fn(),
-  destroy: jest.fn()
+  dispose: jest.fn()
 };
 
 describe('useCreatomatePreview', () => {
@@ -126,8 +124,7 @@ describe('useCreatomatePreview', () => {
     // Wait for the preview to be ready
     await act(async () => {
       // Simulate the ready event
-      const readyCallback = mockPreview.on.mock.calls.find(call => call[0] === 'ready')[1];
-      readyCallback();
+      mockPreview.onReady();
       await waitForNextUpdate();
     });
     
