@@ -146,7 +146,7 @@ export default function TemplateCustomize() {
       {/* Disabled SDK loader */}
       <CreatomateLoader />
       
-      <Alert variant="warning" className="mb-4">
+      <Alert className="mb-4">
         <AlertTriangle className="h-4 w-4 mr-2" />
         <AlertDescription>
           Live preview is temporarily disabled for development. Variable edits won't be reflected in real-time.

@@ -49,7 +49,6 @@ export function useTemplatePreviewUpdater({
             file_url: value,
             file_type: 'image', // Assume image for now
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
             user_id: '',
             file_size: 0,
             metadata: {}
