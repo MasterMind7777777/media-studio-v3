@@ -1,25 +1,15 @@
 
-import { loadCreatomateSdk, isCreatomateSDKAvailable } from '@/hooks/templates/useCreatomateSDKLoader';
-import { isCreatomateDisabled } from '@/components/CreatomateLoader';
+import {
+  isCreatomatePreviewDisabled,
+  getCreatomateToken
+} from '@/lib/loadCreatomatePreview';
 
 // Re-export for convenient imports
 export {
-  loadCreatomateSdk,
-  isCreatomateSDKAvailable,
-  isCreatomateDisabled
+  getCreatomateToken,
+  isCreatomatePreviewDisabled as isCreatomateSDKAvailable,
+  isCreatomatePreviewDisabled as isCreatomateDisabled,
 };
-
-/**
- * Gets the Creatomate public token from environment variables
- */
-export function getCreatomateToken(): string {
-  const token = import.meta.env.VITE_CREATOMATE_TOKEN;
-  if (!token) {
-    console.error('Missing Creatomate token in environment variables');
-    return '';
-  }
-  return token;
-}
 
 /**
  * Gets the Creatomate template ID from environment variables

@@ -3,14 +3,17 @@
  * Creatomate configuration
  * Environment variables for Creatomate integration
  */
+import { getCreatomateToken, isCreatomatePreviewDisabled } from '@/lib/loadCreatomatePreview';
 
 // Public token that can be safely exposed in frontend
-export const CREATOMATE_PUBLIC_TOKEN = 
-  import.meta.env.VITE_CREATOMATE_TOKEN || 'public-jb5rna2gay9buhajvtiyp1hb';
+export const CREATOMATE_PUBLIC_TOKEN = getCreatomateToken();
   
 // Default template ID as fallback
 export const DEFAULT_TEMPLATE_ID =
   import.meta.env.VITE_CREATOMATE_TEMPLATE_ID || '';
+
+// Re-export the disabled flag for convenience
+export const isCreatomateDisabled = isCreatomatePreviewDisabled;
 
 /**
  * Basic video composition JSON to use as fallback

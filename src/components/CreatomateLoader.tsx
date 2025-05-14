@@ -2,12 +2,13 @@
 import React, { useEffect } from 'react';
 import { useCreatomateSDKLoader } from '@/hooks/templates/useCreatomateSDKLoader';
 import { useToast } from '@/hooks/use-toast';
+import { isCreatomatePreviewDisabled } from '@/lib/loadCreatomatePreview';
 
 // Track shown toast IDs to prevent duplicates
 const shownToastIds = new Set<string>();
 
-// Check if Creatomate preview is enabled via environment variable
-export const isCreatomateDisabled = import.meta.env.VITE_CREATOMATE_PREVIEW === 'off';
+// Re-export the flag for backward compatibility
+export const isCreatomateDisabled = isCreatomatePreviewDisabled;
 
 export function CreatomateLoader() {
   const { isLoading, isLoaded, error } = useCreatomateSDKLoader();

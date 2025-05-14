@@ -1,4 +1,3 @@
-
 import { useRef, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -6,12 +5,13 @@ import { Play, Maximize, Pause, AlertCircle, RotateCcw, ImageIcon } from "lucide
 import { useCreatomatePreview } from "@/hooks/templates";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { DEFAULT_TEMPLATE_ID } from "@/config/creatomate";
-import { getCreatomateToken } from "@/integrations/creatomate/config";
+import { getCreatomateToken } from "@/lib/loadCreatomatePreview";
 import { CREATOMATE_PUBLIC_TOKEN } from "@/config/creatomate";
 import { isImageUrl } from "@/lib/utils";
+import { isCreatomatePreviewDisabled } from "@/lib/loadCreatomatePreview";
 
-// Check if Creatomate SDK is disabled using environment variable
-const isCreatomateDisabled = import.meta.env.VITE_CREATOMATE_PREVIEW === 'off';
+// Reuse the environment variable check from our utility
+const isCreatomateDisabled = isCreatomatePreviewDisabled;
 
 interface TemplatePreviewProps {
   previewImageUrl: string;

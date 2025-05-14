@@ -1,7 +1,12 @@
 
 import { useRef, useState, useEffect } from 'react';
-import { useCreatomateSDKLoader, isCreatomateSDKAvailable } from './useCreatomateSDKLoader';
-import { isCreatomateDisabled } from '@/components/CreatomateLoader';
+import { 
+  getPreviewInstance, 
+  disposePreviewInstance, 
+  isCreatomatePreviewDisabled,
+  getCreatomateToken
+} from '@/lib/loadCreatomatePreview';
+import { Preview } from '@creatomate/preview';
 
 export interface PreviewState {
   isReady: boolean;
@@ -9,6 +14,8 @@ export interface PreviewState {
   isLoading: boolean;
   isPlaying: boolean;
   togglePlay: () => void;
+  currentVars: Record<string, any>;
+  forceUpdateVariables: (newVars: Record<string, any>) => void;
 }
 
 interface UseCreatomatePreviewOptions {
@@ -20,25 +27,25 @@ interface UseCreatomatePreviewOptions {
 
 export function useCreatomatePreview(
   { containerId, templateId, variables = {}, onError }: UseCreatomatePreviewOptions
-) {
-  // Use our SDK loader hook
-  const { isLoaded: isSdkLoaded, error: sdkError } = useCreatomateSDKLoader();
-  
+): PreviewState {
   const [previewState, setPreviewState] = useState<PreviewState>({
     isReady: false,
     error: null,
     isLoading: true,
     isPlaying: false,
-    togglePlay: () => {}
+    togglePlay: () => {},
+    currentVars: variables,
+    forceUpdateVariables: () => {}
   });
 
   const [currentVars, setCurrentVars] = useState<Record<string, any>>(variables);
-  const previewRef = useRef<any>(null);
+  const previewRef = useRef<Preview | null>(null);
   const containerRef = useRef<HTMLElement | null>(null);
 
+  // Function to update variables in the preview
   const forceUpdateVariables = (newVars: Record<string, any>) => {
     try {
-      if (previewRef.current && isCreatomateSDKAvailable()) {
+      if (previewRef.current) {
         // Use immutable update for current variables
         setCurrentVars(newVars);
         
@@ -51,13 +58,12 @@ export function useCreatomatePreview(
     }
   };
 
-  // Initialize preview when SDK becomes available
+  // Initialize preview instance
   useEffect(() => {
     let isMounted = true;
-    let preview: any = null;
     
-    // Don't initialize if Creatomate is disabled
-    if (isCreatomateDisabled) {
+    // Don't initialize if Creatomate preview is disabled
+    if (isCreatomatePreviewDisabled) {
       setPreviewState(prev => ({ 
         ...prev, 
         isLoading: false,
@@ -66,22 +72,7 @@ export function useCreatomatePreview(
       return;
     }
 
-    // Handle SDK loading error
-    if (sdkError) {
-      if (onError) onError(sdkError);
-      setPreviewState(prev => ({ 
-        ...prev, 
-        isLoading: false, 
-        error: sdkError 
-      }));
-      return;
-    }
-
-    // Only initialize when SDK is loaded
-    if (!isSdkLoaded) {
-      return;
-    }
-
+    // Function to initialize preview
     const initializePreview = async () => {
       try {
         setPreviewState(prev => ({ ...prev, isLoading: true }));
@@ -98,13 +89,13 @@ export function useCreatomatePreview(
           return;
         }
 
-        const token = import.meta.env.VITE_CREATOMATE_TOKEN;
+        const token = getCreatomateToken();
         if (!token) {
           throw new Error('Creatomate token not found in environment variables');
         }
         
-        // Create the preview instance using the UMD build's global Preview constructor
-        preview = new window.Preview({
+        // Create the preview instance using the ESM module
+        const preview = await getPreviewInstance({
           token,
           templateId, 
           container: containerRef.current,
@@ -136,7 +127,9 @@ export function useCreatomatePreview(
                     isPlaying: !current.isPlaying
                   }));
                 }
-              }
+              },
+              currentVars,
+              forceUpdateVariables
             }));
           }
         });
@@ -181,14 +174,14 @@ export function useCreatomatePreview(
       // Clean up preview if needed
       if (previewRef.current) {
         try {
-          previewRef.current.dispose();
+          disposePreviewInstance();
           previewRef.current = null;
         } catch (e) {
           console.warn('Error disposing Creatomate preview:', e);
         }
       }
     };
-  }, [containerId, templateId, isSdkLoaded, sdkError, onError, variables]);
+  }, [containerId, templateId, onError, variables]);
 
   return {
     ...previewState,
