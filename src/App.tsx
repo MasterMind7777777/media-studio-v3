@@ -7,6 +7,7 @@ import TemplateCustomize from "./pages/TemplateCustomize";
 import Templates from "./pages/Templates";
 import Settings from "./pages/Settings";
 import Create from "./pages/Create";
+import Media from "./pages/Media";
 import { Toaster } from "@/components/ui/toaster";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { CreatomateLoader } from "./components/CreatomateLoader";
@@ -28,10 +29,7 @@ function App() {
           <Route path="/create" element={<Create />} />
           <Route path="/create/:id/customize" element={<TemplateCustomize />} />
           <Route path="/settings" element={<Settings />} />
-          <Route
-            path="/media"
-            element={<div className="p-8">Media Library</div>}
-          />
+          <Route path="/media" element={<Media />} />
           <Route
             path="/activity"
             element={<div className="p-8">Activity Page</div>}
