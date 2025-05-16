@@ -1,3 +1,4 @@
+
 import { Template, RenderJob } from "@/types";
 import { supabase } from "@/integrations/supabase/client";
 import { isImageUrl, isAudioUrl } from "@/lib/utils";
@@ -187,20 +188,23 @@ export async function startRenderJob(
       throw new Error("At least one platform must be selected for rendering");
     }
     
-    // Validate platform objects before sending to edge function
-    const validPlatforms = platforms.map(platform => {
-      // Ensure each platform has the required fields
+    // Standardize platform objects to ensure consistent format
+    // This matches how we store platforms in the database and ensures
+    // the edge function receives properly structured data
+    const standardizedPlatforms = platforms.map(platform => {
+      // Validate platform has required fields
       if (!platform.id || !platform.name || !platform.width || !platform.height) {
         console.error("Invalid platform object:", platform);
         throw new Error(`Invalid platform object: missing required fields`);
       }
       
-      // Return a standardized platform object with only the fields we need
+      // Return a simplified platform object with only the essential fields
+      // This removes any non-serializable properties or functions
       return {
         id: platform.id,
         name: platform.name,
-        width: platform.width,
-        height: platform.height,
+        width: Number(platform.width),  // Ensure these are numbers
+        height: Number(platform.height), // Ensure these are numbers
         aspect_ratio: platform.aspect_ratio || `${platform.width}:${platform.height}`
       };
     });
@@ -208,7 +212,7 @@ export async function startRenderJob(
     // For debugging
     console.log("Starting render job with Creatomate template ID:", creatomateTemplateId);
     console.log("Variables:", variables);
-    console.log("Selected platforms:", validPlatforms);
+    console.log("Standardized platforms:", JSON.stringify(standardizedPlatforms));
     console.log("Database job ID:", database_job_id);
 
     // Clean variables (remove any duplicated keys) - use the imported function from /lib
@@ -220,13 +224,13 @@ export async function startRenderJob(
       throw new Error("User not authenticated");
     }
 
-    // Use the consistent parameter name "creatomateTemplateId"
+    // Call the edge function with properly formatted data
     const { data, error } = await supabase.functions.invoke('creatomate', {
       body: { 
         action: 'start-render',
         creatomateTemplateId: creatomateTemplateId,
         variables: cleanVariables,
-        platforms: validPlatforms, // Send the validated platforms
+        platforms: standardizedPlatforms, // Send the standardized platforms
         user_id: user.id,
         database_job_id,
         include_snapshots: true // Request snapshots from Creatomate for previews
