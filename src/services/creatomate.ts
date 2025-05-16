@@ -187,10 +187,28 @@ export async function startRenderJob(
       throw new Error("At least one platform must be selected for rendering");
     }
     
+    // Validate platform objects before sending to edge function
+    const validPlatforms = platforms.map(platform => {
+      // Ensure each platform has the required fields
+      if (!platform.id || !platform.name || !platform.width || !platform.height) {
+        console.error("Invalid platform object:", platform);
+        throw new Error(`Invalid platform object: missing required fields`);
+      }
+      
+      // Return a standardized platform object with only the fields we need
+      return {
+        id: platform.id,
+        name: platform.name,
+        width: platform.width,
+        height: platform.height,
+        aspect_ratio: platform.aspect_ratio || `${platform.width}:${platform.height}`
+      };
+    });
+    
     // For debugging
     console.log("Starting render job with Creatomate template ID:", creatomateTemplateId);
     console.log("Variables:", variables);
-    console.log("Selected platforms:", platforms);
+    console.log("Selected platforms:", validPlatforms);
     console.log("Database job ID:", database_job_id);
 
     // Clean variables (remove any duplicated keys) - use the imported function from /lib
@@ -208,7 +226,7 @@ export async function startRenderJob(
         action: 'start-render',
         creatomateTemplateId: creatomateTemplateId,
         variables: cleanVariables,
-        platforms,
+        platforms: validPlatforms, // Send the validated platforms
         user_id: user.id,
         database_job_id,
         include_snapshots: true // Request snapshots from Creatomate for previews

@@ -2,13 +2,14 @@
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
-import { Type, Image, Cog, Check, Loader2 } from "lucide-react";
+import { Type, Image, Cog, Check, Loader2, AlertTriangle } from "lucide-react";
 import { MediaAsset, Platform } from "@/types";
 import { TemplateVariableSection } from "@/hooks/templates/useTemplateVariables";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface TemplateVariablesEditorProps {
   textVariables: TemplateVariableSection[];
@@ -44,10 +45,17 @@ export function TemplateVariablesEditor({
     // Initialize with all platforms selected
     const initialSelection: Record<string, Platform> = {};
     platforms.forEach(platform => {
-      initialSelection[platform.id] = platform;
+      if (platform && platform.id && platform.width && platform.height) {
+        initialSelection[platform.id] = platform;
+      } else {
+        console.warn("Invalid platform detected:", platform);
+      }
     });
     return initialSelection;
   });
+  
+  // Track if we have validation errors
+  const [platformValidationError, setPlatformValidationError] = useState<string | null>(null);
 
   // Accordion states
   const [textOpen, setTextOpen] = useState(true);
@@ -57,10 +65,22 @@ export function TemplateVariablesEditor({
 
   // Handle platform selection toggle
   const handlePlatformToggle = (platform: Platform, checked: boolean) => {
+    // Clear any validation errors when user makes a selection
+    setPlatformValidationError(null);
+    
     setSelectedPlatforms(prev => {
       const updated = { ...prev };
       if (checked) {
-        updated[platform.id] = platform;
+        // Validate platform before adding
+        if (platform.id && platform.name && platform.width && platform.height) {
+          updated[platform.id] = platform;
+        } else {
+          toast({
+            title: "Invalid platform",
+            description: "This platform is missing required properties",
+            variant: "destructive"
+          });
+        }
       } else {
         delete updated[platform.id];
       }
@@ -82,6 +102,7 @@ export function TemplateVariablesEditor({
     const platformsToRender = Object.values(selectedPlatforms);
     
     if (platformsToRender.length === 0) {
+      setPlatformValidationError("Please select at least one platform for rendering");
       toast({
         title: "No platforms selected",
         description: "Please select at least one platform for rendering",
@@ -90,6 +111,23 @@ export function TemplateVariablesEditor({
       return;
     }
     
+    // Validate each platform has required properties
+    const invalidPlatforms = platformsToRender.filter(platform => {
+      return !platform.id || !platform.name || !platform.width || !platform.height;
+    });
+    
+    if (invalidPlatforms.length > 0) {
+      setPlatformValidationError("Some selected platforms are missing required properties");
+      toast({
+        title: "Invalid platforms",
+        description: "Some selected platforms are missing required properties",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    // Clear validation error and proceed
+    setPlatformValidationError(null);
     onRender(platformsToRender);
   };
 
@@ -241,11 +279,19 @@ export function TemplateVariablesEditor({
             </div>
           </CollapsibleTrigger>
           <CollapsibleContent className="p-4 pt-0 space-y-3">
+            {platformValidationError && (
+              <Alert variant="destructive" className="mb-2">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>{platformValidationError}</AlertDescription>
+              </Alert>
+            )}
             <p className="text-sm text-muted-foreground mb-2">
               Select the platforms where you want to render this template
             </p>
             {platforms.length > 0 ? (
-              platforms.map(platform => (
+              platforms
+                .filter(platform => platform && platform.id && platform.width && platform.height)
+                .map(platform => (
                 <div key={platform.id} className="flex items-center space-x-2">
                   <Checkbox 
                     id={platform.id} 
@@ -255,7 +301,7 @@ export function TemplateVariablesEditor({
                   <label htmlFor={platform.id} className="text-sm">
                     {platform.name}
                     <span className="text-xs text-muted-foreground ml-2">
-                      ({platform.width}×{platform.height}) - {platform.aspect_ratio}
+                      ({platform.width}×{platform.height}) - {platform.aspect_ratio || `${platform.width}:${platform.height}`}
                     </span>
                   </label>
                 </div>

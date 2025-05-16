@@ -2,6 +2,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startRenderJob } from "@/services/creatomate";
+import { Platform } from "@/types";
 
 /**
  * Hook to create a new render job
@@ -17,7 +18,7 @@ export const useCreateRenderJob = () => {
     }: {
       templateId: string;
       variables: Record<string, any>;
-      platforms: any[];
+      platforms: Platform[];
     }) => {
       try {
         console.log("Creating render job for template:", templateId);
@@ -27,15 +28,35 @@ export const useCreateRenderJob = () => {
           throw new Error("No platforms selected for rendering");
         }
         
+        // Validate that each platform has the required properties
+        platforms.forEach((platform, index) => {
+          if (!platform.id) {
+            throw new Error(`Platform at index ${index} is missing an id`);
+          }
+          if (!platform.name) {
+            throw new Error(`Platform ${platform.id} is missing a name`);
+          }
+          if (!platform.width || typeof platform.width !== 'number') {
+            throw new Error(`Platform ${platform.id} has an invalid width`);
+          }
+          if (!platform.height || typeof platform.height !== 'number') {
+            throw new Error(`Platform ${platform.id} has an invalid height`);
+          }
+        });
+        
         // First, get the Creatomate template ID from our database
         const { data: template, error: templateError } = await supabase
           .from("templates")
           .select("creatomate_template_id")
           .eq("id", templateId)
-          .single();
+          .maybeSingle();
         
-        if (templateError || !template) {
-          throw new Error(`Error fetching template: ${templateError?.message || "Template not found"}`);
+        if (templateError) {
+          throw new Error(`Error fetching template: ${templateError.message}`);
+        }
+        
+        if (!template) {
+          throw new Error("Template not found");
         }
         
         const creatomateTemplateId = template.creatomate_template_id;
