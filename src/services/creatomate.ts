@@ -176,17 +176,21 @@ export async function startRenderJob(
   creatomateTemplateId: string, 
   variables: Record<string, any>,
   platforms: any[],
-  database_job_id?: string // Add optional parameter for database job ID
+  database_job_id?: string
 ): Promise<string[]> {
   try {
     if (!creatomateTemplateId) {
       throw new Error("Creatomate template ID is required");
     }
     
+    if (!platforms || platforms.length === 0) {
+      throw new Error("At least one platform must be selected for rendering");
+    }
+    
     // For debugging
     console.log("Starting render job with Creatomate template ID:", creatomateTemplateId);
     console.log("Variables:", variables);
-    console.log("Platforms:", platforms);
+    console.log("Selected platforms:", platforms);
     console.log("Database job ID:", database_job_id);
 
     // Clean variables (remove any duplicated keys) - use the imported function from /lib
@@ -205,8 +209,8 @@ export async function startRenderJob(
         creatomateTemplateId: creatomateTemplateId,
         variables: cleanVariables,
         platforms,
-        user_id: user.id, // Pass user ID to the edge function
-        database_job_id, // Pass database job ID if provided
+        user_id: user.id,
+        database_job_id,
         include_snapshots: true // Request snapshots from Creatomate for previews
       },
     });
@@ -219,6 +223,8 @@ export async function startRenderJob(
     if (!data) {
       throw new Error("Invalid response from Creatomate edge function");
     }
+    
+    console.log("Edge function response:", data);
     
     // The structure is now { renders: [...] } with an array of render objects
     if (data.renders && Array.isArray(data.renders)) {

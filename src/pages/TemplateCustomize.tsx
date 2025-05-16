@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
@@ -21,7 +22,7 @@ import { useCreateRenderJob } from "@/hooks/api/useCreateRenderJob";
 import { useToast } from "@/hooks/use-toast";
 
 /* types */
-import type { MediaAsset, Template } from "@/types";
+import type { MediaAsset, Platform, Template } from "@/types";
 
 /* utils */
 import { isCreatomateDisabled } from "@/components/CreatomateLoader";
@@ -74,7 +75,7 @@ export default function TemplateCustomize() {
         description: e.message,
         variant: "destructive",
       }),
-    [toast], // ← memoised once, never changes afterward
+    [toast],
   );
 
   const {
@@ -85,13 +86,13 @@ export default function TemplateCustomize() {
   } = useCreatomatePreview({
     containerId: "creatomate-preview-container",
     templateId: template?.creatomate_template_id,
-    variables: template?.variables ?? {}, // still initial vars only
-    onError: handlePreviewError, // ← stable now
+    variables: template?.variables ?? {},
+    onError: handlePreviewError,
   });
 
   /* live variable updater --------------------------------------------- */
   const {
-    variables: patchVars, // keys changed this session
+    variables: patchVars,
     selectedMedia,
     isUpdating,
     handleTextChange,
@@ -147,7 +148,7 @@ export default function TemplateCustomize() {
     [currentMediaKey, handleMediaSelected],
   );
 
-  const handleRender = useCallback(async () => {
+  const handleRender = useCallback(async (selectedPlatforms: Platform[]) => {
     if (!template || !id) {
       toast({
         id: "render-missing-data",
@@ -156,17 +157,28 @@ export default function TemplateCustomize() {
       });
       return;
     }
+    
+    if (selectedPlatforms.length === 0) {
+      toast({
+        id: "render-no-platforms",
+        title: "Cannot start render",
+        description: "Please select at least one platform for rendering",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsRendering(true);
     try {
       const result = await createRenderJob({
         templateId: id,
         variables: currentVars,
-        platforms: template.platforms ?? [],
+        platforms: selectedPlatforms,
       });
       toast({
         id: "render-success",
         title: "Render started successfully!",
-        description: "Your video is now being rendered",
+        description: `Your video is now being rendered for ${selectedPlatforms.length} platform${selectedPlatforms.length !== 1 ? 's' : ''}`,
       });
       navigate(`/projects?job=${result.id}`);
     } catch (err: any) {

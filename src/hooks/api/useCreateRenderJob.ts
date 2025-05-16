@@ -21,6 +21,11 @@ export const useCreateRenderJob = () => {
     }) => {
       try {
         console.log("Creating render job for template:", templateId);
+        console.log("Selected platforms:", platforms);
+        
+        if (!platforms || platforms.length === 0) {
+          throw new Error("No platforms selected for rendering");
+        }
         
         // First, get the Creatomate template ID from our database
         const { data: template, error: templateError } = await supabase
@@ -52,7 +57,7 @@ export const useCreateRenderJob = () => {
             variables: variables,
             platforms: platforms,
             status: "pending",
-            user_id: user.id // Add the user_id field which was missing
+            user_id: user.id
           })
           .select()
           .single();

@@ -1,12 +1,14 @@
+
 import { useState } from "react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Type, Image, Cog, Check, Loader2 } from "lucide-react";
-import { MediaAsset } from "@/types";
+import { MediaAsset, Platform } from "@/types";
 import { TemplateVariableSection } from "@/hooks/templates/useTemplateVariables";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface TemplateVariablesEditorProps {
   textVariables: TemplateVariableSection[];
@@ -19,7 +21,7 @@ interface TemplateVariablesEditorProps {
   onMediaSelect: (key: string) => void;
   isRendering: boolean;
   isUpdating: boolean;
-  onRender: () => void;
+  onRender: (selectedPlatforms: Platform[]) => void;
 }
 
 export function TemplateVariablesEditor({
@@ -37,11 +39,34 @@ export function TemplateVariablesEditor({
 }: TemplateVariablesEditorProps) {
   const { toast } = useToast();
   
+  // Track selected platforms with a state
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Record<string, Platform>>(() => {
+    // Initialize with all platforms selected
+    const initialSelection: Record<string, Platform> = {};
+    platforms.forEach(platform => {
+      initialSelection[platform.id] = platform;
+    });
+    return initialSelection;
+  });
+
   // Accordion states
   const [textOpen, setTextOpen] = useState(true);
   const [mediaOpen, setMediaOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [outputOpen, setOutputOpen] = useState(true);
+
+  // Handle platform selection toggle
+  const handlePlatformToggle = (platform: Platform, checked: boolean) => {
+    setSelectedPlatforms(prev => {
+      const updated = { ...prev };
+      if (checked) {
+        updated[platform.id] = platform;
+      } else {
+        delete updated[platform.id];
+      }
+      return updated;
+    });
+  };
 
   // Helper function to format variable display names
   const formatVariableName = (key: string) => {
@@ -50,6 +75,22 @@ export function TemplateVariablesEditor({
     // Replace underscores with spaces and capitalize first letter
     return baseName.replace(/_/g, ' ')
       .replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  // Handle render button click
+  const handleRender = () => {
+    const platformsToRender = Object.values(selectedPlatforms);
+    
+    if (platformsToRender.length === 0) {
+      toast({
+        title: "No platforms selected",
+        description: "Please select at least one platform for rendering",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    onRender(platformsToRender);
   };
 
   return (
@@ -206,11 +247,10 @@ export function TemplateVariablesEditor({
             {platforms.length > 0 ? (
               platforms.map(platform => (
                 <div key={platform.id} className="flex items-center space-x-2">
-                  <input 
-                    type="checkbox" 
+                  <Checkbox 
                     id={platform.id} 
-                    className="rounded text-studio-600 focus:ring-studio-600"
-                    defaultChecked
+                    checked={!!selectedPlatforms[platform.id]}
+                    onCheckedChange={(checked) => handlePlatformToggle(platform, checked === true)}
                   />
                   <label htmlFor={platform.id} className="text-sm">
                     {platform.name}
@@ -238,15 +278,18 @@ export function TemplateVariablesEditor({
       <div className="p-4 mt-auto border-t">
         <Button 
           className="w-full gap-2 bg-studio-600 hover:bg-studio-700"
-          onClick={onRender}
-          disabled={isRendering || isUpdating}
+          onClick={handleRender}
+          disabled={isRendering || isUpdating || Object.keys(selectedPlatforms).length === 0}
         >
           {isRendering ? "Starting Render..." : 
           isUpdating ? "Saving Changes..." : "Start Render"}
           {(isRendering || isUpdating) && <Loader2 className="h-4 w-4 animate-spin" />}
         </Button>
         <p className="text-xs text-center text-muted-foreground mt-2">
-          Live preview will be enabled in a future update.
+          {Object.keys(selectedPlatforms).length === 0 ? 
+            "Please select at least one platform" : 
+            `Rendering for ${Object.keys(selectedPlatforms).length} selected platform${Object.keys(selectedPlatforms).length !== 1 ? 's' : ''}`
+          }
         </p>
       </div>
     </Card>
