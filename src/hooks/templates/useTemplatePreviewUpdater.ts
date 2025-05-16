@@ -63,6 +63,7 @@ export function useTemplatePreviewUpdater({
     const next = patch(id, SOURCE, url);
     setMods(next);
     onPreviewUpdate(next); // immediate for media (no debounce)
+    setUpd(false);
   };
 
   return {

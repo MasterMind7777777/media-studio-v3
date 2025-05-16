@@ -16,6 +16,7 @@ export interface PreviewState {
   togglePlay: () => void;
   currentVars: Record<string, any>;
   forceUpdateVariables: (vars: Record<string, any>) => void;
+  aspectRatio?: number;
 }
 
 interface UseCreatomatePreviewOptions {
@@ -38,6 +39,7 @@ export function useCreatomatePreview({
   const [error, setError] = useState<Error | null>(null);
   const [currentVars, setCurrentVars] =
     useState<Record<string, any>>(variables);
+  const [aspectRatio, setAspectRatio] = useState<number | undefined>();
 
   /* ---------------- refs --------------------------------------------- */
   const previewRef = useRef<Preview | null>(null);
@@ -121,7 +123,7 @@ export function useCreatomatePreview({
         previewRef.current = await getPreviewInstance(
           {
             container: containerRef.current!,
-            mode: "interactive",
+            mode: "player",
             token,
             templateId,
             modifications: variables,
@@ -161,9 +163,22 @@ export function useCreatomatePreview({
 
         const onState = (evt: any) => {
           if (cancelled) return;
-          const playing = evt.detail?.isPlaying;
-          log("statechange", playing);
+          const detail = (evt as CustomEvent)?.detail || evt;
+
+          const playing = detail?.isPlaying;
+          log("statechange", { playing, width: detail?.width, height: detail?.height });
           if (typeof playing === "boolean") setIsPlaying(playing);
+
+          if (detail?.width && detail?.height && detail.height !== 0) {
+            const newRatio = detail.width / detail.height;
+            setAspectRatio((prevRatio) => {
+              if (prevRatio !== newRatio) {
+                log("→ aspect ratio updated", newRatio);
+                return newRatio;
+              }
+              return prevRatio;
+            });
+          }
         };
 
         const onErr = (err: Error) => {
@@ -225,5 +240,6 @@ export function useCreatomatePreview({
     togglePlay,
     currentVars,
     forceUpdateVariables,
+    aspectRatio,
   };
 }

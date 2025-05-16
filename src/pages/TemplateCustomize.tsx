@@ -81,6 +81,7 @@ export default function TemplateCustomize() {
     currentVars,
     forceUpdateVariables,
     isReady: previewReady,
+    aspectRatio: previewAspectRatio,
   } = useCreatomatePreview({
     containerId: "creatomate-preview-container",
     templateId: template?.creatomate_template_id,
@@ -194,7 +195,7 @@ export default function TemplateCustomize() {
 
       {template && <TemplateHeader templateName={template.name} />}
 
-      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-2 h-[70vh]">
         {/* preview ------------------------------------------------------- */}
         <ErrorBoundary
           fallback={
@@ -203,27 +204,23 @@ export default function TemplateCustomize() {
             </div>
           }
         >
-          <Card className="overflow-hidden">
+          <Card className="overflow-hidden h-full flex flex-col">
             <div className="border-b p-4">
               <h3 className="font-medium">Preview</h3>
             </div>
-            <div className="relative p-4">
+            <div className="flex-1 flex items-center justify-center">
               {templateLoading ? (
-                <div className="flex aspect-video items-center justify-center rounded-md bg-muted">
+                <div className="flex items-center justify-center rounded-md bg-muted w-full h-full">
                   <p className="animate-pulse text-muted-foreground">
                     Loading…
                   </p>
                 </div>
               ) : (
-                <AspectRatio
-                  ratio={16 / 9}
-                  className="overflow-hidden rounded-md bg-muted"
-                >
-                  <div
-                    id="creatomate-preview-container"
-                    className="flex h-full w-full items-center justify-center"
-                  />
-                </AspectRatio>
+                <div
+                  id="creatomate-preview-container"
+                  className="w-full h-full"
+                  style={{ minHeight: 0, minWidth: 0 }}
+                />
               )}
             </div>
           </Card>

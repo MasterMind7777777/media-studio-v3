@@ -41,7 +41,7 @@ export async function createPreviewInstance(
     // Note: container must be an HTMLElement, not a string
     const preview = new Preview(
       options.container as HTMLDivElement, // 1️⃣ element first
-      options.mode || "interactive", // 2️⃣ mode second
+      options.mode || "player", // 2️⃣ mode second
       options.token, // 3️⃣ public token last
     );
 
