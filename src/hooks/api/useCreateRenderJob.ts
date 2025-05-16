@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { startRenderJob } from "@/services/creatomate";
 import { Platform } from "@/types";
+import { Json } from "@/integrations/supabase/types";
 
 /**
  * Hook to create a new render job
@@ -70,13 +71,23 @@ export const useCreateRenderJob = () => {
           throw new Error("User not authenticated");
         }
         
+        // Convert Platform objects to plain objects for database storage
+        // This ensures they're compatible with the Json type expected by Supabase
+        const platformsForDb = platforms.map(platform => ({
+          id: platform.id,
+          name: platform.name,
+          width: platform.width,
+          height: platform.height,
+          aspect_ratio: platform.aspect_ratio || `${platform.width}:${platform.height}`
+        })) as unknown as Json;
+        
         // Create a new render job in our database
         const { data: job, error: jobError } = await supabase
           .from("render_jobs")
           .insert({
             template_id: templateId,
-            variables: variables,
-            platforms: platforms,
+            variables: variables as Json,
+            platforms: platformsForDb,
             status: "pending",
             user_id: user.id
           })
